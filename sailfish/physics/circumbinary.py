@@ -189,6 +189,9 @@ class Physics(NamedTuple):
     constant_softening: bool = True
     """ If local disk height is ignored in gravitational softening """
 
+    retrograde: bool = False
+    """ If disk is retrograde """
+
     diagnostics: List[Diagnostic] = []
     """ Physics diagnostics to be returned when reductions are computed """
 

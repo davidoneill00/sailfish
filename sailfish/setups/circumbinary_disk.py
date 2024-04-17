@@ -608,25 +608,24 @@ class BinaryInspiral(SetupBase):
     A circumbinary disk setup for GW-inspiralling binaries.
     """
 
-    eos = param("isothermal", "EOS type: either isothermal or gamma-law")
-    domain_radius = param(15.0, "half side length of the square computational domain")
-    mach_number = param(10.0, "orbital Mach number (isothermal)", mutable=True)
-    mass_ratio = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
-    sink_rate = param(10.0, "component sink rate", mutable=True)
-    sink_radius = param(0.05, "component sink radius", mutable=True)
-    softening_length = param(0.05, "gravitational softening length", mutable=True)
-    buffer_is_enabled = param(True, "whether the buffer zone is enabled", mutable=True)
-    sink_model = param(
-        "acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True
-    )
-    initial_sigma = param(1.0, "initial disk surface density at r=a (gamma-law)")
-    initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
+    eos                 = param("isothermal", "EOS type: either isothermal or gamma-law")
+    domain_radius       = param(15.0, "half side length of the square computational domain")
+    mach_number         = param(10.0, "orbital Mach number (isothermal)", mutable=True)
+    mass_ratio          = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
+    sink_rate           = param(10.0, "component sink rate", mutable=True)
+    sink_radius         = param(0.05, "component sink radius", mutable=True)
+    softening_length    = param(0.05, "gravitational softening length", mutable=True)
+    buffer_is_enabled   = param(True, "whether the buffer zone is enabled", mutable=True)
+    sink_model          = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
+    initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
+    initial_pressure    = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
-    alpha = param(0.1, "alpha-viscosity parameter (gamma-law)")
-    nu = param(0.001, "kinematic viscosity parameter (isothermal)")
-    constant_softening = param(True, "whether to use constant softening (gamma-law)")
-    gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
-    which_diagnostics = param("none", "diagnostics set to get from solver [none|mdots]")
+    alpha               = param(0.1, "alpha-viscosity parameter (gamma-law)")
+    nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
+    constant_softening  = param(True, "whether to use constant softening (gamma-law)")
+    gamma_law_index     = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    retrograde          = param(False, "is disk retrograde?")
+    which_diagnostics   = param("none", "diagnostics set to get from solver [none|mdots]")
 
     # New inspiral specific parameters
     init_separation = param(100.0, "initial semi-major axis in grav-radii")
@@ -651,10 +650,14 @@ class BinaryInspiral(SetupBase):
         phi_hat_x = -y / max(r, 1e-12)
         phi_hat_y = +x / max(r, 1e-12)
 
+        sign = 1.0
+        if self.retrograde == True:
+                sign = -1.
+
         if self.is_isothermal:
             primitive[0] = self.initial_sigma
-            primitive[1] = sqrt(self.GM / r_softened) * phi_hat_x
-            primitive[2] = sqrt(self.GM / r_softened) * phi_hat_y
+            primitive[1] = sqrt(self.GM / r_softened) * phi_hat_x * sign
+            primitive[2] = sqrt(self.GM / r_softened) * phi_hat_y * sign
 
         elif self.is_gamma_law:
             # See eq. (A2) from Goodman (2003)
@@ -694,6 +697,7 @@ class BinaryInspiral(SetupBase):
                 viscosity_coefficient=self.nu,
                 alpha=0.0,
                 diagnostics=self.diagnostics,
+                retrograde=self.retrograde,
             )
 
         elif self.is_gamma_law:
@@ -710,6 +714,7 @@ class BinaryInspiral(SetupBase):
                 viscosity_coefficient=0.0,
                 alpha=self.alpha,
                 diagnostics=self.diagnostics,
+                retrograde=self.retrograde,
             )
 
     @property

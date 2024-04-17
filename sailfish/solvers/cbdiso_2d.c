@@ -62,6 +62,7 @@ struct KeplerianBuffer {
     double outer_radius;
     double onset_width;
     int is_enabled;
+    int is_retrograde;
 };
 
 
@@ -231,6 +232,8 @@ PRIVATE void buffer_source_term(
         if (rc > onset_radius)
         {
             double v_kep = sqrt(central_mass / rc);
+            if (buffer->is_retrograde)
+                v_kep = -v_kep;
             double px = surface_density * (-yc / rc) * v_kep;
             double py = surface_density * (+xc / rc) * v_kep;
             double u0[NCONS] = {surface_density, px, py};
@@ -398,6 +401,7 @@ PUBLIC void cbdiso_2d_advance_rk(
     double buffer_outer_radius,
     double buffer_onset_width,
     int buffer_is_enabled,
+    int retrograde,
     double x1, // point mass 1
     double y1,
     double vx1,
@@ -431,7 +435,8 @@ PUBLIC void cbdiso_2d_advance_rk(
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
-        buffer_is_enabled
+        buffer_is_enabled,
+        retrograde
     };
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
