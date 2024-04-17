@@ -515,6 +515,13 @@ def simulate(driver):
         main_logger.info(
             f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )
+        if (driver.setup_name == 'binary-inspiral') & (iteration % 100 == 0):
+            ab = setup.binary_semimajor_axis(siml_time)
+            eb = setup.binary_eccentricity(siml_time)
+            nrg = ab * setup.speed_of_light**2 / setup.GM
+            main_logger.info(
+                f"[orbit] a={ab:0.2f}  e={eb:.2f}  nrg={nrg:.2f}"
+            )
 
     yield "end", None, grab_state()
 

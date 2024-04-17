@@ -602,3 +602,202 @@ class EccentricSingleDisk(SetupBase):
             sink_radius=self.sink_radius,
             mass=1.0,
         )
+
+class BinaryInspiral(SetupBase):
+    r"""
+    A circumbinary disk setup for GW-inspiralling binaries.
+    """
+
+    eos = param("isothermal", "EOS type: either isothermal or gamma-law")
+    domain_radius = param(15.0, "half side length of the square computational domain")
+    mach_number = param(10.0, "orbital Mach number (isothermal)", mutable=True)
+    mass_ratio = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
+    sink_rate = param(10.0, "component sink rate", mutable=True)
+    sink_radius = param(0.05, "component sink radius", mutable=True)
+    softening_length = param(0.05, "gravitational softening length", mutable=True)
+    buffer_is_enabled = param(True, "whether the buffer zone is enabled", mutable=True)
+    sink_model = param(
+        "acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True
+    )
+    initial_sigma = param(1.0, "initial disk surface density at r=a (gamma-law)")
+    initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
+    cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
+    alpha = param(0.1, "alpha-viscosity parameter (gamma-law)")
+    nu = param(0.001, "kinematic viscosity parameter (isothermal)")
+    constant_softening = param(True, "whether to use constant softening (gamma-law)")
+    gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    which_diagnostics = param("none", "diagnostics set to get from solver [none|mdots]")
+
+    # New inspiral specific parameters
+    init_separation = param(100.0, "initial semi-major axis in grav-radii")
+    init_eccentricity = param(0.0, "orbital eccentricity of the binary")
+    inspiral_start_time = param(500., "how many orbits before inspiral starts")
+
+    a0 = 1.0
+    GM = 1.0
+
+    @property
+    def is_isothermal(self):
+        return self.eos == "isothermal"
+
+    @property
+    def is_gamma_law(self):
+        return self.eos == "gamma-law"
+
+    def primitive(self, t, coords, primitive):
+        x, y = coords
+        r = sqrt(x * x + y * y)
+        r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
+        phi_hat_x = -y / max(r, 1e-12)
+        phi_hat_y = +x / max(r, 1e-12)
+
+        if self.is_isothermal:
+            primitive[0] = self.initial_sigma
+            primitive[1] = sqrt(self.GM / r_softened) * phi_hat_x
+            primitive[2] = sqrt(self.GM / r_softened) * phi_hat_y
+
+        elif self.is_gamma_law:
+            # See eq. (A2) from Goodman (2003)
+            primitive[0] = (
+                self.initial_sigma
+                * r_softened ** (-3.0 / 5.0)
+                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+            )
+            primitive[1] = sqrt(self.GM / r_softened) * phi_hat_x
+            primitive[2] = sqrt(self.GM / r_softened) * phi_hat_y
+            primitive[3] = (
+                self.initial_pressure
+                * r_softened ** (-3.0 / 2.0)
+                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+            )
+
+    def mesh(self, resolution):
+        return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
+
+    @property
+    def default_resolution(self):
+        return 2000
+
+    @property
+    def physics(self):
+        if self.is_isothermal:
+            return dict(
+                eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
+                mach_number=self.mach_number,
+                point_mass_function=self.point_masses,
+                buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=100.0,
+                buffer_onset_width=1.0,
+                cooling_coefficient=0.0,
+                constant_softening=self.constant_softening,
+                viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+                viscosity_coefficient=self.nu,
+                alpha=0.0,
+                diagnostics=self.diagnostics,
+            )
+
+        elif self.is_gamma_law:
+            return dict(
+                eos_type=EquationOfState.GAMMA_LAW,
+                gamma_law_index=self.gamma_law_index,
+                point_mass_function=self.point_masses,
+                buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=1000.0,  # default value in circumbinary.py
+                buffer_onset_width=0.1,  # default value in circumbinary.py
+                cooling_coefficient=self.cooling_coefficient,
+                constant_softening=self.constant_softening,
+                viscosity_model=ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
+                viscosity_coefficient=0.0,
+                alpha=self.alpha,
+                diagnostics=self.diagnostics,
+            )
+
+    @property
+    def diagnostics(self):
+        if self.which_diagnostics != "none":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+            ]
+        else:
+            return []
+
+    @property
+    def solver(self):
+        if self.is_isothermal:
+            return "cbdiso_2d"
+        elif self.is_gamma_law:
+            return "cbdgam_2d"
+
+    @property
+    def boundary_condition(self):
+        return "outflow"
+
+    @property
+    def default_end_time(self):
+        return 1000.0
+
+    @property
+    def reference_time_scale(self):
+        return 2.0 * pi
+
+    # -------------------------------------------------------------------------
+    @property    
+    def speed_of_light(self):
+        return self.init_separation**0.5
+
+    @property    
+    def gw_inspiral_time(self):
+        beta = 64. / 5. * self.GM**3 * self.mass_ratio / (1 + self.mass_ratio)**2 / self.speed_of_light**5
+        return self.a0**4 / (4. * beta)
+
+    def do_inspiral(self, time):
+        return (time >= self.inspiral_start_time * self.reference_time_scale)
+
+    def eccentricity_expansion(self, eb):
+        return 1.0 + 73. / 24. * eb**2 + 37. / 96. * eb**4
+
+    def binary_eccentricity(self, time):
+        # analytic function for binary eccentricity as fxn of time
+        flag = self.do_inspiral(time)
+        return 0.0
+
+    def binary_semimajor_axis(self, time):
+        flag = self.do_inspiral(time)
+        t0 = time - self.inspiral_start_time * self.reference_time_scale
+        eb = self.binary_eccentricity(time)
+        tgw = self.gw_inspiral_time
+        return self.a0 * (1. - t0 / tgw * flag)**0.25
+
+    def orbital_elements(self, time):
+        return OrbitalElements(
+            semimajor_axis=self.binary_semimajor_axis(time),
+            total_mass=1.0,
+            mass_ratio=self.mass_ratio,
+            eccentricity=self.binary_eccentricity(time),
+        )
+
+    # -------------------------------------------------------------------------
+    def point_masses(self, time):
+        m1, m2 = self.orbital_elements(time).orbital_state(time)
+
+        return (
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m1._asdict(),
+            ),
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m2._asdict(),
+            ),
+        )
+
+    def checkpoint_diagnostics(self, time):
+        return dict(point_masses=self.point_masses(time))
