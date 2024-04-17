@@ -736,7 +736,7 @@ class BinaryInspiral(SetupBase):
 
     @property
     def default_end_time(self):
-        return 1000.0
+        return self.gw_inspiral_time / self.reference_time_scale + self.inspiral_start_time
 
     @property
     def reference_time_scale(self):
