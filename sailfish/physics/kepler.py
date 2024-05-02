@@ -27,20 +27,20 @@ class PointMass(NamedTuple):
         """
         The kinetic energy of a point mass
         """
-        vx = p.velocity_x
-        vy = p.velocity_y
-        return 0.5 * p.mass * (vx * vx + vy * vy)
+        vx = self.velocity_x
+        vy = self.velocity_y
+        return 0.5 * self.mass * (vx * vx + vy * vy)
 
     @property
     def angular_momentum(self) -> float:
         """
         The angular momentum of a point mass
         """
-        x = p.position_x
-        y = p.position_y
-        vx = p.velocity_x
-        vy = p.velocity_y
-        return p.mass * (x * vy - y * vx)
+        x = self.position_x
+        y = self.position_y
+        vx = self.velocity_x
+        vy = self.velocity_y
+        return self.mass * (x * vy - y * vx)
 
     def gravitational_potential(
         self, x: float, y: float, softening_length: float
@@ -48,11 +48,11 @@ class PointMass(NamedTuple):
         """
         Return the gravitational potential of a point mass, with softening.
         """
-        dx = x - p.position_x
-        dy = y - p.position_y
+        dx = x - self.position_x
+        dy = y - self.position_y
         r2 = dx * dx + dy * dy
         s2 = softening_length.powi(2)
-        return -NEWTON_G * p.mass / sqrt(r2 + s2)
+        return -NEWTON_G * self.mass / sqrt(r2 + s2)
 
     def gravitational_acceleration(
         p, x: float, y: float, softening_length: float
@@ -60,12 +60,12 @@ class PointMass(NamedTuple):
         """
         Return the gravitational acceleration due to a point mass.
         """
-        dx = x - p.position_x
-        dy = y - p.position_y
+        dx = x - self.position_x
+        dy = y - self.position_y
         r2 = dx * dx + dy * dy
         s2 = softening_length ** 2.0
-        ax = -NEWTON_G * p.mass / (r2 + s2) ** 1.5 * dx
-        ay = -NEWTON_G * p.mass / (r2 + s2) ** 1.5 * dy
+        ax = -NEWTON_G * self.mass / (r2 + s2) ** 1.5 * dx
+        ay = -NEWTON_G * self.mass / (r2 + s2) ** 1.5 * dy
         return (ax, ay)
 
     def perturb(
@@ -79,10 +79,10 @@ class PointMass(NamedTuple):
 
         dv = (dp - v dm) / m
         """
-        return p._replace(
-            mass=p.mass + dm,
-            velocity_x=velocity_x + (dpx - p.velocity_x * dm) / p.mass,
-            velocity_y=velocity_y + (dpy - p.velocity_y * dm) / p.mass,
+        return self._replace(
+            mass=self.mass + dm,
+            velocity_x=velocity_x + (dpx - self.velocity_x * dm) / self.mass,
+            velocity_y=velocity_y + (dpy - self.velocity_y * dm) / self.mass,
         )
 
 
@@ -95,14 +95,21 @@ class OrbitalState(NamedTuple):
         """
         The sum of the two point masses
         """
-        self[0].mass + self[1].mass
+        return self[0].mass + self[1].mass
 
     @property
     def mass_ratio(self) -> float:
         """
         The system mass ratio, secondary / primary
         """
-        self[1].mass / self[0].mass
+        return self[1].mass / self[0].mass
+
+    @property
+    def reduced_mass(self):
+        """
+        The system reduced mass, M1 * M2 / (M1 + M2)
+        """
+        return self[0].mass * self[1].mass / self.total_mass
 
     @property
     def separation(self) -> float:
@@ -118,11 +125,27 @@ class OrbitalState(NamedTuple):
         return sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
     @property
+    def semimajor_axis(self) -> float:
+        return  -0.5 * NEWTON_G * self[0].mass * self[1].mass / self.total_energy
+
+    @property
+    def eccentricity(self):
+        """
+        The system eccentricity, secondary / primary
+        """
+        M   = self.total_mass
+        mu  = self.reduced_mass
+        a   = self.semimajor_axis
+        L   = self.angular_momentum
+        ecc = sqrt(1 - clamp_between_zero_and_one(L**2 / M / mu**2 / a))
+        return ecc
+    
+    @property
     def total_energy(self) -> float:
         """
         The system total energy
         """
-        return self.kinetic_energy - G * self[0].mass * self[1].mass / self.separation
+        return self.kinetic_energy - NEWTON_G * self[0].mass * self[1].mass / self.separation
 
     @property
     def kinetic_energy(self) -> float:
