@@ -719,7 +719,21 @@ class BinaryInspiral(SetupBase):
 
     @property
     def diagnostics(self):
-        if self.which_diagnostics != "none":
+        if self.which_diagnostics == "david":
+            return [
+                dict(quantity="time"),
+                # dict(quantity="semimajor-axis"),
+                # dict(quantity="eccentricity"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass='both', gravity=True),
+                dict(quantity="torque", which_mass='both', accretion=True),
+                dict(quantity="angular_momentum"),
+                dict(quantity="buffer_torque"),
+                dict(quantity="buffer_mass_rate"),
+                dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
+            ]
+        elif self.which_diagnostics != "none":
             return [
                 dict(quantity="time"),
                 dict(quantity="mdot", which_mass=1, accretion=True),
@@ -749,7 +763,8 @@ class BinaryInspiral(SetupBase):
 
     # -------------------------------------------------------------------------
     @property    
-    def speed_of_light(self):      return self.init_separation_rg**0.5
+    def speed_of_light(self):      
+        return self.init_separation_rg**0.5
 
     @property    
     def gw_inspiral_time(self):

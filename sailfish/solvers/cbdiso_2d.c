@@ -668,6 +668,52 @@ PUBLIC void cbdiso_2d_point_mass_source_term(
     }
 }
 
+PUBLIC void cbdiso_2d_buffer_source_term(
+    int ni,
+    int nj,
+    double patch_xl, // mesh
+    double patch_xr,
+    double patch_yl,
+    double patch_yr,
+    double buffer_surface_density,
+    double buffer_central_mass,
+    double buffer_driving_rate,
+    double buffer_outer_radius,
+    double buffer_onset_width,
+    int buffer_is_enabled,
+    int retrograde,
+    double *conserved, // :: $.shape == (ni + 4, nj + 4, 3)
+    double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 3)
+{
+    int ng = 2; // number of guard zones
+    int si = NCONS * (nj + 2 * ng);
+    int sj = NCONS;
+
+    double dx = (patch_xr - patch_xl) / ni;
+    double dy = (patch_yr - patch_yl) / nj;
+
+    struct KeplerianBuffer buffer = {
+        buffer_surface_density,
+        buffer_central_mass,
+        buffer_driving_rate,
+        buffer_outer_radius,
+        buffer_onset_width,
+        buffer_is_enabled,
+        retrograde
+    };
+
+    FOR_EACH_2D(ni, nj)
+    {
+        int ncc = (i + ng) * si + (j + ng) * sj;
+
+        double xc = patch_xl + (i + 0.5) * dx;
+        double yc = patch_yl + (j + 0.5) * dy;
+        double *uc = &conserved[ncc];
+        double *du = &cons_rate[ncc];
+        buffer_source_term(&buffer, xc, yc, 1.0, uc, du);
+    }
+}
+
 PUBLIC void cbdiso_2d_wavespeed(
     int ni, // mesh
     int nj,

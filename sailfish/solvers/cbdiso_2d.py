@@ -137,6 +137,36 @@ class Patch:
             )
         return cons_rate[ng:-ng, ng:-ng]
 
+    def buffer_source_term(self):
+        """
+        Return an array of the rates of conserved quantities, resulting from
+        the application of the buffer source terms.
+        """
+        ng = 2  # number of guard cells
+        
+        m1, m2 = self.physics.point_masses(self.time)
+        buffer_central_mass = m1.mass + m2.mass
+
+        with self.execution_context:
+            cons_rate = self.xp.zeros_like(self.conserved0)
+            
+            self.lib.cbdiso_2d_buffer_source_term[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.buffer_surface_density,
+                buffer_central_mass, 
+                self.physics.buffer_driving_rate,
+                self.buffer_outer_radius,
+                self.physics.buffer_onset_width,
+                self.physics.buffer_is_enabled,
+                self.physics.retrograde,
+                self.conserved0,
+                cons_rate,
+            )
+        return cons_rate[ng:-ng, ng:-ng]
+
     def maximum_wavespeed(self):
         """
         Return the maximum wavespeed over a given patch.
@@ -379,10 +409,12 @@ class Solver(SolverBase):
         udots2_acc = [p.point_mass_source_term(2, accretion=True) for p in self.patches]
         udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
         udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
+        udots_buff = [p.buffer_source_term() for p in self.patches]
         da = self.mesh.dx * self.mesh.dy
         ng = self.num_guard
 
-        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False):
+        # -----------------------------------------------------------------
+        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False):
             """
             Return one of the udot fields: for a particular patch, conserved
             variable quantity, radial cut (optional), and point mass (either
@@ -399,17 +431,17 @@ class Solver(SolverBase):
                     return f
 
             if quantity == "mdot":
-                return get_field(patch, 0, cut, mass, gravity, accretion)
+                return get_field(patch, 0, cut, mass, gravity, accretion, buffer)
 
             if quantity == "fx":
-                return get_field(patch, 1, cut, mass, gravity, accretion)
+                return get_field(patch, 1, cut, mass, gravity, accretion, buffer)
 
             if quantity == "fy":
-                return get_field(patch, 2, cut, mass, gravity, accretion)
+                return get_field(patch, 2, cut, mass, gravity, accretion, buffer)
 
             if quantity == "torque":
-                fx = get_field(patch, 1, cut, mass, gravity, accretion)
-                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion, buffer)
                 return x * fy - y * fx
 
             if quantity == "sigma_m1":
@@ -435,13 +467,21 @@ class Solver(SolverBase):
                 vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
                 return sigma * (x * vy - y * vx)
 
+            if quantity == "buffer_torque":
+                fx = get_field(patch, 1, cut, mass, False, False, buffer=True)
+                fy = get_field(patch, 2, cut, mass, False, False, buffer=True)
+                return x * fy - y * fx
+
+            if quantity == "buffer_mass_rate":
+                return get_field(patch, 0, cut, mass, False, False, buffer=True)
+
             if quantity == "mass":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
                 return sigma
 
             if quantity == "power":
-                fx = get_field(patch, 1, cut, mass, gravity, accretion)
-                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion, buffer)
                 if mass == 1:
                     m1, m2 = self._physics.point_masses(self.time)
                     vx1, vy1 = m1.velocity_x, m1.velocity_y
@@ -462,8 +502,13 @@ class Solver(SolverBase):
             elif gravity:
                 udots1 = udots1_grv
                 udots2 = udots2_grv
+            else:
+                udots1 = None
+                udots2 = None
 
-            if mass == "both":
+            if buffer:
+                f = udots_buff[i][..., q]
+            elif mass == "both":
                 f = udots1[i][..., q] + udots2[i][..., q]
             elif mass == 1:
                 f = udots1[i][..., q]
@@ -483,10 +528,12 @@ class Solver(SolverBase):
                         d.which_mass,
                         gravity=d.gravity,
                         accretion=d.accretion,
+                        buffer=d.buffer,
                     )
                     result.append(f.sum())
             return result
 
+        # -----------------------------------------------------------------
         pass1 = []
         pass2 = []
 
