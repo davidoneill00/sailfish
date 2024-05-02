@@ -612,9 +612,9 @@ class BinaryInspiral(SetupBase):
     domain_radius       = param(15.0, "half side length of the square computational domain")
     mach_number         = param(10.0, "orbital Mach number (isothermal)", mutable=True)
     mass_ratio          = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
-    sink_rate           = param(10.0, "component sink rate", mutable=True)
-    sink_radius         = param(0.05, "component sink radius", mutable=True)
-    softening_length    = param(0.05, "gravitational softening length", mutable=True)
+    sink_rate           = param(50.0, "component sink rate", mutable=True)
+    sink_radius         = param(0.03, "component sink radius", mutable=True)
+    softening_length    = param(0.03, "gravitational softening length", mutable=True)
     buffer_is_enabled   = param(True, "whether the buffer zone is enabled", mutable=True)
     sink_model          = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
     initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
@@ -628,7 +628,7 @@ class BinaryInspiral(SetupBase):
     which_diagnostics   = param("none", "diagnostics set to get from solver [none|mdots]")
 
     # New inspiral specific parameters
-    init_separation = param(100.0, "initial semi-major axis in grav-radii")
+    init_separation_rg = param(100.0, "initial semi-major axis in grav-radii")
     init_eccentricity = param(0.0, "orbital eccentricity of the binary")
     inspiral_start_time = param(500., "how many orbits before inspiral starts")
 
@@ -679,7 +679,7 @@ class BinaryInspiral(SetupBase):
 
     @property
     def default_resolution(self):
-        return 2000
+        return 3000
 
     @property
     def physics(self):
@@ -749,8 +749,7 @@ class BinaryInspiral(SetupBase):
 
     # -------------------------------------------------------------------------
     @property    
-    def speed_of_light(self):
-        return self.init_separation**0.5
+    def speed_of_light(self):      return self.init_separation_rg**0.5
 
     @property    
     def gw_inspiral_time(self):
