@@ -537,9 +537,19 @@ class Solver(SolverBase):
         pass1 = []
         pass2 = []
 
+        import sailfish.physics.kepler as kepler
+        m1, m2 = self._physics.point_masses(self.time)                                             # These are different PointMass structs with
+        m1 = kepler.PointMass(m1.mass, m1.position_x, m1.position_y, m1.velocity_x, m1.velocity_y) # different attributes....
+        m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y) 
+        orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
+
         for d in diagnostics:
             if d.quantity == "time":
                 pass1.append(self.time / self.setup.reference_time_scale)
+            elif d.quantity == "semimajor-axis":
+                pass1.append(orbital_state.semimajor_axis)
+            elif d.quantity == "eccentricity":
+                pass1.append(orbital_state.eccentricity)
             else:
                 pass1.append(get_sum_fields(d))
 

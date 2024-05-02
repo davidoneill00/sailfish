@@ -722,8 +722,8 @@ class BinaryInspiral(SetupBase):
         if self.which_diagnostics == "david":
             return [
                 dict(quantity="time"),
-                # dict(quantity="semimajor-axis"),
-                # dict(quantity="eccentricity"),
+                dict(quantity="semimajor-axis"),
+                dict(quantity="eccentricity"),
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
                 dict(quantity="torque", which_mass='both', gravity=True),
