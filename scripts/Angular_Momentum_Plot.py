@@ -1,0 +1,78 @@
+import sys 
+import numpy as np 
+import pickle as pk
+import matplotlib.pyplot as plt 
+
+#sys.path.insert(1, "/Users/ctiede/Research/david-sf/sailfish/")
+#sys.path.insert(1,"~/sailfish/")
+sys.path.insert(1,"/groups/astro/davidon/sailfish/")
+import sailfish
+
+
+def load_checkpoint(filename, require_solver=None):
+    with open(filename, "rb") as file:
+        chkpt = pk.load(file)
+        return chkpt
+
+def E_from_M(M, e=1.0):
+    f = lambda E: E - e * np.sin(E) - M
+    E = scipy.optimize.root_scalar(f, x0=M, x1=M + 0.1, method='secant').root
+    return E
+
+class DavidTimeseries:
+
+    def __init__(self, chkpt):
+        ts = load_checkpoint(chkpt)['timeseries']
+        self.time           = np.array([s[ 0] for s in ts])
+        self.semimajor_axis = np.array([s[ 1] for s in ts])
+        self.eccentricity   = np.array([s[ 2] for s in ts])
+        self.mdot1          = np.array([s[ 3] for s in ts])
+        self.mdot2          = np.array([s[ 4] for s in ts])
+        self.torque_g       = np.array([s[ 5] for s in ts])
+        self.torque_a       = np.array([s[ 6] for s in ts])
+        self.jdisk          = np.array([s[ 7] for s in ts])
+        self.torque_b       = np.array([s[ 8] for s in ts])
+        self.mdot_b         = np.array([s[ 9] for s in ts])
+        self.disk_ecc       = np.array([s[10] for s in ts])
+
+    @property
+    def dt(self):
+        return np.r_[0.0, np.diff(self.time * 2 * np.pi)]
+    
+    @property
+    def mean_anomaly(self):
+        return self.time * 2 * np.pi
+
+    @property
+    def eccentric_anomaly(self):
+        return np.array([E_from_M(x, e=e) for x, e in zip(self.mean_anomaly, self.eccentricity)])
+
+    @property
+    def binary_delta_j(self):
+    	return (self.torque_g + self.torque_a) * self.dt
+
+    @property
+    def buffer_delta_j(self):
+    	return self.torque_b * self.dt
+
+    @property
+    def total_angular_momentum(self):
+    	return self.jdisk + self.binary_delta_j + self.buffer_delta_j # self.gw_delta_j
+      
+
+if __name__ == '__main__':
+    filepath = '/lustre/astro/davidon/Storage/sfish-test/'
+    filename = filepath + 'chkpt.%04d.pk'%(int(sys.argv[1]))
+    #file = sys.argv[1]
+    ts = DavidTimeseries(filename)
+    j0 = ts.jdisk[0]
+    plt.plot(ts.time, 1-ts.jdisk / j0, label='1-jdisk/j0')
+    plt.plot(ts.time, ts.binary_delta_j / j0, label='binary torque')
+    plt.plot(ts.time, ts.buffer_delta_j / j0, label='buffer torque')
+    plt.plot(ts.time, 1-ts.total_angular_momentum / j0, label='1-total/j0')
+
+    plt.xlabel('time')
+    plt.ylabel(r'$j / j_0$')
+    plt.legend()
+    savename = "/groups/astro/davidon/AngularMomentum.%04d.png"%(int(sys.argv[1]))
+    plt.savefig(savename, dpi=400)
