@@ -74,5 +74,5 @@ if __name__ == '__main__':
     plt.xlabel('time')
     plt.ylabel(r'$j / j_0$')
     plt.legend()
-    savename = "/groups/astro/davidon/AngularMomentum.%04d.png"%(int(sys.argv[1]))
+    savename = "/groups/astro/davidon/sailfish/Outputs/AngularMomentum.%04d.png"%(int(sys.argv[1]))
     plt.savefig(savename, dpi=400)

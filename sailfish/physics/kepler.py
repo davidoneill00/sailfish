@@ -320,6 +320,7 @@ class OrbitalElements(NamedTuple):
     mass_ratio: float
     eccentricity: float
 
+
     @property
     def omega(self) -> float:
         """

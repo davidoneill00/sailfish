@@ -2,7 +2,16 @@ import argparse
 import pickle
 import sys
 
+sys.path.insert(1,"/groups/astro/davidon/sailfish/")
+import sailfish
+
+#filepath = '/lustre/astro/davidon/Storage/sfish-test/'
+#file     = filepath + 'chkpt.%04d.pk'%(int(sys.argv[1]))
+
+
 sys.path.insert(1, ".")
+#file_dir  = '/lustre/astro/davidon/Storage/sfish-test/'
+#file_name = 'chkpt.000.pk'
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -311,7 +320,7 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
-            pngname = filename.replace(".pk", ".png")
+            pngname = filename.replace(".pk", ".png").replace("/lustre/astro/davidon/Storage/sfish-test/",'/groups/astro/davidon//sailfish/Outputs/')
             print(pngname)
             fig.savefig(pngname, dpi=400)
     if not args.save:
@@ -390,6 +399,27 @@ def main_cbdgam_2d():
 
     plt.show()
 
+'''
+if __name__ == "__main__":
+    chkpt = load_checkpoint(file)
+    if chkpt["solver"] == "srhd_1d":
+        print("plotting for srhd_1d solver")
+        exit(main_srhd_1d())
+    if chkpt["solver"] == "srhd_2d":
+        print("plotting for srhd_2d solver")
+        exit(main_srhd_2d())
+    if chkpt["solver"] == "cbdiso_2d":
+        print("plotting for cbdiso_2d solver")
+        exit(main_cbdiso_2d())
+    if chkpt["solver"] == "cbdisodg_2d":
+        print("plotting for cbdisodg_2d solver")
+        exit(main_cbdisodg_2d())
+    if chkpt["solver"] == "cbdgam_2d":
+        print("plotting for cbdgam_2d solver")
+        exit(main_cbdgam_2d())
+    else:
+        print(f"Unknown solver {chkpt['solver']}")
+'''
 
 if __name__ == "__main__":
     for arg in sys.argv:
@@ -412,3 +442,4 @@ if __name__ == "__main__":
                 exit(main_cbdgam_2d())
             else:
                 print(f"Unknown solver {chkpt['solver']}")
+        
