@@ -783,15 +783,7 @@ class BinaryInspiral(SetupBase):
     #    flag = self.do_inspiral(time)
     #    return 0.0
 
-    #def binary_semimajor_axis(self, time):
-    #    flag = self.do_inspiral(time)
-    #    t0 = time - self.inspiral_start_time * self.reference_time_scale
-    #    eb = self.binary_eccentricity(time)
-    #    tgw = self.gw_inspiral_time
-    #    return self.a0 * (1. - t0 / tgw * flag)**0.25
-
-
-    def orbital_elements(self, time):
+    def Orbital_Elements_for_Inspiral(self, time):
         flag = self.do_inspiral(time)
         if flag:
 
@@ -803,8 +795,32 @@ class BinaryInspiral(SetupBase):
                     speed_of_light=self.speed_of_light,
                     eccentricity0=self.init_eccentricity,
                     SemiMajorAxis0=self.a0,
-                    timestep=#cfl/10. Lets integrate whole orbit at beginning and insert this later,
+                    timestep=1e-2, #cfl/10. Lets integrate whole orbit at beginning and insert this later,
                     plot_inspiral=False)
+
+            return [Peters_OI.semimajoraxis,Peters_OI.eccentricity]
+
+        else:
+
+            return [self.a0,self.init_eccentricity]
+
+
+    def orbital_elements(self, time):
+        '''
+        flag = self.do_inspiral(time)
+        if flag:
+
+            t0 = time - self.inspiral_start_time * self.reference_time_scale
+
+            Peters_OI = Orbital_Inspiral(current_time=t0,
+                    GM=self.GM,
+                    mass_ratio=self.mass_ratio,
+                    speed_of_light=self.speed_of_light,
+                    eccentricity0=self.init_eccentricity,
+                    SemiMajorAxis0=self.a0,
+                    timestep=1e-2, #cfl/10. Lets integrate whole orbit at beginning and insert this later,
+                    plot_inspiral=False)
+
 
             return OrbitalElements(
                 semimajor_axis=Peters_OI.semimajor_axis,
@@ -819,6 +835,14 @@ class BinaryInspiral(SetupBase):
                 total_mass=1.0,
                 mass_ratio=self.mass_ratio,
                 eccentricity=self.init_eccentricity,
+            )
+        '''
+        OEI = self.Orbital_Elements_for_Inspiral(time)
+        return OrbitalElements(
+                semimajor_axis=OEI[0],
+                total_mass=1.0,
+                mass_ratio=self.mass_ratio,
+                eccentricity=OEI[1],
             )
 
     # -------------------------------------------------------------------------

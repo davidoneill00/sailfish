@@ -516,8 +516,14 @@ def simulate(driver):
             f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )
         if (driver.setup_name == 'binary-inspiral') & (iteration % 100 == 0):
-            ab = setup.binary_semimajor_axis(siml_time)
-            eb = setup.binary_eccentricity(siml_time)
+            OEI = setup.Orbital_Elements_for_Inspiral(siml_time)
+            
+            #ab = setup.binary_semimajor_axis(siml_time)
+            #eb = setup.binary_eccentricity(siml_time)
+            
+            ab = OEI[0]
+            eb = OEI[1]
+
             nrg = ab * setup.speed_of_light**2 / setup.GM
             main_logger.info(
                 f"[orbit] a={ab:0.2f}  e={eb:.2f}  nrg={nrg:.2f}"

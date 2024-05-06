@@ -69,8 +69,8 @@ class Orbital_Inspiral():
             plt.show()
 
 
-Binary_Orbital_Elements = Orbital_Inspiral(current_time = 1e5,GM = 1,mass_ratio = 1,speed_of_light = 1e2,eccentricity0 = 0.9,SemiMajorAxis0 = 1, timestep = 1e2, plot_inspiral = True)
-print(Binary_Orbital_Elements.semimajoraxis)
-print(Binary_Orbital_Elements.eccentricity)
+#Binary_Orbital_Elements = Orbital_Inspiral(current_time = 1e5,GM = 1,mass_ratio = 1,speed_of_light = 1e2,eccentricity0 = 0.9,SemiMajorAxis0 = 1, timestep = 1e2, plot_inspiral = True)
+#print(Binary_Orbital_Elements.semimajoraxis)
+#print(Binary_Orbital_Elements.eccentricity)
 
 
