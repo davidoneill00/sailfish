@@ -1,0 +1,6 @@
+(1) Improve Intgrator speed                                   ----------------------- Avoid complete integration at each time 
+(2) Slurm GPU                                                 ----------------------- Running on GPUs needs change in slurm code
+(3) Prograde circular test
+(4) Eccentric test
+(5) Retrograde test
+(6) 
