@@ -11,6 +11,7 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
 )
 from sailfish.physics.kepler import OrbitalElements
+from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
 from sailfish.setup_base import SetupBase, SetupError, param
 
 
@@ -764,7 +765,7 @@ class BinaryInspiral(SetupBase):
     # -------------------------------------------------------------------------
     @property    
     def speed_of_light(self):      
-        return self.init_separation_rg**0.5
+        return 1/self.init_separation_rg**0.5
 
     @property    
     def gw_inspiral_time(self):
@@ -774,28 +775,51 @@ class BinaryInspiral(SetupBase):
     def do_inspiral(self, time):
         return (time >= self.inspiral_start_time * self.reference_time_scale)
 
-    def eccentricity_expansion(self, eb):
-        return 1.0 + 73. / 24. * eb**2 + 37. / 96. * eb**4
+    #def eccentricity_expansion(self, eb):
+    #    return 1.0 + 73. / 24. * eb**2 + 37. / 96. * eb**4
 
-    def binary_eccentricity(self, time):
-        # analytic function for binary eccentricity as fxn of time
-        flag = self.do_inspiral(time)
-        return 0.0
+    #def binary_eccentricity(self, time):
+    #    # analytic function for binary eccentricity as fxn of time
+    #    flag = self.do_inspiral(time)
+    #    return 0.0
 
-    def binary_semimajor_axis(self, time):
-        flag = self.do_inspiral(time)
-        t0 = time - self.inspiral_start_time * self.reference_time_scale
-        eb = self.binary_eccentricity(time)
-        tgw = self.gw_inspiral_time
-        return self.a0 * (1. - t0 / tgw * flag)**0.25
+    #def binary_semimajor_axis(self, time):
+    #    flag = self.do_inspiral(time)
+    #    t0 = time - self.inspiral_start_time * self.reference_time_scale
+    #    eb = self.binary_eccentricity(time)
+    #    tgw = self.gw_inspiral_time
+    #    return self.a0 * (1. - t0 / tgw * flag)**0.25
+
 
     def orbital_elements(self, time):
-        return OrbitalElements(
-            semimajor_axis=self.binary_semimajor_axis(time),
-            total_mass=1.0,
-            mass_ratio=self.mass_ratio,
-            eccentricity=self.binary_eccentricity(time),
-        )
+        flag = self.do_inspiral(time)
+        if flag:
+
+            t0 = time - self.inspiral_start_time * self.reference_time_scale
+
+            Peters_OI = Orbital_Inspiral(current_time=t0,
+                    GM=self.GM,
+                    mass_ratio=self.mass_ratio,
+                    speed_of_light=self.speed_of_light,
+                    eccentricity0=self.init_eccentricity,
+                    SemiMajorAxis0=self.a0,
+                    timestep=#cfl/10. Lets integrate whole orbit at beginning and insert this later,
+                    plot_inspiral=False)
+
+            return OrbitalElements(
+                semimajor_axis=Peters_OI.semimajor_axis,
+                total_mass=1.0,
+                mass_ratio=self.mass_ratio,
+                eccentricity=Peters_OI.eccentricity,
+            )
+
+        else:
+            return OrbitalElements(
+                semimajor_axis=self.a0,
+                total_mass=1.0,
+                mass_ratio=self.mass_ratio,
+                eccentricity=self.init_eccentricity,
+            )
 
     # -------------------------------------------------------------------------
     def point_masses(self, time):
@@ -820,3 +844,4 @@ class BinaryInspiral(SetupBase):
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time))
+
