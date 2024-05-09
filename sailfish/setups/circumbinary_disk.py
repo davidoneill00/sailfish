@@ -2,7 +2,6 @@
 2D disk setups for binary problems.
 """
 
-from scipy.interpolate import interp1d
 from math import sqrt, exp, pi, floor
 import pickle as pk
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
@@ -780,11 +779,6 @@ class BinaryInspiral(SetupBase):
         if flag:
             t0 = time - self.inspiral_start_time * self.reference_time_scale
 
-            #Interpolate_SemiMajorAxis = interp1d(self.inspiral_time_list,self.semi_major_axis_list)
-            #Interpolate_Eccentricity  = interp1d(self.inspiral_time_list,self.eccentricity_list)
-
-            #return [float(Interpolate_SemiMajorAxis(t0)),float(Interpolate_Eccentricity(t0))]
-
             Inspiral_Progress         = t0/self.integration_timestep
             Nstep                     = floor(Inspiral_Progress)
             Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
@@ -810,7 +804,6 @@ class BinaryInspiral(SetupBase):
                 eccentricity=OEI[1],
             )
 
-    # -------------------------------------------------------------------------
     def point_masses(self, time):
         m1, m2 = self.orbital_elements(time).orbital_state(time)
 
