@@ -2,7 +2,9 @@
 2D disk setups for binary problems.
 """
 
-from math import sqrt, exp, pi
+from scipy.interpolate import interp1d
+from math import sqrt, exp, pi, floor
+import pickle as pk
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import (
     EquationOfState,
@@ -13,7 +15,7 @@ from sailfish.physics.circumbinary import (
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
 from sailfish.setup_base import SetupBase, SetupError, param
-
+import os
 
 class CircumbinaryDisk(SetupBase):
     r"""
@@ -609,32 +611,40 @@ class BinaryInspiral(SetupBase):
     A circumbinary disk setup for GW-inspiralling binaries.
     """
 
-    eos                 = param("isothermal", "EOS type: either isothermal or gamma-law")
-    domain_radius       = param(15.0, "half side length of the square computational domain")
-    mach_number         = param(10.0, "orbital Mach number (isothermal)", mutable=True)
-    mass_ratio          = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
-    sink_rate           = param(50.0, "component sink rate", mutable=True)
-    sink_radius         = param(0.03, "component sink radius", mutable=True)
-    softening_length    = param(0.03, "gravitational softening length", mutable=True)
-    buffer_is_enabled   = param(True, "whether the buffer zone is enabled", mutable=True)
-    sink_model          = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
-    initial_sigma       = param(1.0, "initial disk surface density at r=a (gamma-law)")
-    initial_pressure    = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
-    cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
-    alpha               = param(0.1, "alpha-viscosity parameter (gamma-law)")
-    nu                  = param(0.001, "kinematic viscosity parameter (isothermal)")
-    constant_softening  = param(True, "whether to use constant softening (gamma-law)")
-    gamma_law_index     = param(5.0 / 3.0, "adiabatic index (gamma-law)")
-    retrograde          = param(False, "is disk retrograde?")
-    which_diagnostics   = param("none", "diagnostics set to get from solver [none|mdots]")
+    eos                  = param("isothermal", "EOS type: either isothermal or gamma-law")
+    domain_radius        = param(15.0, "half side length of the square computational domain")
+    mach_number          = param(10.0, "orbital Mach number (isothermal)", mutable=True)
+    mass_ratio           = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
+    sink_rate            = param(50.0, "component sink rate", mutable=True)
+    sink_radius          = param(0.03, "component sink radius", mutable=True)
+    softening_length     = param(0.03, "gravitational softening length", mutable=True)
+    buffer_is_enabled    = param(True, "whether the buffer zone is enabled", mutable=True)
+    sink_model           = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
+    initial_sigma        = param(1.0, "initial disk surface density at r=a (gamma-law)")
+    initial_pressure     = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
+    cooling_coefficient  = param(0.0, "strength of the cooling term (gamma-law)")
+    alpha                = param(0.1, "alpha-viscosity parameter (gamma-law)")
+    nu                   = param(0.001, "kinematic viscosity parameter (isothermal)")
+    constant_softening   = param(True, "whether to use constant softening (gamma-law)")
+    gamma_law_index      = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    retrograde           = param(False, "is disk retrograde?")
+    which_diagnostics    = param("none", "diagnostics set to get from solver [none|mdots]")
 
-    # New inspiral specific parameters
-    init_separation_rg = param(100.0, "initial semi-major axis in grav-radii")
-    init_eccentricity = param(0.0, "orbital eccentricity of the binary")
-    inspiral_start_time = param(500., "how many orbits before inspiral starts")
+    # Inspiral specific parameters
+    init_separation_rg   = param(100.0, "initial semi-major axis in grav-radii")
+    init_eccentricity    = param(0.0, "orbital eccentricity of the binary")
+    inspiral_start_time  = param(500., "how many orbits before inspiral starts")
+    integration_timestep = param(0.001, "timestep for integrating the inspiral")
+    semi_major_axis_list = param([]," List of all semi-major axes over the inspiral")
+    eccentricity_list    = param([]," List of all eccentricities axes over the inspiral")
+    inspiral_time_list   = param([]," List of all eccentricities axes over the inspiral")
+    gw_inspiral_time     = param(0.," The circular inspiral time for a0 = 1 ")
+    speed_of_light       = param(0.," The speed of light in units of aOmega ")
 
     a0 = 1.0
     GM = 1.0
+
+
 
     @property
     def is_isothermal(self):
@@ -762,81 +772,36 @@ class BinaryInspiral(SetupBase):
     def reference_time_scale(self):
         return 2.0 * pi
 
-    # -------------------------------------------------------------------------
-    @property    
-    def speed_of_light(self):      
-        return 1/self.init_separation_rg**0.5
-
-    @property    
-    def gw_inspiral_time(self):
-        beta = 64. / 5. * self.GM**3 * self.mass_ratio / (1 + self.mass_ratio)**2 / self.speed_of_light**5
-        return self.a0**4 / (4. * beta)
-
     def do_inspiral(self, time):
         return (time >= self.inspiral_start_time * self.reference_time_scale)
-
-    #def eccentricity_expansion(self, eb):
-    #    return 1.0 + 73. / 24. * eb**2 + 37. / 96. * eb**4
-
-    #def binary_eccentricity(self, time):
-    #    # analytic function for binary eccentricity as fxn of time
-    #    flag = self.do_inspiral(time)
-    #    return 0.0
 
     def Orbital_Elements_for_Inspiral(self, time):
         flag = self.do_inspiral(time)
         if flag:
-
             t0 = time - self.inspiral_start_time * self.reference_time_scale
 
-            Peters_OI = Orbital_Inspiral(current_time=t0,
-                    GM=self.GM,
-                    mass_ratio=self.mass_ratio,
-                    speed_of_light=self.speed_of_light,
-                    eccentricity0=self.init_eccentricity,
-                    SemiMajorAxis0=self.a0,
-                    timestep=1e-2, #cfl/10. Lets integrate whole orbit at beginning and insert this later,
-                    plot_inspiral=False)
+            #Interpolate_SemiMajorAxis = interp1d(self.inspiral_time_list,self.semi_major_axis_list)
+            #Interpolate_Eccentricity  = interp1d(self.inspiral_time_list,self.eccentricity_list)
 
-            return [Peters_OI.semimajoraxis,Peters_OI.eccentricity]
+            #return [float(Interpolate_SemiMajorAxis(t0)),float(Interpolate_Eccentricity(t0))]
+
+            Inspiral_Progress         = t0/self.integration_timestep
+            Nstep                     = floor(Inspiral_Progress)
+            Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
+
+            SemiMajorAxis_N0 = self.semi_major_axis_list[Nstep]
+            Eccentricity_N0  = self.eccentricity_list[Nstep]
+            SemiMajorAxis_N1 = self.semi_major_axis_list[Nstep+1]
+            Eccentricity_N1  = self.eccentricity_list[Nstep+1]
+
+            Interpolated_SMA = SemiMajorAxis_N0+Position_in_Bracket_N0_N1*(SemiMajorAxis_N1-SemiMajorAxis_N0)
+            Interpolated_ECC = Eccentricity_N0+Position_in_Bracket_N0_N1*(Eccentricity_N1-Eccentricity_N0)
+            return [Interpolated_SMA,Interpolated_ECC]
 
         else:
-
             return [self.a0,self.init_eccentricity]
 
-
     def orbital_elements(self, time):
-        '''
-        flag = self.do_inspiral(time)
-        if flag:
-
-            t0 = time - self.inspiral_start_time * self.reference_time_scale
-
-            Peters_OI = Orbital_Inspiral(current_time=t0,
-                    GM=self.GM,
-                    mass_ratio=self.mass_ratio,
-                    speed_of_light=self.speed_of_light,
-                    eccentricity0=self.init_eccentricity,
-                    SemiMajorAxis0=self.a0,
-                    timestep=1e-2, #cfl/10. Lets integrate whole orbit at beginning and insert this later,
-                    plot_inspiral=False)
-
-
-            return OrbitalElements(
-                semimajor_axis=Peters_OI.semimajor_axis,
-                total_mass=1.0,
-                mass_ratio=self.mass_ratio,
-                eccentricity=Peters_OI.eccentricity,
-            )
-
-        else:
-            return OrbitalElements(
-                semimajor_axis=self.a0,
-                total_mass=1.0,
-                mass_ratio=self.mass_ratio,
-                eccentricity=self.init_eccentricity,
-            )
-        '''
         OEI = self.Orbital_Elements_for_Inspiral(time)
         return OrbitalElements(
                 semimajor_axis=OEI[0],

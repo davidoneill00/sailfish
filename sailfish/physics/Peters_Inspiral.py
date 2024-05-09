@@ -7,6 +7,7 @@ class Orbital_Inspiral():
     A class to integrate the orbital elements of a binary undergoing gravitational 
     wave inspiral. 
     """
+
     def __init__(self,
         current_time,
         GM,
@@ -18,11 +19,6 @@ class Orbital_Inspiral():
         plot_inspiral = False
         ): 
         
-        #def circular_inspiral_time():
-        #    beta = 64. / 5. * GM**3 * mass_ratio / (1 + mass_ratio)**2 / speed_of_light**5
-        #    return SemiMajorAxis0**4 / (4. * beta)
-
-
         def Semi_Major_Axis_Decay_Rate(a,e):
             beta                = 64. / 5. * GM**3 * mass_ratio / (1 + mass_ratio)**2 / speed_of_light**5
             eccentricity_factor = 1 + 73/24 * e**2 + 37/96 * e**4
@@ -69,7 +65,10 @@ class Orbital_Inspiral():
             plt.show()
 
 
-#Binary_Orbital_Elements = Orbital_Inspiral(current_time = 1e5,GM = 1,mass_ratio = 1,speed_of_light = 1e2,eccentricity0 = 0.9,SemiMajorAxis0 = 1, timestep = 1e2, plot_inspiral = True)
+
+
+
+#Binary_Orbital_Elements = Orbital_Inspiral(current_time = 1e5,GM = 1,mass_ratio = 1,speed_of_light = 1e1,eccentricity0 = 0.9,SemiMajorAxis0 = 1, timestep = 1e2, plot_inspiral = True)
 #print(Binary_Orbital_Elements.semimajoraxis)
 #print(Binary_Orbital_Elements.eccentricity)
 

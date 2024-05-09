@@ -335,6 +335,11 @@ def simulate(driver):
         timeseries = list()
         dt = None
 
+
+        
+        
+
+
     elif driver.chkpt_file:
         """
         Load driver state from a checkpoint file. The setup model parameters
@@ -464,7 +469,7 @@ def simulate(driver):
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"simulation time / user time is {reference_time:0.4f}")
     logger.info(f"recompute dt every {new_timestep_cadence} iterations")
-    setup.print_model_parameters(newlines=True, logger=main_logger)
+    #setup.print_model_parameters(newlines=True, logger=main_logger)
 
     def grab_state():
         """
@@ -517,9 +522,6 @@ def simulate(driver):
         )
         if (driver.setup_name == 'binary-inspiral') & (iteration % 100 == 0):
             OEI = setup.Orbital_Elements_for_Inspiral(siml_time)
-            
-            #ab = setup.binary_semimajor_axis(siml_time)
-            #eb = setup.binary_eccentricity(siml_time)
             
             ab = OEI[0]
             eb = OEI[1]
@@ -832,6 +834,49 @@ def main():
 
         else:
             driver = DriverArgs.from_namespace(args)
+
+            if (driver.setup_name == 'binary-inspiral'):
+
+                from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
+
+                Inspiral_Model_Parameters = driver.model_parameters
+                Peters_Inspiral_Filename  = os.getcwd() + "/sailfish/physics/GW_Inspiral_%03drg_%03de%04ddt.pk"%(Inspiral_Model_Parameters["init_separation_rg"],Inspiral_Model_Parameters["init_eccentricity"],Inspiral_Model_Parameters["integration_timestep"])
+                speed_of_light            = Inspiral_Model_Parameters["init_separation_rg"]**0.5
+
+                def Circular_Inspiral_Time(a0):
+                    beta           = 64. / 5. * Inspiral_Model_Parameters["GM"]**3 * Inspiral_Model_Parameters["mass_ratio"] / (1 + Inspiral_Model_Parameters["mass_ratio"])**2 / speed_of_light**5
+                    return a0**4 / (4. * beta)
+
+                def Integrate_Inspiral(a0):
+                    Peters_OI = Orbital_Inspiral(current_time=Circular_Inspiral_Time(1),
+                        GM=Inspiral_Model_Parameters["GM"],
+                        mass_ratio=Inspiral_Model_Parameters["mass_ratio"],
+                        speed_of_light=speed_of_light,
+                        eccentricity0=Inspiral_Model_Parameters["init_eccentricity"],
+                        SemiMajorAxis0=a0,
+                        timestep=Inspiral_Model_Parameters["integration_timestep"],
+                        plot_inspiral=False)
+
+                    Inspiral_Dict = {
+                    "TimeDomain":Peters_OI.TimeDomain,
+                    "SemiMajorAxis":Peters_OI.a_array,
+                    "Eccentricity":Peters_OI.e_array,
+                    }
+
+                    return Inspiral_Dict
+
+                Integration_Necessary_Quantities = Integrate_Inspiral(1)
+
+                driver.model_parameters["semi_major_axis_list"] = Integration_Necessary_Quantities["SemiMajorAxis"]
+                driver.model_parameters["eccentricity_list"]    = Integration_Necessary_Quantities["Eccentricity"]
+                driver.model_parameters["inspiral_time_list"]   = list(Integration_Necessary_Quantities["TimeDomain"])
+                driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1)
+                driver.model_parameters["speed_of_light"]       = speed_of_light
+
+
+
+
+
             outdir = (
                 args.output_directory
                 or (driver.chkpt_file and os.path.dirname(driver.chkpt_file))
