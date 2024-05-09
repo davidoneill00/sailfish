@@ -320,7 +320,7 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
-            pngname = filename.replace(".pk", ".png").replace("/lustre/astro/davidon/Storage/sfish-test/",'/groups/astro/davidon//sailfish/Outputs/')
+            pngname = filename.replace(".pk", ".png").replace("/lustre/astro/davidon/Storage/sfish-test/",'/groups/astro/davidon/sailfish/Outputs/')
             print(pngname)
             fig.savefig(pngname, dpi=400)
     if not args.save:
