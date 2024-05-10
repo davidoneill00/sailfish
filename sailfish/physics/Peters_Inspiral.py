@@ -41,7 +41,12 @@ class Orbital_Inspiral():
             e_new = e_old + Eccentricity_Decay_Rate(a_old,e_old) * timestep 
 
             if a_new < 0:
-                # Add a merger flag?
+                a_new = 1e-6
+                e_new = 0.
+                self.a_array.append(list(a_new * np.ones(20)))  
+                self.e_array.append(list(e_new * np.zeros(20)))
+                # Merger has occured. We fix a small semi-major axis to avoid
+                # divergences of an a = 0 binary
                 break
 
             else:

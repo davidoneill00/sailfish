@@ -785,8 +785,12 @@ class BinaryInspiral(SetupBase):
 
             SemiMajorAxis_N0 = self.semi_major_axis_list[Nstep]
             Eccentricity_N0  = self.eccentricity_list[Nstep]
-            SemiMajorAxis_N1 = self.semi_major_axis_list[Nstep+1]
-            Eccentricity_N1  = self.eccentricity_list[Nstep+1]
+            try:
+                SemiMajorAxis_N1 = self.semi_major_axis_list[Nstep+1]
+                Eccentricity_N1  = self.eccentricity_list[Nstep+1]
+            except IndexError as e:
+                SemiMajorAxis_N1 = 0.
+                Eccentricity_N1  = 0.
 
             Interpolated_SMA = SemiMajorAxis_N0+Position_in_Bracket_N0_N1*(SemiMajorAxis_N1-SemiMajorAxis_N0)
             Interpolated_ECC = Eccentricity_N0+Position_in_Bracket_N0_N1*(Eccentricity_N1-Eccentricity_N0)

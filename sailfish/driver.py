@@ -295,7 +295,7 @@ class DriverState(NamedTuple):
     timestep_dt: float
 
 
-def simulate(driver):
+def simulate(driver,inspiral_end_time = None):
     """
     Main generator for running simulations.
 
@@ -335,9 +335,6 @@ def simulate(driver):
         timeseries = list()
         dt = None
 
-
-        
-        
 
 
     elif driver.chkpt_file:
@@ -428,10 +425,14 @@ def simulate(driver):
     fold = driver.fold or 10
     mesh = setup.mesh(driver.resolution)
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
+    if inspiral_end_time != None:
+        end_time = min(inspiral_end_time, driver.end_time, float("inf"))
+        
+
     reference_time = setup.reference_time_scale
     new_timestep_cadence = driver.new_timestep_cadence or 1
     dt = None
-
+    
     if "physics" in driver.verbose_output:
         logger.info(f"physics struct (setup -> solver) {setup.physics}")
     if (
@@ -835,12 +836,23 @@ def main():
         else:
             driver = DriverArgs.from_namespace(args)
 
+            '''We just need reference time. How do we extract this cleanly??'''
+            if driver.setup_name != None:
+                setup = SetupBase.find_setup_class(driver.setup_name)(
+                    **driver.model_parameters or dict()
+                )
+            else:
+                pass
+                #print(driver.chkpt_file)
+                #print(setup)
+                
+
+
             if (driver.setup_name == 'binary-inspiral'):
 
                 from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
 
                 Inspiral_Model_Parameters = driver.model_parameters
-                Peters_Inspiral_Filename  = os.getcwd() + "/sailfish/physics/GW_Inspiral_%03drg_%03de%04ddt.pk"%(Inspiral_Model_Parameters["init_separation_rg"],Inspiral_Model_Parameters["init_eccentricity"],Inspiral_Model_Parameters["integration_timestep"])
                 speed_of_light            = Inspiral_Model_Parameters["init_separation_rg"]**0.5
 
                 def Circular_Inspiral_Time(a0):
@@ -872,9 +884,11 @@ def main():
                 driver.model_parameters["inspiral_time_list"]   = list(Integration_Necessary_Quantities["TimeDomain"])
                 driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1)
                 driver.model_parameters["speed_of_light"]       = speed_of_light
+                inspiral_end_time                               = Integration_Necessary_Quantities["TimeDomain"][-1]/setup.reference_time_scale + driver.model_parameters["inspiral_start_time"]
 
-
-
+            else:
+                inspiral_end_time = None
+            ######################################################
 
 
             outdir = (
@@ -895,7 +909,7 @@ def main():
             else:
                 events_dict = dict()
 
-            for name, number, state in simulate(driver):
+            for name, number, state in simulate(driver,inspiral_end_time):
                 if name == "timeseries":
                     append_timeseries(state)
                 elif name == "checkpoint":
@@ -931,3 +945,6 @@ def main():
 
     except KeyboardInterrupt:
         print("")
+
+    
+
