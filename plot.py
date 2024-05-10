@@ -320,8 +320,9 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
-            pngname = filename.replace(".pk", ".png").replace("/lustre/astro/davidon/Storage/sfish-test/",'/groups/astro/davidon/sailfish/Outputs/')
-            print(pngname)
+            import os
+            CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
+            pngname     = os.getcwd() + "/Outputs/DensityMap.%04d.png"%(CurrentTime)
             fig.savefig(pngname, dpi=400)
     if not args.save:
         plt.show()
