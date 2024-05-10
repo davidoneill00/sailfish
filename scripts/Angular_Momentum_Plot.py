@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 sys.path.insert(1,"/groups/astro/davidon/sailfish/")
 import sailfish
 
-Momentum_Timeseries  = True
-Accretion_Timeseries = True
-Steady_State         = True
+Momentum_Timeseries  = False
+Accretion_Timeseries = False
+Steady_State         = False
 
 def load_checkpoint(filename, require_solver=None):
     with open(filename, "rb") as file:
@@ -67,6 +67,8 @@ if __name__ == '__main__':
     filename = filepath + 'chkpt.%04d.pk'%(int(sys.argv[1]))
     
     Savepath = filepath.replace("/lustre/astro/davidon/Storage/sfish-test/","/groups/astro/davidon/sailfish/Outputs/") 
+
+    print(load_checkpoint(filename)['model_parameters'])
 
     if Momentum_Timeseries:
         ts   = DavidTimeseries(filename)
