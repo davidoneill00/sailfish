@@ -3,5 +3,3 @@ __pycache__
 /data
 /doc/source/_autosummary
 /doc/build
-/scripts/plot.py 
-/scripts/Angular_Momentum_Plot.py
