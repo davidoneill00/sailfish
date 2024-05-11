@@ -4,11 +4,36 @@ import pickle as pk
 import matplotlib.pyplot as plt 
 import sailfish
 import os
+import argparse
 
-Momentum_Timeseries  = True
-Accretion_Timeseries = True
-Steady_State         = True
-SemiMajorAxis        = True
+parser = argparse.ArgumentParser()
+parser.add_argument("checkpoints", type=str, nargs="+")
+parser.add_argument(
+        "--Momentum_Change",
+        "-M",
+        default=False,
+        help="whether to plot the total change in momentum timeseries",
+    )
+parser.add_argument(
+        "--Torque_Components",
+        "-t",
+        default=False,
+        help="whether to plot the torque components from the binary and buffer",
+    )
+parser.add_argument(
+        "--Accretion",
+        "-a",
+        default=False,
+        help="whether to plot the binary's accretion timeseries",
+    )
+parser.add_argument(
+        "--Orbital_Elements",
+        "-o",
+        default=False,
+        help="whether to plot the binary's changing orbital elements",
+    )
+args = parser.parse_args()
+
 
 def load_checkpoint(filename, require_solver=None):
     with open(filename, "rb") as file:
@@ -49,6 +74,10 @@ class DavidTimeseries:
         return np.array([E_from_M(x, e=e) for x, e in zip(self.mean_anomaly, self.eccentricity)])
 
     @property
+    def binary_torque(self):
+        return self.torque_g + self.torque_a
+
+    @property
     def binary_delta_j(self):
     	return (self.torque_g + self.torque_a) * self.dt
 
@@ -62,39 +91,41 @@ class DavidTimeseries:
       
 
 if __name__ == '__main__':
-    filename         = sys.argv[1]
+    filename         = args.checkpoints[0]
     CurrentTime      = load_checkpoint(filename)["time"]/ 2 / np.pi     ########FIX
-    #print(CurrentTime)
     ts               = DavidTimeseries(filename)
     Model_Parameters = load_checkpoint(filename)['model_parameters']
+    Number_of_Orbits = 10.
+    Final_Orbits     = ts.time[ts.time>CurrentTime-Number_of_Orbits*2*np.pi]
 
-    if Momentum_Timeseries:
-        j0   = ts.jdisk
-        plt.plot(ts.time, 1-ts.jdisk / j0, label=r'$\Delta j_\mathrm{disk}/j_0 $',c = 'blue')
-        plt.plot(ts.time, ts.binary_delta_j / j0, label='binary torque',c = 'black')
-        plt.plot(ts.time, ts.buffer_delta_j / j0, label='buffer torque',c = 'green')
-        plt.plot(ts.time, 1-ts.total_angular_momentum / j0, label='1-total/j0',linestyle = 'dashed')
+    if args.Momentum_Change:
+        plt.figure()
+        plt.plot(Final_Orbits, ts.total_angular_momentum[-len(Final_Orbits):], c = 'black')
         plt.xlabel('time')
-        YBounds = max(np.max(np.abs(1-ts.jdisk / j0)), np.max(np.abs(ts.binary_delta_j / j0)), np.max(np.abs(ts.buffer_delta_j / j0)))
-        plt.ylim([-YBounds/3,YBounds/3])
+        plt.title('Total Angular Momentum')
+        savename = os.getcwd() + "/Outputs/TotalAngularMomentum.%04d.png"%(CurrentTime)
+
+
+    if args.Torque_Components:
+        plt.figure()
+        plt.xlabel('time')
+        plt.title('Torque Components')
+        plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):],c='green',label = 'Buffer Torque')
+        plt.plot(Final_Orbits,ts.binary_torque[-len(Final_Orbits):],c = 'black',label = 'Binary Torque')
+
         plt.legend()
-        savename = os.getcwd() + "/Outputs/AngularMomentum.%04d.png"%(CurrentTime)
+        savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
-    if Accretion_Timeseries:
-        viscosity              = Model_Parameters['nu']
-        Initial_Density        = Model_Parameters['initial_sigma']
-        Steady_State_Accretion = 3 * np.pi * viscosity * Initial_Density
-        mdot                   = ts.mdot1+ts.mdot2
+    if args.Accretion:
         plt.figure()
-        plt.plot(ts.time,mdot,label='mdot',linewidth = 1)
-        YBounds = np.max(np.abs(mdot))
-        plt.ylim([-YBounds/3,YBounds/10])
+        plt.plot(Final_Orbits,ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):],label='mdot',linewidth = 1, c = 'red')
         plt.xlabel('time')
-        plt.legend()
+        plt.title('Accretion Rate')
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
+    '''
     if Steady_State:
         viscosity              = Model_Parameters['nu']
         Initial_Density        = Model_Parameters['initial_sigma']
@@ -124,11 +155,11 @@ if __name__ == '__main__':
         plt.legend()
         savename = os.getcwd() +  "/Outputs/MeanTorque_FinalOrbits.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
-
-    if SemiMajorAxis:
+    '''
+    if args.Orbital_Elements:
         plt.figure()
-        plt.plot(ts.time,ts.semimajor_axis, label = 'SemiMajor Axis')
-        plt.plot(ts.time,ts.eccentricity, label = 'Eccentricity')
+        plt.plot(Final_Orbits,ts.semimajor_axis[-len(Final_Orbits):], label = 'SemiMajor Axis')
+        plt.plot(Final_Orbits,ts.eccentricity[-len(Final_Orbits):], label = 'Eccentricity')
         plt.xlabel('Time')
         plt.ylabel('Orbital Elements')
         plt.legend()
