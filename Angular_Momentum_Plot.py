@@ -63,7 +63,7 @@ class DavidTimeseries:
 
 if __name__ == '__main__':
     filename         = sys.argv[1]
-    CurrentTime      = load_checkpoint(filename)["time"]/ 2 / np.pi
+    CurrentTime      = load_checkpoint(filename)["time"]/ 2 / np.pi     ########FIX
     #print(CurrentTime)
     ts               = DavidTimeseries(filename)
     Model_Parameters = load_checkpoint(filename)['model_parameters']
