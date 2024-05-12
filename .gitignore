@@ -3,4 +3,5 @@ __pycache__
 /data
 /doc/source/_autosummary
 /doc/build
-/Outputs
+Outputs/
+sfish-test/
