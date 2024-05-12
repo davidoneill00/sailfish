@@ -638,11 +638,9 @@ class BinaryInspiral(SetupBase):
     eccentricity_list    = param([]," List of all eccentricities axes over the inspiral")
     inspiral_time_list   = param([]," List of all eccentricities axes over the inspiral")
     gw_inspiral_time     = param(0.," The circular inspiral time for a0 = 1 ")
-    #speed_of_light       = param(0.," The speed of light in units of aOmega ")
 
     a0 = 1.0
     GM = 1.0
-
 
 
     @property
@@ -762,11 +760,6 @@ class BinaryInspiral(SetupBase):
     @property
     def boundary_condition(self):
         return "outflow"
-
-    #@property
-    #def default_end_time(self):
-    #    return self.gw_inspiral_time / self.reference_time_scale + self.inspiral_start_time
-    #    #return self.gw_inspiral_time / self.reference_time_scale + self.inspiral_start_time
 
     @property
     def reference_time_scale(self):

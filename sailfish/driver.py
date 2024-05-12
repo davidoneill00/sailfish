@@ -834,16 +834,23 @@ def main():
 
         else:
             driver = DriverArgs.from_namespace(args)
+            outdir = (
+                args.output_directory
+                or (driver.chkpt_file and os.path.dirname(driver.chkpt_file))
+                or "."
+            )
+            
             if driver.setup_name != None:
                 setup = SetupBase.find_setup_class(driver.setup_name)(
                     **driver.model_parameters or dict()
                 )
             else:
-                inspiral_end_time = driver.end_time
-                pass # this is now a restart checkpoint
+                import pickle as pk
+                with open(driver.chkpt_file, "rb") as file:
+                    chkpt = pk.load(file)
 
 
-            if (driver.setup_name == 'binary-inspiral'):
+            if (driver.setup_name == 'binary-inspiral') or (chkpt["setup_name"] == 'binary-inspiral'):
 
                 from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
 
@@ -874,28 +881,15 @@ def main():
 
                 Integration_Necessary_Quantities = Integrate_Inspiral(1)
 
-                driver.model_parameters["semi_major_axis_list"] = Integration_Necessary_Quantities["SemiMajorAxis"]
-                driver.model_parameters["eccentricity_list"]    = Integration_Necessary_Quantities["Eccentricity"]
-                driver.model_parameters["inspiral_time_list"]   = list(Integration_Necessary_Quantities["TimeDomain"])
-                driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1)
-                #driver.model_parameters["default_end_time"]     = Integration_Necessary_Quantities["TimeDomain"][-1]/setup.reference_time_scale + driver.model_parameters["inspiral_start_time"]
-                #driver.model_parameters["speed_of_light"]       = speed_of_light
+                from numpy import pi
+                inspiral_end_time = Integration_Necessary_Quantities["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
-                inspiral_end_time = Integration_Necessary_Quantities["TimeDomain"][-1]/setup.reference_time_scale + driver.model_parameters["inspiral_start_time"]
+                if (driver.setup_name == 'binary-inspiral'):
+                    driver.model_parameters["semi_major_axis_list"] = Integration_Necessary_Quantities["SemiMajorAxis"]
+                    driver.model_parameters["eccentricity_list"]    = Integration_Necessary_Quantities["Eccentricity"]
+                    driver.model_parameters["inspiral_time_list"]   = list(Integration_Necessary_Quantities["TimeDomain"])
+                    driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1)
 
-            '''
-                inspiral_end_time                               = Integration_Necessary_Quantities["TimeDomain"][-1]/setup.reference_time_scale + driver.model_parameters["inspiral_start_time"]
-
-            else:
-                inspiral_end_time = None
-            ######################################################
-            '''
-
-            outdir = (
-                args.output_directory
-                or (driver.chkpt_file and os.path.dirname(driver.chkpt_file))
-                or "."
-            )
 
             if args.event_handlers_file is not None:
                 import importlib.util
