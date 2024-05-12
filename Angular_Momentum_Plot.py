@@ -5,12 +5,13 @@ import matplotlib.pyplot as plt
 import sailfish
 import os
 import argparse
+from sailfish.setup_base import SetupBase
 
 parser = argparse.ArgumentParser()
 parser.add_argument("checkpoints", type=str, nargs="+")
 parser.add_argument(
         "--Momentum_Change",
-        "-M",
+        "-p",
         default=False,
         help="whether to plot the total change in momentum timeseries",
     )
@@ -91,12 +92,22 @@ class DavidTimeseries:
       
 
 if __name__ == '__main__':
-    filename         = args.checkpoints[0]
-    CurrentTime      = load_checkpoint(filename)["time"]/ 2 / np.pi     ########FIX
-    ts               = DavidTimeseries(filename)
-    Model_Parameters = load_checkpoint(filename)['model_parameters']
-    Number_of_Orbits = 10.
-    Final_Orbits     = ts.time[ts.time>CurrentTime-Number_of_Orbits*2*np.pi]
+    filename          = args.checkpoints[0]
+    CurrentTime       = load_checkpoint(filename)["time"] / 2 / np.pi     ########FIX
+    ts                = DavidTimeseries(filename)
+    Model_Parameters  = load_checkpoint(filename)['model_parameters']
+    Number_of_Orbits  = 5.
+    Final_Orbits      = ts.time[ts.time>CurrentTime-Number_of_Orbits*2*np.pi]
+
+    viscosity         = Model_Parameters["nu"]
+    Sigma_0           = Model_Parameters["initial_sigma"]
+    M_dot_0           = 3 * np.pi * viscosity * Sigma_0
+    Normalised_Torque = ts.binary_torque / M_dot_0
+
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+
 
     if args.Momentum_Change:
         plt.figure()

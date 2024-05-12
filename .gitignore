@@ -4,6 +4,3 @@ __pycache__
 /doc/source/_autosummary
 /doc/build
 /Outputs
-CPU.slurm
-GreeneGPU.slurm
-TychoGPU.slurm
