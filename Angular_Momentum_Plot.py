@@ -7,34 +7,6 @@ import os
 import argparse
 from sailfish.setup_base import SetupBase
 
-parser = argparse.ArgumentParser()
-parser.add_argument("checkpoints", type=str, nargs="+")
-parser.add_argument(
-        "--Momentum_Change",
-        "-p",
-        default=False,
-        help="whether to plot the total change in momentum timeseries",
-    )
-parser.add_argument(
-        "--Torque_Components",
-        "-t",
-        default=False,
-        help="whether to plot the torque components from the binary and buffer",
-    )
-parser.add_argument(
-        "--Accretion",
-        "-a",
-        default=False,
-        help="whether to plot the binary's accretion timeseries",
-    )
-parser.add_argument(
-        "--Orbital_Elements",
-        "-o",
-        default=False,
-        help="whether to plot the binary's changing orbital elements",
-    )
-args = parser.parse_args()
-
 
 def load_checkpoint(filename, require_solver=None):
     with open(filename, "rb") as file:
@@ -92,17 +64,49 @@ class DavidTimeseries:
       
 
 if __name__ == '__main__':
-    filename          = args.checkpoints[0]
-    CurrentTime       = load_checkpoint(filename)["time"] / 2 / np.pi     ########FIX
-    ts                = DavidTimeseries(filename)
-    Model_Parameters  = load_checkpoint(filename)['model_parameters']
-    Number_of_Orbits  = 5.
-    Final_Orbits      = ts.time[ts.time>CurrentTime-Number_of_Orbits*2*np.pi]
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("checkpoints", type=str, nargs="+")
+    parser.add_argument(
+        "--Momentum_Change",
+        "-p",
+        default=False,
+        help="whether to plot the total change in momentum timeseries",
+    )
+    parser.add_argument(
+        "--Torque_Components",
+        "-t",
+        default=False,
+        help="whether to plot the torque components from the binary and buffer",
+    )
+    parser.add_argument(
+        "--Accretion",
+        "-a",
+        default=False,
+        help="whether to plot the binary's accretion timeseries",
+    )
+    parser.add_argument(
+        "--Orbital_Elements",
+        "-o",
+        default=False,
+        help="whether to plot the binary's changing orbital elements",
+    )
+    args = parser.parse_args()
+    
+
+
+    filename          = args.checkpoints[0]
+    LoadFile          = load_checkpoint(filename)
+    CurrentTime       = LoadFile["time"] / 2 / np.pi     ########FIX
+    ts                = DavidTimeseries(filename)
+    Model_Parameters  = LoadFile['model_parameters']
+    
+    Number_of_Orbits  = 2.
+    Final_Orbits      = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     viscosity         = Model_Parameters["nu"]
     Sigma_0           = Model_Parameters["initial_sigma"]
     M_dot_0           = 3 * np.pi * viscosity * Sigma_0
-    Normalised_Torque = ts.binary_torque / M_dot_0
+    Normalised_Torque = ts.binary_torque[-len(Final_Orbits):] / M_dot_0
 
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
@@ -121,8 +125,8 @@ if __name__ == '__main__':
         plt.figure()
         plt.xlabel('time')
         plt.title('Torque Components')
-        plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):],c='green',label = 'Buffer Torque')
-        plt.plot(Final_Orbits,ts.binary_torque[-len(Final_Orbits):],c = 'black',label = 'Binary Torque')
+        #plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
+        plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Torque')
 
         plt.legend()
         savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
