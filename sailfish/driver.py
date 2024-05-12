@@ -335,8 +335,6 @@ def simulate(driver,inspiral_end_time = None):
         timeseries = list()
         dt = None
 
-
-
     elif driver.chkpt_file:
         """
         Load driver state from a checkpoint file. The setup model parameters
@@ -425,6 +423,7 @@ def simulate(driver,inspiral_end_time = None):
     fold = driver.fold or 10
     mesh = setup.mesh(driver.resolution)
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
+    
     if inspiral_end_time != None:
         end_time = min(inspiral_end_time, driver.end_time, float("inf"))
         
@@ -527,7 +526,7 @@ def simulate(driver,inspiral_end_time = None):
             ab = OEI[0]
             eb = OEI[1]
 
-            nrg = ab * setup.speed_of_light**2 / setup.GM
+            nrg = ab * driver.model_parameters["init_separation_rg"] #* setup.speed_of_light**2 / setup.GM
             main_logger.info(
                 f"[orbit] a={ab:0.2f}  e={eb:.2f}  nrg={nrg:.2f}"
             )
@@ -835,17 +834,13 @@ def main():
 
         else:
             driver = DriverArgs.from_namespace(args)
-
-            '''We just need reference time. How do we extract this cleanly??'''
             if driver.setup_name != None:
                 setup = SetupBase.find_setup_class(driver.setup_name)(
                     **driver.model_parameters or dict()
                 )
             else:
-                pass
-                #print(driver.chkpt_file)
-                #print(setup)
-                
+                inspiral_end_time = driver.end_time
+                pass # this is now a restart checkpoint
 
 
             if (driver.setup_name == 'binary-inspiral'):
@@ -883,13 +878,18 @@ def main():
                 driver.model_parameters["eccentricity_list"]    = Integration_Necessary_Quantities["Eccentricity"]
                 driver.model_parameters["inspiral_time_list"]   = list(Integration_Necessary_Quantities["TimeDomain"])
                 driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1)
-                driver.model_parameters["speed_of_light"]       = speed_of_light
+                #driver.model_parameters["default_end_time"]     = Integration_Necessary_Quantities["TimeDomain"][-1]/setup.reference_time_scale + driver.model_parameters["inspiral_start_time"]
+                #driver.model_parameters["speed_of_light"]       = speed_of_light
+
+                inspiral_end_time = Integration_Necessary_Quantities["TimeDomain"][-1]/setup.reference_time_scale + driver.model_parameters["inspiral_start_time"]
+
+            '''
                 inspiral_end_time                               = Integration_Necessary_Quantities["TimeDomain"][-1]/setup.reference_time_scale + driver.model_parameters["inspiral_start_time"]
 
             else:
                 inspiral_end_time = None
             ######################################################
-
+            '''
 
             outdir = (
                 args.output_directory

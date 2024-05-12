@@ -18,6 +18,7 @@ def file_load(indir, outdir, savefigbool, filename):
     for name in sorted(Path(indir).iterdir()):
         file_count += 1
         chkpt = msgpack.load(open(name, 'rb'))
+        print(chkpt)
         mesh = chkpt['mesh']
         prim = np.zeros([mesh['ni'], mesh['nj'], 3])
         for patch in chkpt['primitive_patches']:

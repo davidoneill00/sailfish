@@ -638,7 +638,7 @@ class BinaryInspiral(SetupBase):
     eccentricity_list    = param([]," List of all eccentricities axes over the inspiral")
     inspiral_time_list   = param([]," List of all eccentricities axes over the inspiral")
     gw_inspiral_time     = param(0.," The circular inspiral time for a0 = 1 ")
-    speed_of_light       = param(0.," The speed of light in units of aOmega ")
+    #speed_of_light       = param(0.," The speed of light in units of aOmega ")
 
     a0 = 1.0
     GM = 1.0
@@ -763,9 +763,10 @@ class BinaryInspiral(SetupBase):
     def boundary_condition(self):
         return "outflow"
 
-    @property
-    def default_end_time(self):
-        return self.gw_inspiral_time / self.reference_time_scale + self.inspiral_start_time
+    #@property
+    #def default_end_time(self):
+    #    return self.gw_inspiral_time / self.reference_time_scale + self.inspiral_start_time
+    #    #return self.gw_inspiral_time / self.reference_time_scale + self.inspiral_start_time
 
     @property
     def reference_time_scale(self):
@@ -783,18 +784,23 @@ class BinaryInspiral(SetupBase):
             Nstep                     = floor(Inspiral_Progress)
             Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
 
-            SemiMajorAxis_N0 = self.semi_major_axis_list[Nstep]
-            Eccentricity_N0  = self.eccentricity_list[Nstep]
+            self.semi_major_axis_list.append(1e-5)
+            self.eccentricity_list.append(1e-5)
+            
             try:
+                SemiMajorAxis_N0 = self.semi_major_axis_list[Nstep]
+                Eccentricity_N0  = self.eccentricity_list[Nstep]
+
                 SemiMajorAxis_N1 = self.semi_major_axis_list[Nstep+1]
                 Eccentricity_N1  = self.eccentricity_list[Nstep+1]
-            except IndexError as e:
-                SemiMajorAxis_N1 = 0.
-                Eccentricity_N1  = 0.
 
-            Interpolated_SMA = SemiMajorAxis_N0+Position_in_Bracket_N0_N1*(SemiMajorAxis_N1-SemiMajorAxis_N0)
-            Interpolated_ECC = Eccentricity_N0+Position_in_Bracket_N0_N1*(Eccentricity_N1-Eccentricity_N0)
-            return [Interpolated_SMA,Interpolated_ECC]
+                Interpolated_SMA = SemiMajorAxis_N0+Position_in_Bracket_N0_N1*(SemiMajorAxis_N1-SemiMajorAxis_N0)
+                Interpolated_ECC = Eccentricity_N0+Position_in_Bracket_N0_N1*(Eccentricity_N1-Eccentricity_N0)
+                return [Interpolated_SMA,Interpolated_ECC]
+            
+
+            except IndexError as e:
+                return [1e-5,0.]
 
         else:
             return [self.a0,self.init_eccentricity]
