@@ -104,7 +104,7 @@ if __name__ == '__main__':
         plt.xlabel('time')
         plt.title('Total Angular Momentum')
         savename = os.getcwd() + "/Outputs/TotalAngularMomentum.%04d.png"%(CurrentTime)
-
+        plt.savefig(savename, dpi=400)
 
     if args.Torque_Components:
         plt.figure()
