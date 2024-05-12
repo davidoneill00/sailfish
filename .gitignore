@@ -4,6 +4,3 @@ __pycache__
 /doc/source/_autosummary
 /doc/build
 /Outputs
-/sailfish/CPU.slurm
-/sailfish/GreeneGPU.slurm
-/sailfish/TychoGPU.slurm
