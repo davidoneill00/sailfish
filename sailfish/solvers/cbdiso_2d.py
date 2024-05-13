@@ -493,6 +493,7 @@ class Solver(SolverBase):
                 else:
                     raise ValueError("Mass option for 'power' must be 1 or 2.")
 
+
             q = quantity
             i = self.patches.index(patch)
 
