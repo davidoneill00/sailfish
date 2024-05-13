@@ -101,12 +101,13 @@ if __name__ == '__main__':
     ts                = DavidTimeseries(filename)
     Model_Parameters  = LoadFile['model_parameters']
     
-    Number_of_Orbits  = 2.
+    Number_of_Orbits  = 1.
     Final_Orbits      = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     viscosity         = Model_Parameters["nu"]
     Sigma_0           = Model_Parameters["initial_sigma"]
     M_dot_0           = 3 * np.pi * viscosity * Sigma_0
-    Normalised_Torque = ts.binary_torque[-len(Final_Orbits):] / M_dot_0
+    #Normalised_Torque = ts.binary_torque[-len(Final_Orbits):] / M_dot_0
+    Normalised_Torque = ts.torque_g[-len(Final_Orbits):] / M_dot_0
 
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
@@ -126,7 +127,7 @@ if __name__ == '__main__':
         plt.xlabel('time')
         plt.title('Torque Components')
         #plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
-        plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Torque')
+        plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
 
         plt.legend()
         savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
@@ -140,37 +141,6 @@ if __name__ == '__main__':
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
-    '''
-    if Steady_State:
-        viscosity              = Model_Parameters['nu']
-        Initial_Density        = Model_Parameters['initial_sigma']
-        CheckpointCadence      = load_checkpoint(filename)['driver'].events['checkpoint'].interval
-        Steady_State_Accretion = 3 * np.pi * viscosity * Initial_Density
-        mdot                   = ts.mdot1+ts.mdot2
-        Number_of_Orbits       = 10
-
-        plt.figure()
-        Later_Times   = ts.time[len(ts.time)-Number_of_Orbits*10:len(ts.time)-1]
-        Later_Torques = ts.torque_g[len(ts.time)-Number_of_Orbits*10:len(ts.time)-1]
-        Later_mdot    = mdot[len(ts.time)-Number_of_Orbits*10:len(ts.time)-1]
-        plt.plot(Later_Times,Later_Torques/Later_mdot, c= 'black', label = 'Unitless Torque')
-        plt.plot(Later_Times,Later_mdot/Steady_State_Accretion,c = 'red',label = r'$\dot{M}/M_0$ ')
-        plt.xlabel('time')
-        plt.legend()
-        savename = os.getcwd() +  "/Outputs/SteadyState_TorqueAccretion.%04d.png"%(CurrentTime)
-        plt.savefig(savename, dpi=400)
-
-        plt.figure()
-        Split_Array  = np.array_split([Later_Torques[i]/Later_mdot[i] for i in range(0,Number_of_Orbits*10 -1)],Number_of_Orbits)
-        Mean_torques = [np.mean(Split_Array[i]) for i in range(0,Number_of_Orbits)]
-        Final_Orbits = np.arange(np.round(CurrentTime) - Number_of_Orbits,np.round(CurrentTime),1)
-        plt.plot(Final_Orbits,Mean_torques,c = 'black',label = 'Orbit Averaged Torque')
-        plt.axhline(y = np.mean(Mean_torques), c = 'red',label = 'Global Mean Torque')
-        plt.xlabel('Time [t/P]')
-        plt.legend()
-        savename = os.getcwd() +  "/Outputs/MeanTorque_FinalOrbits.%04d.png"%(CurrentTime)
-        plt.savefig(savename, dpi=400)
-    '''
     if args.Orbital_Elements:
         plt.figure()
         plt.plot(Final_Orbits,ts.semimajor_axis[-len(Final_Orbits):], label = 'SemiMajor Axis')
@@ -180,30 +150,6 @@ if __name__ == '__main__':
         plt.legend()
         savename = os.getcwd() +  "/Outputs/OrbitalElements.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
