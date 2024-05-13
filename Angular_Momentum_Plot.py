@@ -118,26 +118,28 @@ if __name__ == '__main__':
         plt.figure()
         plt.plot(Final_Orbits, ts.total_angular_momentum[-len(Final_Orbits):], c = 'black')
         plt.xlabel('time')
-        plt.title('Total Angular Momentum')
+        plt.title('Total Angular Momentum e = 0 Retrograde')
         savename = os.getcwd() + "/Outputs/TotalAngularMomentum.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
     if args.Torque_Components:
         plt.figure()
         plt.xlabel('time')
-        plt.title('Torque Components')
+        plt.title(r'Torque e = 0 Retrograde')
+        plt.ylabel(r'$\tau/\dot{M}_0$')
         #plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
         plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
-
+        plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
         plt.legend()
         savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
     if args.Accretion:
         plt.figure()
-        plt.plot(Final_Orbits,ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):],label='mdot',linewidth = 1, c = 'red')
+        plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 3, c = 'red')
         plt.xlabel('time')
-        plt.title('Accretion Rate')
+        plt.ylabel(r'$\dot{M}/\langle\dot{M}\rangle$')
+        plt.title('Accretion Rate e = 0 Retrograde')
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
@@ -145,6 +147,7 @@ if __name__ == '__main__':
         plt.figure()
         plt.plot(Final_Orbits,ts.semimajor_axis[-len(Final_Orbits):], label = 'SemiMajor Axis')
         plt.plot(Final_Orbits,ts.eccentricity[-len(Final_Orbits):], label = 'Eccentricity')
+        plt.title(r'Orbital Elements $e_0 = 0$ Retrograde')
         plt.xlabel('Time')
         plt.ylabel('Orbital Elements')
         plt.legend()
