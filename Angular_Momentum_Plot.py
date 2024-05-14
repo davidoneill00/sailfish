@@ -33,6 +33,18 @@ class DavidTimeseries:
         self.torque_b       = np.array([s[ 8] for s in ts])
         self.mdot_b         = np.array([s[ 9] for s in ts])
         self.disk_ecc       = np.array([s[10] for s in ts])
+        self.innertorque    = np.array([s[11] for s in ts])
+        self.outertorque    = np.array([s[12] for s in ts])
+        
+        self.power_g1       = np.array([s[13] for s in ts])
+        self.power_a1       = np.array([s[14] for s in ts])
+        self.power_g2       = np.array([s[15] for s in ts])
+        self.power_a2       = np.array([s[16] for s in ts])
+        self.innerpower_1   = np.array([s[17] for s in ts])
+        self.outerpower_1   = np.array([s[18] for s in ts])
+        self.innerpower_2   = np.array([s[19] for s in ts])
+        self.outerpower_2   = np.array([s[20] for s in ts])
+
 
     @property
     def dt(self):
@@ -95,19 +107,24 @@ if __name__ == '__main__':
     
 
 
-    filename          = args.checkpoints[0]
-    LoadFile          = load_checkpoint(filename)
-    CurrentTime       = LoadFile["time"] / 2 / np.pi     ########FIX
-    ts                = DavidTimeseries(filename)
-    Model_Parameters  = LoadFile['model_parameters']
+    filename            = args.checkpoints[0]
+    LoadFile            = load_checkpoint(filename)
+    CurrentTime         = LoadFile["time"] / 2 / np.pi     ########FIX
+    ts                  = DavidTimeseries(filename)
+    Model_Parameters    = LoadFile['model_parameters']
     
-    Number_of_Orbits  = 1.
-    Final_Orbits      = ts.time[ts.time>CurrentTime-Number_of_Orbits]
-    viscosity         = Model_Parameters["nu"]
-    Sigma_0           = Model_Parameters["initial_sigma"]
-    M_dot_0           = 3 * np.pi * viscosity * Sigma_0
-    #Normalised_Torque = ts.binary_torque[-len(Final_Orbits):] / M_dot_0
-    Normalised_Torque = ts.torque_g[-len(Final_Orbits):] / M_dot_0
+    Number_of_Orbits    = 1.
+    Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
+    viscosity           = Model_Parameters["nu"]
+    Sigma_0             = Model_Parameters["initial_sigma"]
+    M_dot_0             = 3 * np.pi * viscosity * Sigma_0
+    
+    Normalised_Power    = (ts.power_g1[-len(Final_Orbits):]+ts.power_g2[-len(Final_Orbits):]) / M_dot_0
+    Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
+    InnerClipped_Power  = (ts.innerpower_1[-len(Final_Orbits):]+ts.innerpower_2[-len(Final_Orbits):]) / M_dot_0
+    OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) / M_dot_0
+    InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
+    OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
 
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
@@ -125,11 +142,16 @@ if __name__ == '__main__':
     if args.Torque_Components:
         plt.figure()
         plt.xlabel('time')
-        plt.title(r'Torque e = 0 Retrograde')
+        plt.title(r'Torque Retrograde')
         plt.ylabel(r'$\tau/\dot{M}_0$')
-        #plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
+        plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
         plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
         plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
+        plt.plot(Final_Orbits,InnerClipped_Torque,c = 'blue',label = 'for r>a')
+        plt.axhline(y=np.mean(InnerClipped_Torque),c = 'blue',label = 'for r>a',linestyle = 'dashed')
+        plt.plot(Final_Orbits,OuterClipped_Torque,c = 'red',label = 'for r<a')
+        plt.axhline(y=np.mean(OuterClipped_Torque),c = 'red',label = 'for r<a',linestyle = 'dashed')
+        
         plt.legend()
         savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
@@ -145,8 +167,10 @@ if __name__ == '__main__':
 
     if args.Orbital_Elements:
         plt.figure()
-        plt.plot(Final_Orbits,ts.semimajor_axis[-len(Final_Orbits):], label = 'SemiMajor Axis')
-        plt.plot(Final_Orbits,ts.eccentricity[-len(Final_Orbits):], label = 'Eccentricity')
+        plt.plot(ts.time,ts.semimajor_axis, label = 'SemiMajor Axis')
+        plt.plot(ts.time,ts.eccentricity, label = 'Eccentricity')
+	    #plt.plot(Final_Orbits,ts.semimajor_axis[-len(Final_Orbits):], label = 'SemiMajor Axis')
+        #plt.plot(Final_Orbits,ts.eccentricity[-len(Final_Orbits):], label = 'Eccentricity')
         plt.title(r'Orbital Elements $e_0 = 0$ Retrograde')
         plt.xlabel('Time')
         plt.ylabel('Orbital Elements')
