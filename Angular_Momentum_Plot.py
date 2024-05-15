@@ -6,7 +6,7 @@ import sailfish
 import os
 import argparse
 from sailfish.setup_base import SetupBase
-
+from sailfish.physics.kepler import OrbitalState, PointMass
 
 def load_checkpoint(filename, require_solver=None):
     with open(filename, "rb") as file:
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         "--Torque_Components",
         "-t",
         default=False,
-        help="whether to plot the torque components from the binary and buffer",
+        help="whether to plot the torque components from the binary",
     )
     parser.add_argument(
         "--Accretion",
@@ -103,16 +103,28 @@ if __name__ == '__main__':
         default=False,
         help="whether to plot the binary's changing orbital elements",
     )
+    parser.add_argument(
+        "--Power_Components",
+        "-p",
+        default=False,
+        help="whether to plot the power exerted on the binary",
+    )
     args = parser.parse_args()
     
 
 
     filename            = args.checkpoints[0]
     LoadFile            = load_checkpoint(filename)
+    Primary,Secondary   = LoadFile["point_masses"]
+ 
+    Point_MassPrimary   = PointMass(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
+    Point_MassSecondary = PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
+    OrbitalEccentricity = OrbitalState(Point_MassPrimary,Point_MassSecondary).eccentricity
+
     CurrentTime         = LoadFile["time"] / 2 / np.pi     ########FIX
     ts                  = DavidTimeseries(filename)
     Model_Parameters    = LoadFile['model_parameters']
-    
+
     Number_of_Orbits    = 1.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     viscosity           = Model_Parameters["nu"]
@@ -135,25 +147,37 @@ if __name__ == '__main__':
         plt.figure()
         plt.plot(Final_Orbits, ts.total_angular_momentum[-len(Final_Orbits):], c = 'black')
         plt.xlabel('time')
-        plt.title('Total Angular Momentum e = 0 Retrograde')
+        plt.title('Total Angular Momentum e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
         savename = os.getcwd() + "/Outputs/TotalAngularMomentum.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
     if args.Torque_Components:
         plt.figure()
         plt.xlabel('time')
-        plt.title(r'Torque Retrograde')
+        plt.title(r'Torque Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
         plt.ylabel(r'$\tau/\dot{M}_0$')
-        plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
-        plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
-        plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
-        plt.plot(Final_Orbits,InnerClipped_Torque,c = 'blue',label = 'for r>a')
-        plt.axhline(y=np.mean(InnerClipped_Torque),c = 'blue',label = 'for r>a',linestyle = 'dashed')
-        plt.plot(Final_Orbits,OuterClipped_Torque,c = 'red',label = 'for r<a')
-        plt.axhline(y=np.mean(OuterClipped_Torque),c = 'red',label = 'for r<a',linestyle = 'dashed')
-        
+        #plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
+        #plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
+        #plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
+        plt.plot(Final_Orbits,InnerClipped_Torque,c = 'red',label = 'r<a')
+        plt.axhline(y=np.mean(InnerClipped_Torque),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
+        plt.plot(Final_Orbits,OuterClipped_Torque,c = 'blue',label = 'r>a')
+        plt.axhline(y=np.mean(OuterClipped_Torque),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
         plt.legend()
         savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
+        plt.savefig(savename, dpi=400)
+
+    if args.Power_Components:
+        plt.figure()
+        plt.xlabel('time')
+        plt.title(r'Power Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
+        plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
+        plt.plot(Final_Orbits,InnerClipped_Power,c = 'red',label = ' r<a')
+        plt.axhline(y=np.mean(InnerClipped_Power),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
+        plt.plot(Final_Orbits,OuterClipped_Power),c = 'blue',label = 'r>a')
+        plt.axhline(y=np.mean(OuterClipped_Power),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
+        plt.legend()
+        savename = os.getcwd() + "/Outputs/PowerComponents.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
     if args.Accretion:
@@ -161,7 +185,7 @@ if __name__ == '__main__':
         plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 3, c = 'red')
         plt.xlabel('time')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}\rangle$')
-        plt.title('Accretion Rate e = 0 Retrograde')
+        plt.title('Accretion Rate e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
@@ -171,7 +195,7 @@ if __name__ == '__main__':
         plt.plot(ts.time,ts.eccentricity, label = 'Eccentricity')
 	    #plt.plot(Final_Orbits,ts.semimajor_axis[-len(Final_Orbits):], label = 'SemiMajor Axis')
         #plt.plot(Final_Orbits,ts.eccentricity[-len(Final_Orbits):], label = 'Eccentricity')
-        plt.title(r'Orbital Elements $e_0 = 0$ Retrograde')
+        plt.title(r'Orbital Elements $e_0 =$%g Retrograde'%(np.round(OrbitalEccentricity,3)))
         plt.xlabel('Time')
         plt.ylabel('Orbital Elements')
         plt.legend()
