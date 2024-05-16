@@ -19,9 +19,10 @@ def E_from_M(M, e=1.0):
     return E
 
 class DavidTimeseries:
-
     def __init__(self, chkpt):
-        ts = load_checkpoint(chkpt)['timeseries']
+        Checkpoint = load_checkpoint(chkpt)
+        ts = Checkpoint['timeseries']
+
         self.time           = np.array([s[ 0] for s in ts])
         self.semimajor_axis = np.array([s[ 1] for s in ts])
         self.eccentricity   = np.array([s[ 2] for s in ts])
@@ -34,17 +35,18 @@ class DavidTimeseries:
         self.mdot_b         = np.array([s[ 9] for s in ts])
         self.disk_ecc       = np.array([s[10] for s in ts])
 
-        #self.innertorque    = np.array([s[11] for s in ts])
-        #self.outertorque    = np.array([s[12] for s in ts])
-        #self.power_g1       = np.array([s[13] for s in ts])
-        #self.power_a1       = np.array([s[14] for s in ts])
-        #self.power_g2       = np.array([s[15] for s in ts])
-        #self.power_a2       = np.array([s[16] for s in ts])
-        #self.innerpower_1   = np.array([s[17] for s in ts])
-        #self.outerpower_1   = np.array([s[18] for s in ts])
-        #self.innerpower_2   = np.array([s[19] for s in ts])
-        #self.outerpower_2   = np.array([s[20] for s in ts])
-
+        if Checkpoint["model_parameters"]["which_diagnostics"] == "david_new":
+            self.innertorque    = np.array([s[11] for s in ts])
+            self.outertorque    = np.array([s[12] for s in ts])
+            self.power_g1       = np.array([s[13] for s in ts])
+            self.power_a1       = np.array([s[14] for s in ts])
+            self.power_g2       = np.array([s[15] for s in ts])
+            self.power_a2       = np.array([s[16] for s in ts])
+            self.innerpower_1   = np.array([s[17] for s in ts])
+            self.outerpower_1   = np.array([s[18] for s in ts])
+            self.innerpower_2   = np.array([s[19] for s in ts])
+            self.outerpower_2   = np.array([s[20] for s in ts])
+            self.sigma          = np.array([s[21] for s in ts])
 
     @property
     def dt(self):
@@ -80,7 +82,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoints", type=str, nargs="+")
     parser.add_argument(
-        "--Momentum_Change",
+        "--Disk_Momentum",
         "-jd",
         default=False,
         help="whether to plot the total change in momentum timeseries",
@@ -109,14 +111,17 @@ if __name__ == '__main__':
         default=False,
         help="whether to plot the power exerted on the binary",
     )
+    parser.add_argument(
+        "--Density",
+        "-d",
+        default=False,
+        help="whether to plot the power exerted on the binary",
+    )
     args = parser.parse_args()
     
-
-
     filename            = args.checkpoints[0]
     LoadFile            = load_checkpoint(filename)
     Primary,Secondary   = LoadFile["point_masses"]
- 
     Point_MassPrimary   = PointMass(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
     Point_MassSecondary = PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
     OrbitalEccentricity = OrbitalState(Point_MassPrimary,Point_MassSecondary).eccentricity
@@ -130,23 +135,15 @@ if __name__ == '__main__':
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
     M_dot_0             = 3 * np.pi * viscosity * Sigma_0
-    
-    #Normalised_Power    = (ts.power_g1[-len(Final_Orbits):]+ts.power_g2[-len(Final_Orbits):]) / M_dot_0
     Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
-    #InnerClipped_Power  = (ts.innerpower_1[-len(Final_Orbits):]+ts.innerpower_2[-len(Final_Orbits):]) / M_dot_0
-    #OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) / M_dot_0
-    #InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
-    #OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
 
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    #print('Inner Mean Torque',np.mean(InnerClipped_Torque))
-    #print('Outer Mean Torque',np.mean(OuterClipped_Torque))
-    #print('Inner Mean Power',np.mean(InnerClipped_Power))
-    #print('Outer Mean Power',np.mean(OuterClipped_Power))
 
-    if args.Momentum_Change:
+    print(ts.sigma)
+
+    if args.Disk_Momentum:
         plt.figure()
         plt.plot(Final_Orbits, ts.total_angular_momentum[-len(Final_Orbits):], c = 'black')
         plt.xlabel('time')
@@ -159,6 +156,12 @@ if __name__ == '__main__':
         plt.xlabel('time')
         plt.title(r'Torque Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
         plt.ylabel(r'$\tau/\dot{M}_0$')
+
+        #InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
+        #OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
+        #print('Inner Mean Torque',np.mean(InnerClipped_Torque))
+        #print('Outer Mean Torque',np.mean(OuterClipped_Torque))
+
         #plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
         plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
         plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
@@ -171,6 +174,12 @@ if __name__ == '__main__':
         plt.savefig(savename, dpi=400)
 
     if args.Power_Components:
+        Normalised_Power    = (ts.power_g1[-len(Final_Orbits):]+ts.power_g2[-len(Final_Orbits):]) / M_dot_0
+        InnerClipped_Power  = (ts.innerpower_1[-len(Final_Orbits):]+ts.innerpower_2[-len(Final_Orbits):]) / M_dot_0
+        OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) / M_dot_0
+        #print('Inner Mean Power',np.mean(InnerClipped_Power))
+        #print('Outer Mean Power',np.mean(OuterClipped_Power))
+
         plt.figure()
         plt.xlabel('time')
         plt.title(r'Power Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
