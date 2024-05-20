@@ -3,6 +3,9 @@ import pickle as pk
 import sailfish
 import numpy as np 
 import matplotlib.pyplot as plt 
+import multiprocessing as mp
+from multiprocessing import Pool, cpu_count
+import fnmatch
 
 Plot = False
 
@@ -10,6 +13,7 @@ def load_checkpoint(filename):
     with open(filename, "rb") as file:
         chkpt = pk.load(file)
         return chkpt
+
 
 def CavityContour(chkpt):
 	fields = {
@@ -26,6 +30,7 @@ def CavityContour(chkpt):
 	p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
 	v = p.vertices
 	return v
+
 
 def MaxDist(points):
 	Npoints = len(points)
@@ -110,42 +115,54 @@ def main_cbdiso_2d(chkpt,points):
 
 
 
+def MP_Cavity_Properties(arg):
+	chkpt             = load_checkpoint(arg)
+	contour_lines     = CavityContour(chkpt)
+	cavity_properties = MaxDist(contour_lines)
+	
+	if Plot:
+		main_cbdiso_2d(chkpt,contour_lines)
+
+	return [chkpt["time"]/2/np.pi,cavity_properties["SemiMajorAxis"],cavity_properties["Eccentricity"],cavity_properties["Cavity_Slope_Radians"]]
+
 
 
 if __name__ == "__main__":
 	from pathlib import Path
 	import os
-	import fnmatch
 
-	directory       = Path(sys.argv[1])
-	Time_Snapshots  = []
-	Semi_Major_Axis = []
-	Eccentricity    = []
-	Argument_Apses  = []
-	for arg in directory.iterdir():
-		if fnmatch.fnmatch(arg, '*chkpt*.pk'):
-		#if arg.suffix == '.pk':
-			print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-			print('Reading in',arg)
-			chkpt         = load_checkpoint(arg)
-			contour_lines = CavityContour(chkpt)
-			cavity_properties = MaxDist(contour_lines)
-			print('Which has cavity parameters',cavity_properties)
-			Semi_Major_Axis.append(cavity_properties["SemiMajorAxis"])
-			Eccentricity.append(cavity_properties["Eccentricity"])
-			Argument_Apses.append(cavity_properties["Cavity_Slope_Radians"])
-			Time_Snapshots.append(chkpt["time"] / 2 / np.pi)
-			if Plot:
-				main_cbdiso_2d(chkpt,contour_lines)
-			else:
-				pass
-
+	Checkpoints     = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*chkpt*.pk')]
 	
+	p           = Pool()	
+	CavityState = p.map(MP_Cavity_Properties,Checkpoints)
 	
+	CavityState     = sum(CavityState, [])
+	Time_Snapshots  = CavityState[0::4]
+	Semi_Major_Axis = CavityState[1::4]
+	Eccentricity    = CavityState[2::4]
+	Argument_Apses  = CavityState[3::4]
 
-	lists = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses))
+
+	lists        = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses))
 	sorted_lists = sorted(lists, key=lambda x: x[0])
 	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses = zip(*sorted_lists)
+
+
+	fig, ax = plt.subplots(figsize=[12, 9])
+	plt.title('Cavity Properties')
+	plt.plot(sorted_times,sorted_SMA, c = 'brown', linewidth = 2, label = r'Semi Major Axis $[a_0]$')
+	plt.plot(sorted_times,sorted_ecc, c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
+	plt.plot(sorted_times,sorted_Apses, c = 'silver', linestyle = 'dotted',linewidth = 2, label = 'Apsidal Inclination (Radians)')
+	plt.scatter(sorted_times,sorted_SMA, c = 'brown', s = 50)
+	plt.scatter(sorted_times,sorted_ecc, c = 'blue', s = 50)
+	plt.scatter(sorted_times,sorted_Apses, c = 'silver', s = 50)
+	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
+	plt.legend()
+	FigDirectory =  sys.argv[2]
+	pngname = FigDirectory + f"{'/CavityProperties'}.{int(np.round(10*Time_Snapshots[-1],2)):04d}.png"
+	print(pngname)
+	fig.savefig(pngname, dpi=400)
+
 
 	Cavity_Properties = {
 	"time": list(sorted_times),
@@ -162,21 +179,6 @@ if __name__ == "__main__":
 	with open(FileName, "wb") as cvt:
 		pk.dump(Cavity_Properties, cvt)
 
-	fig, ax = plt.subplots(figsize=[12, 9])
-	plt.title('Cavity Properties')
-	plt.plot(sorted_times,sorted_SMA, c = 'brown', linewidth = 2, label = r'Semi Major Axis $[a_0]$')
-	plt.plot(sorted_times,sorted_ecc, c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
-	plt.plot(sorted_times,sorted_Apses, c = 'silver', linestyle = 'dotted',linewidth = 2, label = 'Apsidal Inclination (Radians)')
-	plt.scatter(sorted_times,sorted_SMA, c = 'brown', s = 50)
-	plt.scatter(sorted_times,sorted_ecc, c = 'blue', s = 50)
-	plt.scatter(sorted_times,sorted_Apses, c = 'silver', s = 50)
-	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
-	plt.legend()
-	FigDirectory =  sys.argv[2]
-	pngname = FigDirectory + f"{'/CavityProperties'}.{int(np.round(10*Time_Snapshots[-1],2)):04d}.png"
-	print(pngname)
-	fig.savefig(pngname, dpi=400)
-	print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
 	exit()
 
         
