@@ -6,14 +6,16 @@ import matplotlib.pyplot as plt
 import multiprocessing as mp
 from multiprocessing import Pool, cpu_count
 import fnmatch
+from logging import getLogger
 
-Plot = False
+logger = getLogger(__name__)
+Plot = True
 
 def load_checkpoint(filename):
     with open(filename, "rb") as file:
         chkpt = pk.load(file)
+        print('This file has been imported',filename)
         return chkpt
-
 
 def CavityContour(chkpt):
 	fields = {
@@ -111,7 +113,8 @@ def main_cbdiso_2d(chkpt,points):
 	plt.plot(Position_List[:,0],Position_List[:,1],c = 'black', linestyle = 'dashed', linewidth = 2)
 	
 	fig.suptitle('Orbit %g'%(chkpt["time"] / 2 / np.pi))
-	plt.show()
+	FigDirectory =  sys.argv[2]
+	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi))
 
 
 
@@ -119,11 +122,13 @@ def MP_Cavity_Properties(arg):
 	chkpt             = load_checkpoint(arg)
 	contour_lines     = CavityContour(chkpt)
 	cavity_properties = MaxDist(contour_lines)
-	
+	Binary_SMA        = np.array([s[ 1] for s in chkpt['timeseries']])[-1]
+	#Binary_SMA        = chkpt['timeseries'].semimajor_axis[-1]
+
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines)
 
-	return [chkpt["time"]/2/np.pi,cavity_properties["SemiMajorAxis"],cavity_properties["Eccentricity"],cavity_properties["Cavity_Slope_Radians"]]
+	return [chkpt["time"]/2/np.pi,cavity_properties["SemiMajorAxis"],cavity_properties["Eccentricity"],cavity_properties["Cavity_Slope_Radians"],Binary_SMA]
 
 
 
@@ -132,20 +137,23 @@ if __name__ == "__main__":
 	import os
 
 	Checkpoints     = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*chkpt*.pk')]
-	
-	p           = Pool()	
+
+	p           = Pool()
+
+	print('Beginning multiprocessing')
 	CavityState = p.map(MP_Cavity_Properties,Checkpoints)
-	
+	print('Finished multiprocessing')
 	CavityState     = sum(CavityState, [])
-	Time_Snapshots  = CavityState[0::4]
-	Semi_Major_Axis = CavityState[1::4]
-	Eccentricity    = CavityState[2::4]
-	Argument_Apses  = CavityState[3::4]
+	Time_Snapshots  = CavityState[0::5]
+	Semi_Major_Axis = CavityState[1::5]
+	Eccentricity    = CavityState[2::5]
+	Argument_Apses  = CavityState[3::5]
+	BinarySMA       = CavityState[4::5]
 
 
-	lists        = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses))
+	lists        = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses,BinarySMA))
 	sorted_lists = sorted(lists, key=lambda x: x[0])
-	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses = zip(*sorted_lists)
+	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = zip(*sorted_lists)
 
 
 	fig, ax = plt.subplots(figsize=[12, 9])
@@ -163,6 +171,9 @@ if __name__ == "__main__":
 	print(pngname)
 	fig.savefig(pngname, dpi=400)
 
+	plt.figure()
+	plt.plot(BinarySMA,Semi_Major_Axis)
+	plt.savefig(FigDirectory + '/Decoupling.png')
 
 	Cavity_Properties = {
 	"time": list(sorted_times),
