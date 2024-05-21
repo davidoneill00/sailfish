@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import multiprocessing as mp
 from multiprocessing import Pool, cpu_count
 import fnmatch
-import logging
+import gc
 
 Plot = True
 
@@ -16,6 +16,7 @@ def load_checkpoint(filename):
         chkpt = pk.load(file)
         print("This file has been imported",filename)
         return chkpt
+
 
 def CavityContour(chkpt):
 	fields = {
@@ -31,7 +32,6 @@ def CavityContour(chkpt):
 	extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1	
 	p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
 	v = p.vertices
-	print('Completed Contours')
 	return v
 
 
@@ -71,7 +71,6 @@ def MaxDist(points):
 	"Cavity_Slope_Radians":Max_Slope,
 	"Cavity_Slope_Degrees":Max_Slope*180/np.pi,
 	}
-	print('Found Cavity Properties')
 	return Properties
 
 
@@ -125,34 +124,82 @@ def MP_Cavity_Properties(arg):
 	contour_lines     = CavityContour(chkpt)
 	cavity_properties = MaxDist(contour_lines)
 	Binary_SMA        = np.array([s[ 1] for s in chkpt['timeseries']])[-1]
-	
+	cavity_properties["Binary_SemiMajorAxis"] = Binary_SMA
+
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines)
-	print('Loop Finishing')
-	return [chkpt["time"]/2/np.pi,cavity_properties["SemiMajorAxis"],cavity_properties["Eccentricity"],cavity_properties["Cavity_Slope_Radians"],Binary_SMA]
+	
+	FileName = arg.replace('chkpt','CavityProperties')
+	with open(FileName, "wb") as cvt:
+		pk.dump(cavity_properties, cvt)
 
+	del chkpt
+	del contour_lines
+	del cavity_properties
+	del Binary_SMA
+
+	gc.collect()
+	print('Completed Task')
+	
+
+def CheckForCavityFileExistence():
+	from pathlib import Path
+	import os
+	import re
+
+	directory      = Path(sys.argv[1])
+	chkpt_pattern  = re.compile(r'chkpt\.(\d{4})\.pk')
+	cavity_pattern = 'CavityProperties.{:04d}.pk'
+	Missing_cavity = []
+
+	for filename in os.listdir(directory):
+		match = chkpt_pattern.match(filename)
+		if match:
+			number = int(match.group(1))
+			corresponding_file = cavity_pattern.format(number)
+			full_path = os.path.join(directory, filename)
+			if os.path.exists(os.path.join(directory, corresponding_file)):
+				pass
+			else:
+				Missing_cavity.append(full_path)
+
+	if Missing_cavity == []:
+		return True
+	else:
+		return Missing_cavity
 
 
 if __name__ == "__main__":
 	from pathlib import Path
 	import os
+	import re
 
-	Checkpoints     = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*chkpt*.pk')]
-	p               = Pool(8)
+	Cavity_File_Check = CheckForCavityFileExistence()
+	if Cavity_File_Check != True:
+		print('Missing the cavity property files',Cavity_File_Check)
 
-	CavityState     = p.map(MP_Cavity_Properties,Checkpoints)
-	CavityState     = sum(CavityState, [])
-	Time_Snapshots  = CavityState[0::5]
-	Semi_Major_Axis = CavityState[1::5]
-	Eccentricity    = CavityState[2::5]
-	Argument_Apses  = CavityState[3::5]
-	BinarySMA       = CavityState[4::5]
+		Cavity_File_Check
+		#Checkpoints     = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*chkpt*.pk')]
+
+		p               = Pool()
+		CavityState     = p.map(MP_Cavity_Properties,Cavity_File_Check)
+
+	
+	exit()
+
+	#CavityState     = sum(CavityState, [])
+	#Time_Snapshots  = CavityState[0::5]
+	#Semi_Major_Axis = CavityState[1::5]
+	#Eccentricity    = CavityState[2::5]
+	#Argument_Apses  = CavityState[3::5]
+	#BinarySMA       = CavityState[4::5]
 
 
-	lists        = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses,BinarySMA))
-	sorted_lists = sorted(lists, key=lambda x: x[0])
-	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = zip(*sorted_lists)
+	#lists        = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses,BinarySMA))
+	#sorted_lists = sorted(lists, key=lambda x: x[0])
+	#sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = zip(*sorted_lists)
 
+	
 
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Properties')
@@ -188,7 +235,7 @@ if __name__ == "__main__":
 	with open(FileName, "wb") as cvt:
 		pk.dump(Cavity_Properties, cvt)
 
-	exit()
+
 
         
 
