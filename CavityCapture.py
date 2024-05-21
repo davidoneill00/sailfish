@@ -5,6 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import multiprocessing as mp
 from multiprocessing import Pool, cpu_count
+from pathlib import Path
+import os
+import re
 import fnmatch
 import gc
 
@@ -125,6 +128,7 @@ def MP_Cavity_Properties(arg):
 	cavity_properties = MaxDist(contour_lines)
 	Binary_SMA        = np.array([s[ 1] for s in chkpt['timeseries']])[-1]
 	cavity_properties["Binary_SemiMajorAxis"] = Binary_SMA
+	cavity_properties["CurrentTime"]          = chkpt["time"] / 2 / np.pi
 
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines)
@@ -143,10 +147,6 @@ def MP_Cavity_Properties(arg):
 	
 
 def CheckForCavityFileExistence():
-	from pathlib import Path
-	import os
-	import re
-
 	directory      = Path(sys.argv[1])
 	chkpt_pattern  = re.compile(r'chkpt\.(\d{4})\.pk')
 	cavity_pattern = 'CavityProperties.{:04d}.pk'
@@ -169,11 +169,29 @@ def CheckForCavityFileExistence():
 		return Missing_cavity
 
 
-if __name__ == "__main__":
-	from pathlib import Path
-	import os
-	import re
+def LoadCavityFiles():
+	Cavity_Checkpoints = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*CavityProperties*.pk')]
+	Time_Snapshots     = []
+	Semi_Major_Axis    = []
+	Eccentricity       = []
+	Argument_Apses     = []
+	BinarySMA          = []
+	for cc in Cavity_Checkpoints:
+		cav_props = load_checkpoint(cc)
 
+		Time_Snapshots.append(cav_props["CurrentTime"])
+		Semi_Major_Axis.append(cav_props["SemiMajorAxis"])
+		Eccentricity.append(cav_props["Eccentricity"])
+		Argument_Apses.append(cav_props["Cavity_Slope_Radians"])
+		BinarySMA.append(cav_props["Binary_SemiMajorAxis"])
+
+	lists = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses,BinarySMA))
+	sorted_lists = sorted(lists, key=lambda x: x[0])
+	return zip(*sorted_lists)
+	 
+
+if __name__ == "__main__":
+	
 	Cavity_File_Check = CheckForCavityFileExistence()
 	if Cavity_File_Check != True:
 		print('Missing the cavity property files',Cavity_File_Check)
@@ -185,21 +203,8 @@ if __name__ == "__main__":
 		CavityState     = p.map(MP_Cavity_Properties,Cavity_File_Check)
 
 	
-	exit()
-
-	#CavityState     = sum(CavityState, [])
-	#Time_Snapshots  = CavityState[0::5]
-	#Semi_Major_Axis = CavityState[1::5]
-	#Eccentricity    = CavityState[2::5]
-	#Argument_Apses  = CavityState[3::5]
-	#BinarySMA       = CavityState[4::5]
-
-
-	#lists        = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses,BinarySMA))
-	#sorted_lists = sorted(lists, key=lambda x: x[0])
-	#sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = zip(*sorted_lists)
-
 	
+	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = LoadCavityFiles()
 
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Properties')
@@ -212,30 +217,32 @@ if __name__ == "__main__":
 	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
 	plt.legend()
 	FigDirectory =  sys.argv[2]
-	pngname = FigDirectory + f"{'/CavityProperties'}.{int(np.round(10*Time_Snapshots[-1],2)):04d}.png"
+	pngname = FigDirectory + f"{'/CavityProperties'}.{int(sorted_times[-1]):04d}.png"
 	fig.savefig(pngname, dpi=400)
 
-	plt.figure()
-	plt.plot(BinarySMA,Semi_Major_Axis)
+
+	fig, ax = plt.subplots(figsize=[12, 9])
+	#plt.title()
+	plt.xlabel(r'$\log_{10} a_\mathrm{bin}$')
+	#plt.plot(np.array(sorted_Binary_SMA)[::-1],np.array(sorted_SMA)[::-1])
+	plt.plot(np.log10(np.array(sorted_Binary_SMA)),np.log10(np.array(sorted_SMA)))
+	plt.gca().invert_xaxis()
+	#plt.yscale('log')
+	#ax.set_yscale('log')
+	#ax.set_xscale('log')
 	plt.savefig(FigDirectory + '/Decoupling.png')
 
-	Cavity_Properties = {
-	"time": list(sorted_times),
-	"SemiMajorAxis": list(sorted_SMA),
-	"Eccentricity": list(sorted_ecc),
-	"ApsidalInclination": list(sorted_Apses),
-	"Binary_SMA":list(sorted_Binary_SMA)
-	}
+	#Cavity_Properties = {
+	#"time": list(sorted_times),
+	#"SemiMajorAxis": list(sorted_SMA),
+	#"Eccentricity": list(sorted_ecc),
+	#"ApsidalInclination": list(sorted_Apses),
+	#"Binary_SMA":list(sorted_Binary_SMA)
+	#}
 
-	outdir = sys.argv[2]
-	FileName = f"CavityProperties.{int(np.round(10*Time_Snapshots[-1],2)):04d}.pk"
-	Path(outdir).mkdir(parents=True, exist_ok=True)
-	FileName = os.path.join(outdir, FileName)
+	#outdir = sys.argv[2]
+	#FileName = f"CavityProperties.{int(sorted_times[-1]):04d}.pk"
+	#Path(outdir).mkdir(parents=True, exist_ok=True)
+	#FileName = os.path.join(outdir, FileName)
 
-	with open(FileName, "wb") as cvt:
-		pk.dump(Cavity_Properties, cvt)
-
-
-
-        
-
+	exit()
