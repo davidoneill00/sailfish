@@ -6,15 +6,15 @@ import matplotlib.pyplot as plt
 import multiprocessing as mp
 from multiprocessing import Pool, cpu_count
 import fnmatch
-from logging import getLogger
+import logging
 
-logger = getLogger(__name__)
 Plot = True
 
 def load_checkpoint(filename):
+    print("About to import",filename)
     with open(filename, "rb") as file:
         chkpt = pk.load(file)
-        print('This file has been imported',filename)
+        print("This file has been imported",filename)
         return chkpt
 
 def CavityContour(chkpt):
@@ -123,11 +123,10 @@ def MP_Cavity_Properties(arg):
 	contour_lines     = CavityContour(chkpt)
 	cavity_properties = MaxDist(contour_lines)
 	Binary_SMA        = np.array([s[ 1] for s in chkpt['timeseries']])[-1]
-	#Binary_SMA        = chkpt['timeseries'].semimajor_axis[-1]
-
+	
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines)
-
+	print('Loop Finishing')
 	return [chkpt["time"]/2/np.pi,cavity_properties["SemiMajorAxis"],cavity_properties["Eccentricity"],cavity_properties["Cavity_Slope_Radians"],Binary_SMA]
 
 
@@ -137,12 +136,9 @@ if __name__ == "__main__":
 	import os
 
 	Checkpoints     = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*chkpt*.pk')]
+	p               = Pool()
 
-	p           = Pool()
-
-	print('Beginning multiprocessing')
-	CavityState = p.map(MP_Cavity_Properties,Checkpoints)
-	print('Finished multiprocessing')
+	CavityState     = p.map(MP_Cavity_Properties,Checkpoints)
 	CavityState     = sum(CavityState, [])
 	Time_Snapshots  = CavityState[0::5]
 	Semi_Major_Axis = CavityState[1::5]
@@ -168,7 +164,6 @@ if __name__ == "__main__":
 	plt.legend()
 	FigDirectory =  sys.argv[2]
 	pngname = FigDirectory + f"{'/CavityProperties'}.{int(np.round(10*Time_Snapshots[-1],2)):04d}.png"
-	print(pngname)
 	fig.savefig(pngname, dpi=400)
 
 	plt.figure()
@@ -179,7 +174,8 @@ if __name__ == "__main__":
 	"time": list(sorted_times),
 	"SemiMajorAxis": list(sorted_SMA),
 	"Eccentricity": list(sorted_ecc),
-	"ApsidalInclination": list(sorted_Apses)
+	"ApsidalInclination": list(sorted_Apses),
+	"Binary_SMA":list(sorted_Binary_SMA)
 	}
 
 	outdir = sys.argv[2]
