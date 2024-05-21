@@ -222,27 +222,18 @@ if __name__ == "__main__":
 
 
 	fig, ax = plt.subplots(figsize=[12, 9])
-	#plt.title()
-	plt.xlabel(r'$\log_{10} a_\mathrm{bin}$')
-	#plt.plot(np.array(sorted_Binary_SMA)[::-1],np.array(sorted_SMA)[::-1])
-	plt.plot(np.log10(np.array(sorted_Binary_SMA)),np.log10(np.array(sorted_SMA)))
+	plt.title('Cavity Semi Major Axis',fontsize=25)
+	plt.xlabel(r'$\log_{10} a_\mathrm{bin}~[a_0]$',fontsize=20)
+	plt.ylabel(r'$\log_{10} a_\mathrm{cav}~[a_0]$',fontsize=20)
+	plt.plot(np.array(sorted_Binary_SMA),np.array(sorted_SMA),c='black')
+	plt.scatter(np.array(sorted_Binary_SMA),np.array(sorted_SMA),c='black',marker='*')
 	plt.gca().invert_xaxis()
-	#plt.yscale('log')
-	#ax.set_yscale('log')
-	#ax.set_xscale('log')
-	plt.savefig(FigDirectory + '/Decoupling.png')
+	ax.set_yscale('log')
+	ax.set_xscale('log')
+	plt.yticks([10,1,0.1,0.001])
+	plt.xticks([1,0.1,0.01])
+	plt.savefig(FigDirectory + '/Decoupling.png', dpi=400)
 
-	#Cavity_Properties = {
-	#"time": list(sorted_times),
-	#"SemiMajorAxis": list(sorted_SMA),
-	#"Eccentricity": list(sorted_ecc),
-	#"ApsidalInclination": list(sorted_Apses),
-	#"Binary_SMA":list(sorted_Binary_SMA)
-	#}
-
-	#outdir = sys.argv[2]
-	#FileName = f"CavityProperties.{int(sorted_times[-1]):04d}.pk"
-	#Path(outdir).mkdir(parents=True, exist_ok=True)
-	#FileName = os.path.join(outdir, FileName)
+	
 
 	exit()
