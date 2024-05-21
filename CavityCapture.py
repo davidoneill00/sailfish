@@ -31,6 +31,7 @@ def CavityContour(chkpt):
 	extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1	
 	p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
 	v = p.vertices
+	print('Completed Contours')
 	return v
 
 
@@ -70,7 +71,7 @@ def MaxDist(points):
 	"Cavity_Slope_Radians":Max_Slope,
 	"Cavity_Slope_Degrees":Max_Slope*180/np.pi,
 	}
-
+	print('Found Cavity Properties')
 	return Properties
 
 
@@ -114,6 +115,7 @@ def main_cbdiso_2d(chkpt,points):
 	
 	fig.suptitle('Orbit %g'%(chkpt["time"] / 2 / np.pi))
 	FigDirectory =  sys.argv[2]
+	print('Saving Plot')
 	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi))
 
 
@@ -136,7 +138,7 @@ if __name__ == "__main__":
 	import os
 
 	Checkpoints     = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*chkpt*.pk')]
-	p               = Pool()
+	p               = Pool(8)
 
 	CavityState     = p.map(MP_Cavity_Properties,Checkpoints)
 	CavityState     = sum(CavityState, [])
