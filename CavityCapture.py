@@ -194,13 +194,13 @@ if __name__ == "__main__":
 	
 	Cavity_File_Check = CheckForCavityFileExistence()
 	if Cavity_File_Check != True:
-		print('Missing the cavity property files',Cavity_File_Check)
+		print('There are missing cavity property files. Now running fits for',Cavity_File_Check)
 
-		Cavity_File_Check
-		#Checkpoints     = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*chkpt*.pk')]
-
-		p               = Pool()
-		CavityState     = p.map(MP_Cavity_Properties,Cavity_File_Check)
+		num_tasks_per_batch = 48
+		for i in range(0, len(Cavity_File_Check), num_tasks_per_batch):
+			with Pool(processes=pool_size) as pool:
+				batch       = Cavity_File_Check[i:i + num_tasks_per_batch]
+				CavityState = pool.map(MP_Cavity_Properties, batch)
 
 	
 	
