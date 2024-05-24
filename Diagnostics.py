@@ -46,7 +46,7 @@ class DavidTimeseries:
             self.outerpower_1   = np.array([s[18] for s in ts])
             self.innerpower_2   = np.array([s[19] for s in ts])
             self.outerpower_2   = np.array([s[20] for s in ts])
-            self.sigma          = np.array([s[21] for s in ts])
+            #self.sigma          = np.array([s[21] for s in ts])
 
     @property
     def dt(self):
@@ -141,7 +141,7 @@ if __name__ == '__main__':
     print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
 
-    print(ts.sigma)
+    #print(ts.sigma)
 
     if args.Disk_Momentum:
         plt.figure()
@@ -157,18 +157,18 @@ if __name__ == '__main__':
         plt.title(r'Torque Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
         plt.ylabel(r'$\tau/\dot{M}_0$')
 
-        #InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
-        #OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
-        #print('Inner Mean Torque',np.mean(InnerClipped_Torque))
-        #print('Outer Mean Torque',np.mean(OuterClipped_Torque))
+        InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
+        OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
+        print('Inner Mean Torque',np.mean(InnerClipped_Torque))
+        print('Outer Mean Torque',np.mean(OuterClipped_Torque))
 
-        #plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
-        plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
-        plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
-        #plt.plot(Final_Orbits,InnerClipped_Torque,c = 'red',label = 'r<a')
-        #plt.axhline(y=np.mean(InnerClipped_Torque),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
-        #plt.plot(Final_Orbits,OuterClipped_Torque,c = 'blue',label = 'r>a')
-        #plt.axhline(y=np.mean(OuterClipped_Torque),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
+        ##plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
+        #plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
+        #plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
+        plt.plot(Final_Orbits,InnerClipped_Torque,c = 'red',label = 'r<a')
+        plt.axhline(y=np.mean(InnerClipped_Torque),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
+        plt.plot(Final_Orbits,OuterClipped_Torque,c = 'blue',label = 'r>a')
+        plt.axhline(y=np.mean(OuterClipped_Torque),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
         plt.legend()
         savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
@@ -177,8 +177,8 @@ if __name__ == '__main__':
         Normalised_Power    = (ts.power_g1[-len(Final_Orbits):]+ts.power_g2[-len(Final_Orbits):]) / M_dot_0
         InnerClipped_Power  = (ts.innerpower_1[-len(Final_Orbits):]+ts.innerpower_2[-len(Final_Orbits):]) / M_dot_0
         OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) / M_dot_0
-        #print('Inner Mean Power',np.mean(InnerClipped_Power))
-        #print('Outer Mean Power',np.mean(OuterClipped_Power))
+        print('Inner Mean Power',np.mean(InnerClipped_Power))
+        print('Outer Mean Power',np.mean(OuterClipped_Power))
 
         plt.figure()
         plt.xlabel('time')
