@@ -46,7 +46,6 @@ class DavidTimeseries:
             self.outerpower_1   = np.array([s[18] for s in ts])
             self.innerpower_2   = np.array([s[19] for s in ts])
             self.outerpower_2   = np.array([s[20] for s in ts])
-            self.sigma          = np.array([s[21] for s in ts])
 
     @property
     def dt(self):
@@ -130,7 +129,7 @@ if __name__ == '__main__':
     ts                  = DavidTimeseries(filename)
     Model_Parameters    = LoadFile['model_parameters']
 
-    Number_of_Orbits    = 4.
+    Number_of_Orbits    = 1200.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
@@ -140,8 +139,6 @@ if __name__ == '__main__':
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-
-    print(ts.sigma)
 
     if args.Disk_Momentum:
         plt.figure()
@@ -193,11 +190,24 @@ if __name__ == '__main__':
         plt.savefig(savename, dpi=400)
 
     if args.Accretion:
+
         plt.figure()
-        plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 3, c = 'red')
+        plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 0.1, c = 'red')
         plt.xlabel('time')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}\rangle$')
         plt.title('Accretion Rate e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
+        savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
+        plt.savefig(savename, dpi=400)
+
+        bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits/1)
+        bin_means    = [np.mean(bin) for bin in bins]
+        Orbit_Number = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
+
+        plt.figure()
+        plt.plot(Orbit_Number,bin_means/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 1)
+        plt.xlabel('time')
+        plt.ylabel(r'$\dot{M}/\langle\dot{M}\rangle$')
+        plt.title('Accretion Rate Averaged e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 

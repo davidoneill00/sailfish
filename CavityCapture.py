@@ -118,7 +118,7 @@ def main_cbdiso_2d(chkpt,points):
 	fig.suptitle('Orbit %g'%(chkpt["time"] / 2 / np.pi))
 	FigDirectory =  sys.argv[2]
 	print('Saving Plot')
-	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi))
+	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
 
 
 
@@ -196,9 +196,9 @@ if __name__ == "__main__":
 	if Cavity_File_Check != True:
 		print('There are missing cavity property files. Now running fits for',Cavity_File_Check)
 
-		num_tasks_per_batch = 48
+		num_tasks_per_batch = 4
 		for i in range(0, len(Cavity_File_Check), num_tasks_per_batch):
-			with Pool(processes=pool_size) as pool:
+			with Pool(processes=num_tasks_per_batch) as pool:
 				batch       = Cavity_File_Check[i:i + num_tasks_per_batch]
 				CavityState = pool.map(MP_Cavity_Properties, batch)
 
