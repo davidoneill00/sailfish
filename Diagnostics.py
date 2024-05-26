@@ -23,6 +23,9 @@ class DavidTimeseries:
         Checkpoint = load_checkpoint(chkpt)
         ts = Checkpoint['timeseries']
 
+        self.pointmasses    = Checkpoint["point_masses"]
+        self.currenttime    = Checkpoint["time"] / 2 / np.pi 
+        self.modelparams    = Checkpoint['model_parameters'] 
         self.time           = np.array([s[ 0] for s in ts])
         self.semimajor_axis = np.array([s[ 1] for s in ts])
         self.eccentricity   = np.array([s[ 2] for s in ts])
@@ -119,17 +122,16 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     
+
+    ts                  = DavidTimeseries(filename)
     filename            = args.checkpoints[0]
-    LoadFile            = load_checkpoint(filename)
-    Primary,Secondary   = LoadFile["point_masses"]
+    Primary,Secondary   = ts.pointmasses
     Point_MassPrimary   = PointMass(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
     Point_MassSecondary = PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
     OrbitalEccentricity = OrbitalState(Point_MassPrimary,Point_MassSecondary).eccentricity
 
-    CurrentTime         = LoadFile["time"] / 2 / np.pi     ########FIX
-    print(CurrentTime)
-    ts                  = DavidTimeseries(filename)
-    Model_Parameters    = LoadFile['model_parameters']
+    CurrentTime         = ts.currenttime
+    Model_Parameters    = ts.modelparams
 
     Number_of_Orbits    = 100.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
