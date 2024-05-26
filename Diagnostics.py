@@ -123,8 +123,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
 
-    ts                  = DavidTimeseries(filename)
     filename            = args.checkpoints[0]
+    ts                  = DavidTimeseries(filename)
     Primary,Secondary   = ts.pointmasses
     Point_MassPrimary   = PointMass(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
     Point_MassSecondary = PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
@@ -133,7 +133,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 100.
+    Number_of_Orbits    = 400.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
