@@ -127,6 +127,7 @@ if __name__ == '__main__':
     OrbitalEccentricity = OrbitalState(Point_MassPrimary,Point_MassSecondary).eccentricity
 
     CurrentTime         = LoadFile["time"] / 2 / np.pi     ########FIX
+    print(CurrentTime)
     ts                  = DavidTimeseries(filename)
     Model_Parameters    = LoadFile['model_parameters']
 
@@ -195,7 +196,7 @@ if __name__ == '__main__':
     if args.Accretion:
 
         plt.figure()
-        plt.plot(Final_Orbits[::25],(ts.mdot1[-len(Final_Orbits)::25]+ts.mdot2[-len(Final_Orbits)::25])/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 0.1, c = 'red')
+        plt.plot(Final_Orbits[::],(ts.mdot1[-len(Final_Orbits)::]+ts.mdot2[-len(Final_Orbits)::])/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 0.1, c = 'red')
         plt.xlabel('time')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}\rangle$')
         plt.title('Accretion Rate e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
