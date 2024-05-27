@@ -263,6 +263,9 @@ def main_cbdiso_2d():
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
+        print(chkpt["point_masses"][0])
+        print(chkpt["point_masses"][1])
+        print(chkpt["time"]/2/np.pi)
         mesh = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
 
