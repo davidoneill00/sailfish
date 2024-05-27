@@ -246,7 +246,7 @@ class OrbitalState(NamedTuple):
         l2 = m2 * r2 * vf2
         r = r1 + r2
         l = l1 + l2
-        h = t1 + t2 - G * m1 * m2 / r
+        h = t1 + t2 - NEWTON_G * m1 * m2 / r
 
         if h >= 0.0:
             raise ValueError("the orbit is unbound")
@@ -255,7 +255,7 @@ class OrbitalState(NamedTuple):
         a = -0.5 * NEWTON_G * m1 * m2 / h
         b = sqrt(-0.5 * l * l / h * (m1 + m2) / (m1 * m2))
         e = sqrt(clamp_between_zero_and_one(1.0 - b * b / a / a))
-        omega = sqrt(G * m / a / a / a)
+        omega = sqrt(NEWTON_G * m / a / a / a)
 
         # semi-major and semi-minor axes of the primary
         a1 = a * q / (1.0 + q)
@@ -288,7 +288,10 @@ class OrbitalState(NamedTuple):
         # cartesian components of semi-major axis, and the argument of periapse
         ax = (cn - e) * x1 + sn * sqrt(1.0 - e * e) * y1
         ay = (cn - e) * y1 - sn * sqrt(1.0 - e * e) * x1
-        pomega = atan2(ay, ax)
+        if e>1e-4:
+            pomega = atan2(ay, ax)
+        else:
+            pomega = 0
 
         # final result
         elements = OrbitalElements(a, m, q, e)
