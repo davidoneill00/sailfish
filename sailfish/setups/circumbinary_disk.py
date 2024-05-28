@@ -835,6 +835,7 @@ class BinaryInspiral(SetupBase):
                 eccentricity=OEI[1],
             )
 
+    '''
     def point_masses(self, time):
         m1, m2 = self.orbital_elements(time).orbital_state(time)
 
@@ -854,6 +855,42 @@ class BinaryInspiral(SetupBase):
                 **m2._asdict(),
             ),
         )
+    '''
+    def point_masses(self, time):
+        from math import cos, sin, sqrt
+        semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)
+        omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
+        m1 = 0.5
+        m2 = 0.5
+        x1 = semi_major * cos (omega_b * time)
+        y1 = semi_major * sin (omega_b * time)
+        x2 = -x1
+        y2 = -y1
+        vx1 = -y1
+        xy1 = x1
+        vx2 = -vx1
+        vy2 = -vy1
+
+        c1 = PointMass(m1, x1, y1, vx1, vy1)
+        c2 = PointMass(m2, x2, y2, vx2, vy2)
+        m1, m2 = OrbitalState(c1, c2)    
+
+        return (
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m1._asdict(),
+            ),
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m2._asdict(),
+            ),
+        )            
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time))
