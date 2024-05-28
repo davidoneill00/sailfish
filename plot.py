@@ -263,9 +263,16 @@ def main_cbdiso_2d():
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
-        print(chkpt["point_masses"][0])
-        print(chkpt["point_masses"][1])
+        #print(chkpt["point_masses"][0])
+        #print(chkpt["point_masses"][1])
+        from sailfish.physics.kepler import OrbitalOrientation, OrbitalState
+        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(chkpt["time"]/2/np.pi)
+        Primary,Secondary = chkpt["point_masses"]
+        #Point_MassPrimary = OrbitalOrientation(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
+        #Point_MassSecondary = PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
+        print(OrbitalState(Primary,Secondary).orbital_parameters(0)[1])
+
         mesh = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
 
