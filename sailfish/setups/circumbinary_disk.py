@@ -11,7 +11,7 @@ from sailfish.physics.circumbinary import (
     SinkModel,
     ViscosityModel,
 )
-from sailfish.physics.kepler import OrbitalElements
+from sailfish.physics.kepler import OrbitalElements, OrbitalState
 from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
 from sailfish.setup_base import SetupBase, SetupError, param
 import os
@@ -858,6 +858,7 @@ class BinaryInspiral(SetupBase):
     '''
     def point_masses(self, time):
         from math import cos, sin, sqrt
+        
         semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)
         omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
         m1 = 0.5
@@ -867,30 +868,16 @@ class BinaryInspiral(SetupBase):
         x2 = -x1
         y2 = -y1
         vx1 = -y1
-        xy1 = x1
+        vy1 = x1
         vx2 = -vx1
         vy2 = -vy1
 
-        c1 = PointMass(m1, x1, y1, vx1, vy1)
-        c2 = PointMass(m2, x2, y2, vx2, vy2)
-        m1, m2 = OrbitalState(c1, c2)    
+        c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length=self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius=self.sink_radius,)
+        c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length=self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius=self.sink_radius,)
+        #m1, m2 = OrbitalState(c1, c2)    
 
-        return (
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m1._asdict(),
-            ),
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m2._asdict(),
-            ),
-        )            
+        return (c1,c2)
+           
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time))
