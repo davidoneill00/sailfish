@@ -863,8 +863,8 @@ class BinaryInspiral(SetupBase):
         omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
         m1 = 0.5
         m2 = 0.5
-        x1 = semi_major * cos (omega_b * time)
-        y1 = semi_major * sin (omega_b * time)
+        x1 = 0.5 * semi_major * cos (omega_b * time)
+        y1 = 0.5 * semi_major * sin (omega_b * time)
         x2 = -x1
         y2 = -y1
         vx1 = -y1
