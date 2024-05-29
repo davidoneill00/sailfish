@@ -284,7 +284,8 @@ def main_cbdiso_2d():
         plt.scatter(0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), 0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
         plt.scatter(-0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), -0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
 
-
+        plt.scatter(Primary.position_x, Primary.position_y, marker = 'o', c = 'green')
+        plt.scatter(Secondary.position_x, Secondary.position_y, marker = 'o', c = 'green')
 
 
 
