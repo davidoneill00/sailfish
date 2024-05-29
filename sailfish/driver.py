@@ -879,16 +879,16 @@ def main():
 
                     return Inspiral_Dict
 
-                Integration_Necessary_Quantities = Integrate_Inspiral(1)
+                Integrated_Orbit = Integrate_Inspiral(1.)
 
                 from numpy import pi
-                inspiral_end_time = Integration_Necessary_Quantities["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
+                inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
                 if (driver.setup_name == 'binary-inspiral'):
-                    driver.model_parameters["semi_major_axis_list"] = Integration_Necessary_Quantities["SemiMajorAxis"]
-                    driver.model_parameters["eccentricity_list"]    = Integration_Necessary_Quantities["Eccentricity"]
-                    driver.model_parameters["inspiral_time_list"]   = list(Integration_Necessary_Quantities["TimeDomain"])
-                    driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1)
+                    driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
+                    driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
+                    driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
+                    driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1.)
 
 
             if args.event_handlers_file is not None:

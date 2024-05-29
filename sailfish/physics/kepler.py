@@ -352,7 +352,7 @@ class OrbitalElements(NamedTuple):
         m1 = m / (1.0 + q)
         m2 = m - m1
         return m1 * m2 / m * sqrt(NEWTON_G * m * a * (1.0 - e * e))
-
+    '''
     def orbital_state_from_eccentric_anomaly(
         self, eccentric_anomaly: float
     ) -> OrbitalState:
@@ -436,7 +436,7 @@ class OrbitalElements(NamedTuple):
         c2 = PointMass(m2, x2p, y2p, vx2p, vy2p)
 
         return OrbitalState(c1, c2)
-
+    '''
 
 def solve_newton_rapheson(f, g, x: float) -> float:
     n = 0
