@@ -265,15 +265,21 @@ def main_cbdiso_2d():
         chkpt = load_checkpoint(filename)
         #print(chkpt["point_masses"][0])
         #print(chkpt["point_masses"][1])
-        from sailfish.physics.kepler import OrbitalOrientation, OrbitalState
+        from sailfish.physics.kepler import OrbitalOrientation, OrbitalState, PointMass
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(chkpt["time"]/2/np.pi)
         Primary,Secondary = chkpt["point_masses"]
         #OrbitalOrientation(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
-        #PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
-        #print(OrbitalState(Primary,Secondary).orbital_parameters(0)[1])
+        print('point mass 1',chkpt["point_masses"][0])
+        print('point mass 1',chkpt["point_masses"][1])
+
+        #print('point mass 1',PointMass(Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y))
+        #print('point mass 2',PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y))
         print('x,y,vx,vy',Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
         print('x,y,vx,vy',Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
+        
+        plt.scatter(0.5 * np.cos(chkpt["time"]), 0.5 * np.sin(chkpt["time"]),marker = 'o', c = 'white')
+        plt.scatter(-0.5 * np.cos(chkpt["time"]), -0.5 * np.sin(chkpt["time"]),marker = 'o', c = 'white')
 
         mesh = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
