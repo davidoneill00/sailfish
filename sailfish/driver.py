@@ -857,12 +857,13 @@ def main():
                 Inspiral_Model_Parameters = driver.model_parameters
                 speed_of_light            = Inspiral_Model_Parameters["init_separation_rg"]**0.5
 
-                def Circular_Inspiral_Time(a0):
+                def Circular_Inspiral_Time():
+                    a0 = 1.
                     beta           = 64. / 5. * Inspiral_Model_Parameters["GM"]**3 * Inspiral_Model_Parameters["mass_ratio"] / (1 + Inspiral_Model_Parameters["mass_ratio"])**2 / speed_of_light**5
                     return a0**4 / (4. * beta)
 
                 def Integrate_Inspiral(a0):
-                    Peters_OI = Orbital_Inspiral(current_time=Circular_Inspiral_Time(1),
+                    Peters_OI = Orbital_Inspiral(#current_time=Circular_Inspiral_Time(1),
                         GM=Inspiral_Model_Parameters["GM"],
                         mass_ratio=Inspiral_Model_Parameters["mass_ratio"],
                         speed_of_light=speed_of_light,
@@ -882,13 +883,14 @@ def main():
                 Integrated_Orbit = Integrate_Inspiral(1.)
 
                 from numpy import pi
-                inspiral_end_time = Integrated_Orbit["TimeDomain"][-1] + driver.model_parameters["inspiral_start_time"]
+
+                inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
                 if (driver.setup_name == 'binary-inspiral'):
                     driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
                     driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
                     driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
-                    driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time(1.)
+                    driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time()
 
 
             if args.event_handlers_file is not None:

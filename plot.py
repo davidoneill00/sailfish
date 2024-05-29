@@ -276,7 +276,7 @@ def main_cbdiso_2d():
         #print('x,y,vx,vy',Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
         
         semi_majax = chkpt["timeseries"][-1][ 1]
-        omega_____ = np.sqrt(1/semi_majax/semi_majax/semi_majax)
+        omega_____ = np.sqrt(1./semi_majax/semi_majax/semi_majax)
 
         print('SEMIMAJOR AXIS',semi_majax)
         print('OMEGA',omega_____)
@@ -286,8 +286,6 @@ def main_cbdiso_2d():
 
         plt.scatter(Primary.position_x, Primary.position_y, marker = 'o', c = 'green')
         plt.scatter(Secondary.position_x, Secondary.position_y, marker = 'o', c = 'green')
-
-        print('')
 
         mesh = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
@@ -341,7 +339,8 @@ def main_cbdiso_2d():
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
         fig.colorbar(cm)
-        fig.suptitle(filename)
+        #fig.suptitle(filename)
+        fig.suptitle(chkpt["time"]/2/np.pi)
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )

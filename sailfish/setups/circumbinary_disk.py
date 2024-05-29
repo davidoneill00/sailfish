@@ -799,9 +799,9 @@ class BinaryInspiral(SetupBase):
     def Orbital_Elements_for_Inspiral(self, time):
         flag = self.do_inspiral(time)
         if flag:
-            t0 = time - self.inspiral_start_time * self.reference_time_scale
+            Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
 
-            Inspiral_Progress         = t0/self.integration_timestep
+            Inspiral_Progress         = Inspiral_t/self.integration_timestep
             Nstep                     = floor(Inspiral_Progress)
             Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
 
@@ -825,6 +825,7 @@ class BinaryInspiral(SetupBase):
 
         else:
             return [self.a0,self.init_eccentricity]
+
 
     def orbital_elements(self, time):
         OEI = self.Orbital_Elements_for_Inspiral(time)

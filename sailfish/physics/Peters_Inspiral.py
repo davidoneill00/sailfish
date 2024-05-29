@@ -9,7 +9,7 @@ class Orbital_Inspiral():
     """
 
     def __init__(self,
-        current_time,
+        #current_time,
         GM,
         mass_ratio,
         speed_of_light,
@@ -29,22 +29,27 @@ class Orbital_Inspiral():
             eccentricity_factor = 1 + 121/304 * e**2
             return -gamma * eccentricity_factor / a**4 / ((1-e**2) ** 2.5)
 
-        self.a_array = []
-        self.e_array = []
-        self.T       = np.arange(0,current_time+timestep,timestep)
+        def Circular_Inspiral_Time():
+            #semimajoraxis0 = 1.
+            beta           = 64. / 5. * GM**3 * mass_ratio / (1 + mass_ratio)**2 / speed_of_light**5
+            return SemiMajorAxis0**4 / (4. * beta)
+
+        self.a_array = [SemiMajorAxis0]
+        self.e_array = [eccentricity0]
+        self.T       = np.arange(0,Circular_Inspiral_Time() + timestep,timestep)
 
         a_old        = SemiMajorAxis0
         e_old        = eccentricity0
 
         for i in range(len(self.T)):
-            a_new = a_old + Semi_Major_Axis_Decay_Rate(a_old,e_old,) * timestep 
+            a_new = a_old + Semi_Major_Axis_Decay_Rate(a_old,e_old) * timestep 
             e_new = e_old + Eccentricity_Decay_Rate(a_old,e_old) * timestep 
 
             if a_new < 0:
                 a_new = 1e-6
                 e_new = 0.
-                self.a_array.append(list(a_new * np.ones(20)))  
-                self.e_array.append(list(e_new * np.zeros(20)))
+                self.a_array.append(a_new)
+                self.e_array.append(e_new)
                 # Merger has occured. We fix a small semi-major axis to avoid
                 # divergences of an a = 0 binary
                 break
@@ -55,9 +60,10 @@ class Orbital_Inspiral():
                 a_old = a_new
                 e_old = e_new
 
-        self.semimajoraxis = a_old
-        self.eccentricity  = e_old
-        self.TimeDomain    = self.T[0:len(self.a_array)]
+        #self.semimajoraxis = a_old
+        #self.eccentricity  = e_old
+        self.TimeDomain    = self.T[0:-1]
+        print('Final integrated time............',self.TimeDomain[-1])
 
         if plot_inspiral:
             Peters_Scale = 4 * 64. / 5. * (GM)**3 * mass_ratio / (1+mass_ratio)**2 / (speed_of_light)**5 / (SemiMajorAxis0**4)
