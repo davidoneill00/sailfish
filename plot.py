@@ -269,9 +269,11 @@ def main_cbdiso_2d():
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(chkpt["time"]/2/np.pi)
         Primary,Secondary = chkpt["point_masses"]
-        #Point_MassPrimary = OrbitalOrientation(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
-        #Point_MassSecondary = PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
-        print(OrbitalState(Primary,Secondary).orbital_parameters(0)[1])
+        #OrbitalOrientation(Primary.mass, Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
+        #PointMass(Secondary.mass,Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
+        #print(OrbitalState(Primary,Secondary).orbital_parameters(0)[1])
+        print('x,y,vx,vy',Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
+        print('x,y,vx,vy',Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
 
         mesh = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
