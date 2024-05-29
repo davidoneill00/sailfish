@@ -278,8 +278,10 @@ def main_cbdiso_2d():
         print('x,y,vx,vy',Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
         print('x,y,vx,vy',Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
         
-        plt.scatter(0.5 * np.cos(chkpt["time"]), 0.5 * np.sin(chkpt["time"]),marker = 'o', c = 'white')
-        plt.scatter(-0.5 * np.cos(chkpt["time"]), -0.5 * np.sin(chkpt["time"]),marker = 'o', c = 'white')
+        semi_majax = chkpt["timeseries"][0][ 1]
+        omega_____ = np.sqrt(1/semi_majax/semi_majax/semi_majax)
+        plt.scatter(0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), 0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
+        plt.scatter(-0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), -0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
 
         mesh = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
