@@ -882,7 +882,7 @@ def main():
                 Integrated_Orbit = Integrate_Inspiral(1.)
 
                 from numpy import pi
-                inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
+                inspiral_end_time = Integrated_Orbit["TimeDomain"][-1] + driver.model_parameters["inspiral_start_time"]
 
                 if (driver.setup_name == 'binary-inspiral'):
                     driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
