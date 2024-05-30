@@ -835,7 +835,7 @@ class BinaryInspiral(SetupBase):
             Nstep                    = floor(Inspiral_Progress)
 
             from numpy import trapz
-            Integrated_Orbital_Phase = trapz(self.FixedPhases[0,Nstep], self.inspiral_time_list[0,Nstep], axis=0)
+            Integrated_Orbital_Phase = trapz(self.FixedPhases[0:Nstep], self.inspiral_time_list[0:Nstep], axis=0)
 
             return Integrated_Orbital_Phase + self.inspiral_start_time * self.reference_time_scale
 
