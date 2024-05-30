@@ -268,16 +268,10 @@ def main_cbdiso_2d():
 
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print('Current time',chkpt["time"]/2/np.pi,'[P]')
-        Primary,Secondary = chkpt["point_masses"]
         
-        #print('point mass 1',chkpt["point_masses"][0])
-        #print('point mass 1',chkpt["point_masses"][1])
-
-        #print('x,y,vx,vy',Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
-        #print('x,y,vx,vy',Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
-        
-        semi_majax = chkpt["timeseries"][-1][ 1]
-        omega_____ = np.sqrt(1./semi_majax/semi_majax/semi_majax)
+        Primary,Secondary = chkpt["point_masses"]    
+        semi_majax        = chkpt["timeseries"][-1][ 1]
+        omega_____        = np.sqrt(1./semi_majax/semi_majax/semi_majax)
 
         print('SEMIMAJOR AXIS',semi_majax)
         print('OMEGA',omega_____)
@@ -306,8 +300,8 @@ def main_cbdiso_2d():
         
         print('IN COMPARISON TO',sailfish.physics.)
         '''
-        print('Weird part is X:',0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]))
-        print('Weird part is Y:',0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]))
+        print('Weird part is X:',0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.cos(omega_____ * t))
+        print('Weird part is Y:',0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.sin(omega_____ * t))
         print('Compared to Prim X:',Primary.position_x)
         print('Compared to Prim Y:',Primary.position_y)
 
