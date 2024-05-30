@@ -863,8 +863,7 @@ def main():
                     return a0**4 / (4. * beta)
 
                 def Integrate_Inspiral(a0):
-                    Peters_OI = Orbital_Inspiral(#current_time=Circular_Inspiral_Time(1),
-                        GM=Inspiral_Model_Parameters["GM"],
+                    Peters_OI = Orbital_Inspiral(GM=Inspiral_Model_Parameters["GM"],
                         mass_ratio=Inspiral_Model_Parameters["mass_ratio"],
                         speed_of_light=speed_of_light,
                         eccentricity0=Inspiral_Model_Parameters["init_eccentricity"],
@@ -883,6 +882,9 @@ def main():
                 Integrated_Orbit = Integrate_Inspiral(1.)
 
                 from numpy import pi
+                #import matplotlib.pyplot as plt
+                #plt.plot(list(Integrated_Orbit["TimeDomain"]),Integrated_Orbit["SemiMajorAxis"])
+                #plt.show()
 
                 inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 

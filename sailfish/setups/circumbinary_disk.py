@@ -815,17 +815,25 @@ class BinaryInspiral(SetupBase):
                 SemiMajorAxis_N1 = self.semi_major_axis_list[Nstep+1]
                 Eccentricity_N1  = self.eccentricity_list[Nstep+1]
 
-                Interpolated_SMA = SemiMajorAxis_N0+Position_in_Bracket_N0_N1*(SemiMajorAxis_N1-SemiMajorAxis_N0)
-                Interpolated_ECC = Eccentricity_N0+Position_in_Bracket_N0_N1*(Eccentricity_N1-Eccentricity_N0)
+                Interpolated_SMA = SemiMajorAxis_N0+Position_in_Bracket_N0_N1 *(SemiMajorAxis_N1-SemiMajorAxis_N0)
+                Interpolated_ECC = Eccentricity_N0+Position_in_Bracket_N0_N1 *(Eccentricity_N1-Eccentricity_N0)
                 return [Interpolated_SMA,Interpolated_ECC]
             
-
             except IndexError as e:
                 return [1e-5,0.]
 
         else:
             return [self.a0,self.init_eccentricity]
 
+
+    #def PlotInterpolated_Orbital_Elements_for_Inspiral(self, time):
+    #    import numpy as np
+    #    import matplotlib.pyplot as plt
+    #    timegrid    = np.linspace(0,2 * np.pi * 2 + 2 * np.pi * 1244, 1000)
+    #    outputelems = [self.PreOrbital_Elements_for_Inspiral(tttttt)[0] for tttttt in timegrid]
+    #    plt.plot(timegrid,outputelems)
+    #    plt.show()
+        
 
     def orbital_elements(self, time):
         OEI = self.Orbital_Elements_for_Inspiral(time)
