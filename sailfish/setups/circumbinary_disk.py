@@ -831,12 +831,12 @@ class BinaryInspiral(SetupBase):
         if flag:
             Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
 
-            Inspiral_Progress         = Inspiral_t/self.integration_timestep
-            Nstep                     = floor(Inspiral_Progress)
+            Inspiral_Progress        = Inspiral_t/self.integration_timestep
+            Nstep                    = floor(Inspiral_Progress)
 
-            Integrated_Orbital_Phase = np.trapz(self.FixedPhases[0,Nstep], BinaryRadial[0,Nstep], axis=0)
+            Integrated_Orbital_Phase = np.trapz(self.FixedPhases[0,Nstep], self.inspiral_time_list[0,Nstep], axis=0)
 
-            return Integrated_Orbital_Phase
+            return Integrated_Orbital_Phase + self.inspiral_start_time * self.reference_time_scale
 
         else:
             return np.sqrt(self.GM/self.a0/self.a0/self.a0) * time
@@ -885,11 +885,11 @@ class BinaryInspiral(SetupBase):
         from math import cos, sin, sqrt
         
         semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)
-        omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
+        #omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
         m1 = 0.5
         m2 = 0.5
-        x1 = 0.5 * semi_major * cos (omega_b * time)
-        y1 = 0.5 * semi_major * sin (omega_b * time)
+        x1 = 0.5 * semi_major * cos (self.Integrated_Phase(time))
+        y1 = 0.5 * semi_major * sin (self.Integrated_Phase(time))
         x2 = -x1
         y2 = -y1
         vx1 = -y1
