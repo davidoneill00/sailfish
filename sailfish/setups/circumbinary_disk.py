@@ -637,6 +637,7 @@ class BinaryInspiral(SetupBase):
     semi_major_axis_list = param([]," List of all semi-major axes over the inspiral")
     eccentricity_list    = param([]," List of all eccentricities axes over the inspiral")
     inspiral_time_list   = param([]," List of all eccentricities axes over the inspiral")
+    FixedPhases          = param([]," Find the phase at each point in the inspiral which can be integrated ")
     gw_inspiral_time     = param(0.," The circular inspiral time for a0 = 1 ")
 
     a0 = 1.0
@@ -824,6 +825,21 @@ class BinaryInspiral(SetupBase):
 
         else:
             return [self.a0,self.init_eccentricity]
+
+    def Integrated_Phase(time):
+        flag = self.do_inspiral(time)
+        if flag:
+            Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
+
+            Inspiral_Progress         = Inspiral_t/self.integration_timestep
+            Nstep                     = floor(Inspiral_Progress)
+
+            Integrated_Orbital_Phase = np.trapz(self.FixedPhases[0,Nstep], BinaryRadial[0,Nstep], axis=0)
+
+            return Integrated_Orbital_Phase
+
+        else:
+            return np.sqrt(self.GM/self.a0/self.a0/self.a0) * time
 
 
     #def PlotInterpolated_Orbital_Elements_for_Inspiral(self, time):

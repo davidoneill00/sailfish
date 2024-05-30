@@ -881,17 +881,18 @@ def main():
 
                 Integrated_Orbit = Integrate_Inspiral(1.)
 
-                from numpy import pi
-                #import matplotlib.pyplot as plt
-                #plt.plot(list(Integrated_Orbit["TimeDomain"]),Integrated_Orbit["SemiMajorAxis"])
-                #plt.show()
 
+                from numpy import pi, sqrt
+
+                FixedPhases = [sqrt(Inspiral_Model_Parameters["GM"] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i]) * Integrated_Orbit["TimeDomain"][i] for i in range(len(Integrated_Orbit["SemiMajorAxis"]))]
+                
                 inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
                 if (driver.setup_name == 'binary-inspiral'):
                     driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
                     driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
                     driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
+                    driver.model_parameters["FixedPhases"]          = FixedPhases
                     driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time()
 
 
