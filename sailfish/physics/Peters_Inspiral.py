@@ -61,6 +61,7 @@ class Orbital_Inspiral():
 
         self.TimeDomain    = self.T[0:len(self.a_array)]
 
+
         if plot_inspiral:
             Peters_Scale = 4 * 64. / 5. * (GM)**3 * mass_ratio / (1+mass_ratio)**2 / (speed_of_light)**5 / (SemiMajorAxis0**4)
             plt.plot(self.TimeDomain,self.a_array,c = 'red',label = 'Semi-Major axis a/a0')

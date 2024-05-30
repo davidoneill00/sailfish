@@ -848,6 +848,7 @@ def main():
                 import pickle as pk
                 with open(driver.chkpt_file, "rb") as file:
                     chkpt = pk.load(file)
+                    
 
 
             if (driver.setup_name == 'binary-inspiral') or (chkpt["setup_name"] == 'binary-inspiral'):
@@ -881,10 +882,9 @@ def main():
 
                 Integrated_Orbit = Integrate_Inspiral(1.)
 
+                from numpy import pi, sqrt, cumsum
 
-                from numpy import pi, sqrt
-
-                FixedPhases = [sqrt(Inspiral_Model_Parameters["GM"] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i]) * Integrated_Orbit["TimeDomain"][i] for i in range(len(Integrated_Orbit["SemiMajorAxis"]))]
+                FixedPhases___ = list(cumsum([sqrt(Inspiral_Model_Parameters["GM"] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i]) * Integrated_Orbit["TimeDomain"][i] for i in range(0,len(Integrated_Orbit["SemiMajorAxis"]))]) * driver.model_parameters["integration_timestep"])
                 
                 inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
@@ -892,8 +892,20 @@ def main():
                     driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
                     driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
                     driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
-                    driver.model_parameters["FixedPhases"]          = FixedPhases
+                    driver.model_parameters["Fixed_Phases"]         = FixedPhases___
                     driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time()
+
+                #elif chkpt["setup_name"] == 'binary-inspiral':
+                #    cmp_ = chkpt["model_parameters"]
+                #    cmp_["Fixed_Phases"] = FixedPhases___
+
+                #    #with open('/scratch/do2364@/sfish-test/Prograde_Inspiral_Test/chkpt.0100.pk', "wb") as cvt:
+                #    with open('sfish-test/chkpt.0100.pk', "wb") as cvt:
+                #        pk.dump(chkpt, cvt)
+                #    print('PICKLE DUMPED')
+                #    exit()
+                
+
 
 
             if args.event_handlers_file is not None:

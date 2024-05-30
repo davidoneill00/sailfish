@@ -637,12 +637,11 @@ class BinaryInspiral(SetupBase):
     semi_major_axis_list = param([]," List of all semi-major axes over the inspiral")
     eccentricity_list    = param([]," List of all eccentricities axes over the inspiral")
     inspiral_time_list   = param([]," List of all eccentricities axes over the inspiral")
-    FixedPhases          = param([]," Find the phase at each point in the inspiral which can be integrated ")
+    Fixed_Phases         = param([]," Find the phase at each point in the inspiral which can be integrated ")
     gw_inspiral_time     = param(0.," The circular inspiral time for a0 = 1 ")
 
     a0 = 1.0
     GM = 1.0
-
 
     @property
     def is_isothermal(self):
@@ -826,18 +825,21 @@ class BinaryInspiral(SetupBase):
         else:
             return [self.a0,self.init_eccentricity]
 
-    def Integrated_Phase(self,time):
+    def Interpolated_Phase(self,time):
         flag = self.do_inspiral(time)
         if flag:
             Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
 
-            Inspiral_Progress        = Inspiral_t/self.integration_timestep
-            Nstep                    = floor(Inspiral_Progress)
+            Inspiral_Progress         = Inspiral_t/self.integration_timestep
+            Nstep                     = floor(Inspiral_Progress)
+            Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
 
-            from numpy import trapz
-            Integrated_Orbital_Phase = trapz(self.FixedPhases[0:Nstep], self.inspiral_time_list[0:Nstep], axis=0)
+            Phase_N0 = self.Fixed_Phases[Nstep]
+            Phase_N1 = self.Fixed_Phases[Nstep + 1]
 
-            return Integrated_Orbital_Phase + self.inspiral_start_time * self.reference_time_scale
+            Interpolated_Phase = Phase_N0 + Position_in_Bracket_N0_N1 * (Phase_N1 - Phase_N0)
+
+            return Interpolated_Phase + self.inspiral_start_time * self.reference_time_scale
 
         else:
             return np.sqrt(self.GM/self.a0/self.a0/self.a0) * time
@@ -889,8 +891,8 @@ class BinaryInspiral(SetupBase):
         #omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
         m1 = 0.5
         m2 = 0.5
-        x1 = 0.5 * semi_major * cos (self.Integrated_Phase(time))
-        y1 = 0.5 * semi_major * sin (self.Integrated_Phase(time))
+        x1 = 0.5 * semi_major * cos (self.Interpolated_Phase(time))
+        y1 = 0.5 * semi_major * sin (self.Interpolated_Phase(time))
         x2 = -x1
         y2 = -y1
         vx1 = -y1
