@@ -37,6 +37,9 @@ class DavidTimeseries:
         self.torque_b       = np.array([s[ 8] for s in ts])
         self.mdot_b         = np.array([s[ 9] for s in ts])
         self.disk_ecc       = np.array([s[10] for s in ts])
+        self.Inspiral_Times = Checkpoint["model_parameters"]["inspiral_time_list"]
+        self.Orbital_Phase  = Checkpoint["model_parameters"]["Fixed_Phases"]
+
 
         if Checkpoint["model_parameters"]["which_diagnostics"] == "david_new":
             self.innertorque    = np.array([s[11] for s in ts])
@@ -49,7 +52,6 @@ class DavidTimeseries:
             self.outerpower_1   = np.array([s[18] for s in ts])
             self.innerpower_2   = np.array([s[19] for s in ts])
             self.outerpower_2   = np.array([s[20] for s in ts])
-
 
     @property
     def dt(self):
@@ -79,6 +81,7 @@ class DavidTimeseries:
     def total_angular_momentum(self):
     	return self.jdisk + self.binary_delta_j + self.buffer_delta_j # self.gw_delta_j
       
+    
 
 if __name__ == '__main__':
 
@@ -140,7 +143,13 @@ if __name__ == '__main__':
     M_dot_0             = 3 * np.pi * viscosity * Sigma_0
     Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
 
-
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.title('Orbital Phase')
+    plt.ylabel(r'$\phi$ Radians')
+    plt.xlabel('Time from inspiral')
+    plt.plot(np.array(ts.Inspiral_Times[0:15624999])/2/np.pi,ts.Orbital_Phase[0:15624999])
+    plt.show()
     #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     #print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
     #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')

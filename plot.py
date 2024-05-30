@@ -280,6 +280,8 @@ def main_cbdiso_2d():
 
         print('OMEGA TIMES T',omega_____ * chkpt["time"])
 
+        print(Primary)
+        print(Secondary)
         '''
         from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
         def Integrate_Inspiral(a0):
