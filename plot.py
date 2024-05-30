@@ -265,6 +265,7 @@ def main_cbdiso_2d():
         chkpt = load_checkpoint(filename)
         
         from sailfish.physics.kepler import OrbitalOrientation, OrbitalState, PointMass
+
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print(chkpt["time"]/2/np.pi)
         Primary,Secondary = chkpt["point_masses"]
@@ -280,6 +281,31 @@ def main_cbdiso_2d():
 
         print('SEMIMAJOR AXIS',semi_majax)
         print('OMEGA',omega_____)
+
+        '''
+        from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
+        def Integrate_Inspiral(a0):
+            Peters_OI = Orbital_Inspiral(GM=1.,
+                mass_ratio=1.,
+                speed_of_light=10.,
+                eccentricity0=0.,
+                SemiMajorAxis0=1.,
+                timestep=0.0005,
+                plot_inspiral=False)
+
+            Inspiral_Dict = {
+                "TimeDomain":Peters_OI.TimeDomain,
+                "SemiMajorAxis":Peters_OI.a_array,
+                "Eccentricity":Peters_OI.e_array,
+                }
+
+            return Inspiral_Dict
+
+                Integrated_Orbit = Integrate_Inspiral(1.)
+
+        
+        print('IN COMPARISON TO',sailfish.physics.)
+        '''
 
         plt.scatter(0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), 0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
         plt.scatter(-0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), -0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')

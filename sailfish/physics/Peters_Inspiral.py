@@ -60,7 +60,6 @@ class Orbital_Inspiral():
                 e_old = e_new
 
         self.TimeDomain    = self.T[0:len(self.a_array)]
-        #print('Final integrated time............',self.TimeDomain[-1])
 
         if plot_inspiral:
             Peters_Scale = 4 * 64. / 5. * (GM)**3 * mass_ratio / (1+mass_ratio)**2 / (speed_of_light)**5 / (SemiMajorAxis0**4)
