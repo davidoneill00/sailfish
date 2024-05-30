@@ -300,8 +300,8 @@ def main_cbdiso_2d():
         
         print('IN COMPARISON TO',sailfish.physics.)
         '''
-        print('Weird part is X:',0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.cos(omega_____ * t))
-        print('Weird part is Y:',0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.sin(omega_____ * t))
+        print('Weird part is X:',0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.cos(omega_____ * chkpt["time"]))
+        print('Weird part is Y:',0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.sin(omega_____ * chkpt["time"]))
         print('Compared to Prim X:',Primary.position_x)
         print('Compared to Prim Y:',Primary.position_y)
 
