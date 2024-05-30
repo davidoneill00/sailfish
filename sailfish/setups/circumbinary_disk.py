@@ -887,16 +887,16 @@ class BinaryInspiral(SetupBase):
     def point_masses(self, time):
         from math import cos, sin, sqrt
         
-        semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)
-        #omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
+        semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)#self.Orbital_Elements_for_Inspiral(time)
+        omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
         m1 = 0.5
         m2 = 0.5
         x1 = 0.5 * semi_major * cos (self.Interpolated_Phase(time))
         y1 = 0.5 * semi_major * sin (self.Interpolated_Phase(time))
         x2 = -x1
         y2 = -y1
-        vx1 = -y1
-        vy1 = x1
+        vx1 = - omega_b * y1
+        vy1 = omega_b * x1
         vx2 = -vx1
         vy2 = -vy1
 

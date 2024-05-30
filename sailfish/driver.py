@@ -884,7 +884,7 @@ def main():
 
                 from numpy import pi, sqrt, cumsum
 
-                FixedPhases___ = list(cumsum([sqrt(Inspiral_Model_Parameters["GM"] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i]) * Integrated_Orbit["TimeDomain"][i] for i in range(0,len(Integrated_Orbit["SemiMajorAxis"]))]) * driver.model_parameters["integration_timestep"])
+                FixedPhases___ = list(cumsum([sqrt(Inspiral_Model_Parameters["GM"] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i]) for i in range(0,len(Integrated_Orbit["SemiMajorAxis"]))]) * driver.model_parameters["integration_timestep"])
                 
                 inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
