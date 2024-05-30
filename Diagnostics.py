@@ -143,13 +143,12 @@ if __name__ == '__main__':
     M_dot_0             = 3 * np.pi * viscosity * Sigma_0
     Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
 
-    import matplotlib.pyplot as plt
     plt.figure()
     plt.title('Orbital Phase')
     plt.ylabel(r'$\phi$ Radians')
     plt.xlabel('Time from inspiral')
     plt.plot(np.array(ts.Inspiral_Times[0:15624999])/2/np.pi,ts.Orbital_Phase[0:15624999])
-    plt.show()
+    plt.savefig(os.getcwd() + '/Outputs/OrbitalPhase.png',dpi = 400)
     #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     #print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
     #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')

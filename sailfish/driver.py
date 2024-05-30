@@ -899,7 +899,7 @@ def main():
                 #    cmp_ = chkpt["model_parameters"]
                 #    cmp_["Fixed_Phases"] = FixedPhases___
 
-                #    #with open('/scratch/do2364@/sfish-test/Prograde_Inspiral_Test/chkpt.0100.pk', "wb") as cvt:
+                #    with open('/scratch/do2364@/sfish-test/Prograde_Inspiral_Test/chkpt.0100.pk', "wb") as cvt:
                 #    with open('sfish-test/chkpt.0100.pk', "wb") as cvt:
                 #        pk.dump(chkpt, cvt)
                 #    print('PICKLE DUMPED')
