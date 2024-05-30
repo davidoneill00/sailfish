@@ -826,7 +826,7 @@ class BinaryInspiral(SetupBase):
         else:
             return [self.a0,self.init_eccentricity]
 
-    def Integrated_Phase(time):
+    def Integrated_Phase(self,time):
         flag = self.do_inspiral(time)
         if flag:
             Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
