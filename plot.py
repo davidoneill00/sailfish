@@ -268,13 +268,17 @@ def main_cbdiso_2d():
 
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         print('Current time',chkpt["time"]/2/np.pi,'[P]')
-        
+        print('Current time',chkpt["time"],'[2pi]')
+
+
         Primary,Secondary = chkpt["point_masses"]    
         semi_majax        = chkpt["timeseries"][-1][ 1]
         omega_____        = np.sqrt(1./semi_majax/semi_majax/semi_majax)
 
         print('SEMIMAJOR AXIS',semi_majax)
         print('OMEGA',omega_____)
+
+        print('OMEGA TIMES T',omega_____ * chkpt["time"])
 
         '''
         from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
