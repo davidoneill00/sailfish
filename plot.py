@@ -267,11 +267,11 @@ def main_cbdiso_2d():
         from sailfish.physics.kepler import OrbitalOrientation, OrbitalState, PointMass
 
         print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-        print(chkpt["time"]/2/np.pi)
+        print('Current time',chkpt["time"]/2/np.pi,'[P]')
         Primary,Secondary = chkpt["point_masses"]
         
-        print('point mass 1',chkpt["point_masses"][0])
-        print('point mass 1',chkpt["point_masses"][1])
+        #print('point mass 1',chkpt["point_masses"][0])
+        #print('point mass 1',chkpt["point_masses"][1])
 
         #print('x,y,vx,vy',Primary.position_x, Primary.position_y, Primary.velocity_x, Primary.velocity_y)
         #print('x,y,vx,vy',Secondary.position_x,Secondary.position_y,Secondary.velocity_x,Secondary.velocity_y)
@@ -306,8 +306,12 @@ def main_cbdiso_2d():
         
         print('IN COMPARISON TO',sailfish.physics.)
         '''
+        print('Weird part is X:',0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]))
+        print('Weird part is Y:',0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]))
+        print('Compared to Prim X:',Primary.position_x)
+        print('Compared to Prim Y:',Primary.position_y)
 
-        plt.scatter(0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), 0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
+        plt.scatter(0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]) , 0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
         plt.scatter(-0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), -0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
 
         plt.scatter(Primary.position_x, Primary.position_y, marker = 'o', c = 'green')
