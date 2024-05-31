@@ -264,58 +264,6 @@ def main_cbdiso_2d():
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
         
-        from sailfish.physics.kepler import OrbitalOrientation, OrbitalState, PointMass
-
-        print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-        print('Current time',chkpt["time"]/2/np.pi,'[P]')
-        print('Current time',chkpt["time"],'[2pi]')
-
-
-        Primary,Secondary = chkpt["point_masses"]    
-        semi_majax        = chkpt["timeseries"][-1][ 1]
-        omega_____        = np.sqrt(1./semi_majax/semi_majax/semi_majax)
-
-        print('SEMIMAJOR AXIS',semi_majax)
-        print('OMEGA',omega_____)
-
-        print('OMEGA TIMES T',omega_____ * chkpt["time"])
-
-        print(Primary)
-        print(Secondary)
-        '''
-        from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
-        def Integrate_Inspiral(a0):
-            Peters_OI = Orbital_Inspiral(GM=1.,
-                mass_ratio=1.,
-                speed_of_light=10.,
-                eccentricity0=0.,
-                SemiMajorAxis0=1.,
-                timestep=0.0005,
-                plot_inspiral=False)
-
-            Inspiral_Dict = {
-                "TimeDomain":Peters_OI.TimeDomain,
-                "SemiMajorAxis":Peters_OI.a_array,
-                "Eccentricity":Peters_OI.e_array,
-                }
-
-            return Inspiral_Dict
-
-                Integrated_Orbit = Integrate_Inspiral(1.)
-
-        
-        print('IN COMPARISON TO',sailfish.physics.)
-        '''
-        print('Weird part is X:',0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.cos(omega_____ * chkpt["time"]))
-        print('Weird part is Y:',0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),'Are these the same?', 0.5 * np.sin(omega_____ * chkpt["time"]))
-        print('Compared to Prim X:',Primary.position_x)
-        print('Compared to Prim Y:',Primary.position_y)
-
-        plt.scatter(0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]) , 0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
-        plt.scatter(-0.5 * semi_majax * np.cos(omega_____ * chkpt["time"]), -0.5 * semi_majax * np.sin(omega_____ * chkpt["time"]),marker = 'o', c = 'white')
-
-        plt.scatter(Primary.position_x, Primary.position_y, marker = 'o', c = 'green')
-        plt.scatter(Secondary.position_x, Secondary.position_y, marker = 'o', c = 'green')
 
         mesh = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])

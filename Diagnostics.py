@@ -136,7 +136,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 400.
+    Number_of_Orbits    = 500.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
@@ -149,9 +149,6 @@ if __name__ == '__main__':
     plt.xlabel('Time from inspiral')
     plt.plot(np.array(ts.Inspiral_Times[0:15624999])/2/np.pi,ts.Orbital_Phase[0:15624999])
     plt.savefig(os.getcwd() + '/Outputs/OrbitalPhase.png',dpi = 400)
-    #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    #print('Unitless Torque normalised to SteadyState Accretion: ',np.mean(Normalised_Torque))
-    #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
 
 
     if args.Disk_Momentum:
@@ -206,9 +203,9 @@ if __name__ == '__main__':
     if args.Accretion:
 
         plt.figure()
-        plt.plot(Final_Orbits[::],(ts.mdot1[-len(Final_Orbits)::]+ts.mdot2[-len(Final_Orbits)::])/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 0.1, c = 'red')
+        plt.plot(Final_Orbits[::],(ts.mdot1[-len(Final_Orbits)::]+ts.mdot2[-len(Final_Orbits)::])/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.1, c = 'red')
         plt.xlabel('time')
-        plt.ylabel(r'$\dot{M}/\langle\dot{M}\rangle$')
+        plt.ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         plt.title('Accretion Rate e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
