@@ -842,7 +842,8 @@ class BinaryInspiral(SetupBase):
             return Interpolated_Phase + self.inspiral_start_time * self.reference_time_scale
 
         else:
-            return np.sqrt(self.GM/self.a0/self.a0/self.a0) * time
+            from math import sqrt
+            return sqrt(self.GM/self.a0/self.a0/self.a0) * time
 
 
     #def PlotInterpolated_Orbital_Elements_for_Inspiral(self, time):
