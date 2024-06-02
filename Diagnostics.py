@@ -207,22 +207,14 @@ if __name__ == '__main__':
         plt.xlabel('time')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         plt.title('Accretion Rate e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
+        
+        bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits/1)
+        bin_means    = [np.mean(bin) for bin in bins]
+        Orbit_Number = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
+
+        plt.plot(Orbit_Number,bin_means/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.5, label = 'Binned Means')
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
-
-
-        
-        #bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits/1)
-        #bin_means    = [np.mean(bin) for bin in bins]
-        #Orbit_Number = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
-
-        #plt.figure()
-        #plt.plot(Orbit_Number,bin_means/np.mean(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):]),label='mdot',linewidth = 0.5)
-        #plt.xlabel('time')
-        #plt.ylabel(r'$\dot{M}/\langle\dot{M}\rangle$')
-        #plt.title('Accretion Rate Averaged e = %g'%(np.round(OrbitalEccentricity,3)))
-        #savename = os.getcwd() +  "/Outputs/AveragedAccretionRate.%04d.png"%(CurrentTime)
-        #plt.savefig(savename, dpi=400)
 
     if args.Orbital_Elements:
         plt.figure()
