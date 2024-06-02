@@ -136,7 +136,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 500.
+    Number_of_Orbits    = 1500.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
@@ -203,16 +203,20 @@ if __name__ == '__main__':
     if args.Accretion:
 
         plt.figure()
-        plt.plot(Final_Orbits[::],(ts.mdot1[-len(Final_Orbits)::]+ts.mdot2[-len(Final_Orbits)::])/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.1, c = 'red')
-        plt.xlabel('time')
+        plt.plot(Final_Orbits[::5],(ts.mdot1[-len(Final_Orbits)::5]+ts.mdot2[-len(Final_Orbits)::5])/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.1, c = 'red')
+        plt.xlabel('Time [P]')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
-        plt.title('Accretion Rate e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
-        
-        bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits/1)
+        plt.title('Accretion Rate e = %g Prograde'%(np.round(OrbitalEccentricity,3)))
+        plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
+
+
+        Nbins        = 2
+        bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits/Nbins)
         bin_means    = [np.mean(bin) for bin in bins]
         Orbit_Number = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
 
-        plt.plot(Orbit_Number,bin_means/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.5, label = 'Binned Means')
+        plt.plot(Orbit_Number[::Nbins],bin_means/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
+        plt.legend()
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
