@@ -214,7 +214,7 @@ if __name__ == '__main__':
         TimeBins      = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
         hist, edges   = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
         CumulativeAcc = np.cumsum(hist)
-        MeanAccretion = [np.mean(AccretionRate[CumulativeAcc[i-1]:CumulativeAcc[i]]) for i in range(1,int(Number_of_Orbits))]
+        MeanAccretion = [np.mean(AccretionRate[CumulativeAcc[i-1]:CumulativeAcc[i]]) for i in range(1,len(TimeBins))]
         #Nbins        = 2
         #TimeBins     = 
         #bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits#/Nbins)
