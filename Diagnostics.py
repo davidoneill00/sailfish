@@ -222,7 +222,7 @@ if __name__ == '__main__':
         #
 
         plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
-        plt.legend()
+        plt.legend(loc = 'upper right')
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
