@@ -210,10 +210,17 @@ if __name__ == '__main__':
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
 
 
-        Nbins        = 2
-        bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits/Nbins)
-        bin_means    = [np.mean(bin) for bin in bins]
-        Orbit_Number = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
+        TimeBins     = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
+        BinnedTimes  = []
+        for i in range(1,len(TimeBins)):
+            BinnedTimes.append(np.array(ts.time[np.digitize(ts.time,TimeBins)==i]))
+
+
+        BinnedTimes = np.array(BinnedTimes)
+        print(np.shape(BinnedTimes))
+        #bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits#/Nbins)
+        #bin_means    = [np.mean(bin) for bin in bins]
+        #Orbit_Number = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
 
         plt.plot(Orbit_Number[::Nbins],bin_means/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.legend()
