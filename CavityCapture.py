@@ -171,6 +171,7 @@ def CheckForCavityFileExistence():
 
 def LoadCavityFiles():
 	Cavity_Checkpoints = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*CavityProperties*.pk')]
+	print(Cavity_Checkpoints)
 	Time_Snapshots     = []
 	Semi_Major_Axis    = []
 	Eccentricity       = []
