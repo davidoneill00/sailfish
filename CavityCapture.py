@@ -178,7 +178,7 @@ def LoadCavityFiles():
 	BinarySMA          = []
 	for cc in Cavity_Checkpoints:
 		cav_props = load_checkpoint(cc)
-
+        print(cav_props)
 		Time_Snapshots.append(cav_props["CurrentTime"])
 		Semi_Major_Axis.append(cav_props["SemiMajorAxis"])
 		Eccentricity.append(cav_props["Eccentricity"])
