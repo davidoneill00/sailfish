@@ -129,11 +129,11 @@ def MP_Cavity_Properties(arg):
 	Binary_SMA        = np.array([s[ 1] for s in chkpt['timeseries']])[-1]
 	cavity_properties["Binary_SemiMajorAxis"] = Binary_SMA
 	cavity_properties["CurrentTime"]          = chkpt["time"] / 2 / np.pi
-
+	cavity_properties["viscosity"]            = chkpt["model_parameters"]["nu"]
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines)
 	
-	FileName = arg.replace('chkpt','CavityProperties')
+	FileName = arg.replace('chkpt','CavityProperties%g_nu'%(cavity_properties["viscosity"]))
 	with open(FileName, "wb") as cvt:
 		pk.dump(cavity_properties, cvt)
 
@@ -234,7 +234,7 @@ if __name__ == "__main__":
 	plt.yticks([10,1,0.1,0.001])
 	plt.xticks([1,0.1,0.01])
 	plt.ylim([0.06,1.2])
-	plt.xlim([0.02,1])
+	plt.xlim([1,0.02])
 	plt.savefig(FigDirectory + '/Decoupling.png', dpi=400)
 
 	
