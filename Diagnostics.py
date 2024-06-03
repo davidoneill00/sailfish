@@ -138,7 +138,7 @@ if __name__ == '__main__':
 
     Number_of_Orbits    = 1500.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
-    TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
+    TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],2)
     hist, edges         = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
     CumulativeTimeBin   = np.cumsum(hist)
     viscosity           = Model_Parameters["nu"]
