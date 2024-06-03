@@ -233,6 +233,8 @@ if __name__ == "__main__":
 	ax.set_xscale('log')
 	plt.yticks([10,1,0.1,0.001])
 	plt.xticks([1,0.1,0.01])
+	plt.ylim([0.06,1.2])
+	plt.xlim([0.02,1])
 	plt.savefig(FigDirectory + '/Decoupling.png', dpi=400)
 
 	
