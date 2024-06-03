@@ -138,10 +138,13 @@ if __name__ == '__main__':
 
     Number_of_Orbits    = 1500.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
+    TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
+    hist, edges         = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
+    CumulativeTimeBin   = np.cumsum(hist)
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
     M_dot_0             = 3 * np.pi * viscosity * Sigma_0
-    Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
+    
 
     plt.figure()
     plt.title('Orbital Phase')
@@ -162,43 +165,58 @@ if __name__ == '__main__':
     if args.Torque_Components:
         plt.figure()
         plt.xlabel('time')
-        plt.title(r'Torque Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
+        #plt.title(r'Torque Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
         plt.ylabel(r'$\tau/\dot{M}_0$')
 
         InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
         OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
-        print('Inner Mean Torque',np.mean(InnerClipped_Torque))
-        print('Outer Mean Torque',np.mean(OuterClipped_Torque))
+        Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
 
-        ##plt.plot(Final_Orbits,ts.torque_b[-len(Final_Orbits):]/ M_dot_0,c='green',label = 'Buffer Torque')
-        #plt.plot(Final_Orbits,Normalised_Torque,c = 'black',label = 'Binary Gravitational Torque')
-        #plt.axhline(y=np.mean(Normalised_Torque),c = 'black',label = 'Mean Gravitational Torque',linestyle = 'dashed')
-        plt.plot(Final_Orbits,InnerClipped_Torque,c = 'red',label = 'r<a')
-        plt.axhline(y=np.mean(InnerClipped_Torque),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
-        plt.plot(Final_Orbits,OuterClipped_Torque,c = 'blue',label = 'r>a')
-        plt.axhline(y=np.mean(OuterClipped_Torque),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
-        plt.legend()
-        savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
+        MeanTorque = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        plt.figure()
+        plt.plot(TimeBins[1:],Normalised_Torque,linewidth = 0.5, label = 'Binned Torque Mean', c = 'black')
+        plt.legend(loc = 'upper right')
+        plt.title('Torque')
+        savename = os.getcwd() +  "/Outputs/MeanPower.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
+
+        
+        #plt.plot(Final_Orbits,InnerClipped_Torque,c = 'red',label = 'r<a')
+        #plt.axhline(y=np.mean(InnerClipped_Torque),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
+        #plt.plot(Final_Orbits,OuterClipped_Torque,c = 'blue',label = 'r>a')
+        #plt.axhline(y=np.mean(OuterClipped_Torque),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
+        #plt.legend()
+        #savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
+        #plt.savefig(savename, dpi=400)
 
     if args.Power_Components:
         Normalised_Power    = (ts.power_g1[-len(Final_Orbits):]+ts.power_g2[-len(Final_Orbits):]) / M_dot_0
         InnerClipped_Power  = (ts.innerpower_1[-len(Final_Orbits):]+ts.innerpower_2[-len(Final_Orbits):]) / M_dot_0
         OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) / M_dot_0
-        print('Inner Mean Power',np.mean(InnerClipped_Power))
-        print('Outer Mean Power',np.mean(OuterClipped_Power))
-
+        
+        
+        
+        MeanPower = [np.mean(Normalised_Power[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.figure()
-        plt.xlabel('time')
-        plt.title(r'Power Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
+        plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Power Mean', c = 'black')
+        plt.legend(loc = 'upper right')
+        savename = os.getcwd() +  "/Outputs/MeanPower.%04d.png"%(CurrentTime)
+        plt.title('Power')
         plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
-        plt.plot(Final_Orbits,InnerClipped_Power,c = 'red',label = ' r<a')
-        plt.axhline(y=np.mean(InnerClipped_Power),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
-        plt.plot(Final_Orbits,OuterClipped_Power,c = 'blue',label = 'r>a')
-        plt.axhline(y=np.mean(OuterClipped_Power),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
-        plt.legend()
-        savename = os.getcwd() + "/Outputs/PowerComponents.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
+
+
+        #plt.figure()
+        #plt.xlabel('time')
+        #plt.title(r'Power Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
+        #plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
+        #plt.plot(Final_Orbits,InnerClipped_Power,c = 'red',label = ' r<a')
+        #plt.axhline(y=np.mean(InnerClipped_Power),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
+        #plt.plot(Final_Orbits,OuterClipped_Power,c = 'blue',label = 'r>a')
+        #plt.axhline(y=np.mean(OuterClipped_Power),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
+        #plt.legend()
+        #savename = os.getcwd() + "/Outputs/PowerComponents.%04d.png"%(CurrentTime)
+        #plt.savefig(savename, dpi=400)
 
     if args.Accretion:
 
@@ -210,11 +228,11 @@ if __name__ == '__main__':
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
 
 
-        AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
-        TimeBins      = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
-        hist, edges   = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
-        CumulativeAcc = np.cumsum(hist)
-        MeanAccretion = [np.mean(AccretionRate[CumulativeAcc[i-1]:CumulativeAcc[i]]) for i in range(1,len(TimeBins))]
+        #AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
+        #TimeBins      = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
+        #hist, edges   = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
+        #CumulativeAcc = np.cumsum(hist)
+        MeanAccretion = [np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         #Nbins        = 2
         #TimeBins     = 
         #bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits#/Nbins)
