@@ -175,6 +175,7 @@ if __name__ == '__main__':
         MeanTorque = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.figure()
         plt.plot(TimeBins[1:],MeanTorque,linewidth = 0.5, label = 'Binned Torque Mean', c = 'black')
+        plt.plot(ts.time,Normalised_Torque)
         plt.legend(loc = 'upper right')
         plt.title('Torque')
         savename = os.getcwd() +  "/Outputs/MeanTorque.%04d.png"%(CurrentTime)
