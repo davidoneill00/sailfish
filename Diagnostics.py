@@ -177,7 +177,7 @@ if __name__ == '__main__':
         plt.plot(TimeBins[1:],MeanTorque,linewidth = 0.5, label = 'Binned Torque Mean', c = 'black')
         plt.legend(loc = 'upper right')
         plt.title('Torque')
-        savename = os.getcwd() +  "/Outputs/MeanPower.%04d.png"%(CurrentTime)
+        savename = os.getcwd() +  "/Outputs/MeanTorque.%04d.png"%(CurrentTime)
         plt.savefig(savename, dpi=400)
 
         
@@ -195,7 +195,7 @@ if __name__ == '__main__':
         OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) / M_dot_0
         
         
-        
+        plt.figure()
         MeanPower = [np.mean(Normalised_Power[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.figure()
         plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Power Mean', c = 'black')
@@ -228,7 +228,7 @@ if __name__ == '__main__':
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
 
 
-        #AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
+        AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
         #TimeBins      = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
         #hist, edges   = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
         #CumulativeAcc = np.cumsum(hist)
