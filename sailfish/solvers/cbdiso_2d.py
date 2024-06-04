@@ -548,9 +548,11 @@ class Solver(SolverBase):
             if d.quantity == "time":
                 pass1.append(self.time / self.setup.reference_time_scale)
             elif d.quantity == "semimajor-axis":
-                pass1.append(orbital_state.semimajor_axis)
+                #pass1.append(orbital_state.semimajor_axis)
+                pass1.append(self.setup.Orbital_Elements_for_Inspiral(self.time)[0])
             elif d.quantity == "eccentricity":
-                pass1.append(orbital_state.eccentricity)
+                #pass1.append(orbital_state.eccentricity)
+                pass1.append(self.setup.Orbital_Elements_for_Inspiral(self.time)[1])
             else:
                 pass1.append(get_sum_fields(d))
 
