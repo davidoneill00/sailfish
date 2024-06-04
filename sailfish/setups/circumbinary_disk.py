@@ -920,7 +920,7 @@ class BinaryInspiral(SetupBase):
             vx1     = 0.
             vy1     = 0.
             vx2     = 0.
-            vx2     = 0.
+            vy2     = 0.
 
 
         c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length=self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius=self.sink_radius,)
