@@ -640,6 +640,7 @@ class BinaryInspiral(SetupBase):
     Fixed_Phases         = param([]," Find the phase at each point in the inspiral which can be integrated ")
     gw_inspiral_time     = param(0.," The circular inspiral time for a0 = 1 ")
 
+
     a0 = 1.0
     GM = 1.0
 
@@ -827,6 +828,7 @@ class BinaryInspiral(SetupBase):
 
     def Interpolated_Phase(self,time):
         flag = self.do_inspiral(time)
+        
         if flag:
             Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
 
@@ -834,12 +836,19 @@ class BinaryInspiral(SetupBase):
             Nstep                     = floor(Inspiral_Progress)
             Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
 
-            Phase_N0 = self.Fixed_Phases[Nstep]
-            Phase_N1 = self.Fixed_Phases[Nstep + 1]
+            self.Fixed_Phases.append(1e-5)
 
-            Interpolated_Phase = Phase_N0 + Position_in_Bracket_N0_N1 * (Phase_N1 - Phase_N0)
+            try:
+                Phase_N0 = self.Fixed_Phases[Nstep]
+                Phase_N1 = self.Fixed_Phases[Nstep + 1]
 
-            return Interpolated_Phase + self.inspiral_start_time * self.reference_time_scale
+                Interpolated_Phase = Phase_N0 + Position_in_Bracket_N0_N1 * (Phase_N1 - Phase_N0)
+
+                return Interpolated_Phase + self.inspiral_start_time * self.reference_time_scale
+
+            except IndexError as e:
+                return 0.
+
 
         else:
             from math import sqrt
@@ -887,26 +896,38 @@ class BinaryInspiral(SetupBase):
     '''
     def point_masses(self, time):
         from math import cos, sin, sqrt
-        
-        semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)#self.Orbital_Elements_for_Inspiral(time)
-        omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
         m1 = 0.5
         m2 = 0.5
-        x1 = 0.5 * semi_major * cos (self.Interpolated_Phase(time))
-        y1 = 0.5 * semi_major * sin (self.Interpolated_Phase(time))
-        x2 = -x1
-        y2 = -y1
-        vx1 = - omega_b * y1
-        vy1 = omega_b * x1
-        vx2 = -vx1
-        vy2 = -vy1
+        semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)
+        if semi_major>0.0001:
+            omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
+            
+            x1 = 0.5 * semi_major * cos (self.Interpolated_Phase(time))
+            y1 = 0.5 * semi_major * sin (self.Interpolated_Phase(time))
+            x2 = -x1
+            y2 = -y1
+            vx1 = - omega_b * y1
+            vy1 = omega_b * x1
+            vx2 = -vx1
+            vy2 = -vy1
+
+            
+        else:
+            x1      = 0.
+            x2      = 0.
+            y1      = 0.
+            y2      = 0.
+            vx1     = 0.
+            vy1     = 0.
+            vx2     = 0.
+            vx2     = 0.
+
 
         c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length=self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius=self.sink_radius,)
         c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length=self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius=self.sink_radius,)
         #m1, m2 = OrbitalState(c1, c2)    
 
         return (c1,c2)
-           
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time))
