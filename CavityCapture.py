@@ -115,10 +115,10 @@ def main_cbdiso_2d(chkpt,points):
 	Position_List = np.array([Parameterisation(a_cavity,e_cavity,i,arg_aps) for i in np.linspace(0,2*np.pi,100)]).reshape(100,2)
 	plt.plot(Position_List[:,0],Position_List[:,1],c = 'black', linestyle = 'dashed', linewidth = 2)
 	
-	fig.suptitle('Orbit %g'%(chkpt["time"] / 2 / np.pi))
-	FigDirectory =  sys.argv[2]
-	print('Saving Plot')
-	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
+	#fig.suptitle('Orbit %g'%(chkpt["time"] / 2 / np.pi))
+	#FigDirectory =  sys.argv[2]
+	#print('Saving Plot')
+	#plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
 
 
 
@@ -147,9 +147,10 @@ def MP_Cavity_Properties(arg):
 	
 
 def CheckForCavityFileExistence():
+    nu = 0.003
 	directory      = Path(sys.argv[1])
 	chkpt_pattern  = re.compile(r'chkpt\.(\d{4})\.pk')
-	cavity_pattern = 'CavityProperties.{:04d}.pk'
+	cavity_pattern = 'CavityProperties%g_nu.{:04d}.pk'%(nu)
 	Missing_cavity = []
 
 	for filename in os.listdir(directory):
@@ -220,8 +221,8 @@ if __name__ == "__main__":
 	pngname = FigDirectory + f"{'/CavityProperties'}.{int(sorted_times[-1]):04d}.png"
 	fig.savefig(pngname, dpi=400)
 
-	print('BSMA',np.array(sorted_Binary_SMA))
-	print('CSMA',np.array(sorted_SMA))
+	print('BSMA',sorted_Binary_SMA)
+	print('CSMA',sorted_SMA)
 
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Semi Major Axis',fontsize=25)
