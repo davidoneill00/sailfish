@@ -171,7 +171,6 @@ def CheckForCavityFileExistence():
 
 def LoadCavityFiles():
 	Cavity_Checkpoints = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*CavityProperties*.pk')]
-	print(Cavity_Checkpoints)
 	Time_Snapshots     = []
 	Semi_Major_Axis    = []
 	Eccentricity       = []
@@ -221,6 +220,8 @@ if __name__ == "__main__":
 	pngname = FigDirectory + f"{'/CavityProperties'}.{int(sorted_times[-1]):04d}.png"
 	fig.savefig(pngname, dpi=400)
 
+	print('BSMA',np.array(sorted_Binary_SMA))
+	print('CSMA',np.array(sorted_SMA))
 
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Semi Major Axis',fontsize=25)
@@ -236,7 +237,5 @@ if __name__ == "__main__":
 	plt.ylim([0.06,1.2])
 	plt.xlim([1,0.02])
 	plt.savefig(FigDirectory + '/Decoupling.png', dpi=400)
-
-	
 
 	exit()
