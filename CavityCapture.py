@@ -147,7 +147,7 @@ def MP_Cavity_Properties(arg):
 	
 
 def CheckForCavityFileExistence():
-    nu = 0.003
+	nu = 0.003
 	directory      = Path(sys.argv[1])
 	chkpt_pattern  = re.compile(r'chkpt\.(\d{4})\.pk')
 	cavity_pattern = 'CavityProperties%g_nu.{:04d}.pk'%(nu)
