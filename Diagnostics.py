@@ -226,7 +226,7 @@ if __name__ == '__main__':
         plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.1, c = 'red')
         plt.xlabel('Time [P]')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
-        plt.title(r'Retrograde Accretion Rate e = %g, $\nu=$'%(np.round(OrbitalEccentricity,3),viscosity))
+        plt.title(r'Retrograde Accretion Rate e = %g, $\nu=%g$'%(np.round(OrbitalEccentricity,3),viscosity))
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
 
 
