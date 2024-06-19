@@ -281,13 +281,7 @@ def main_cbdiso_2d():
             prim = chkpt["solution"]
 
         if args.field == 'speed':
-            #fig, ax = plt.subplots(figsize=[12, 9])
-            ni, nj = mesh.shape
-            xspace = np.linspace(mesh.x0,mesh.x1,ni)
-            yspace = np.linspace(mesh.y0,mesh.y1,nj)
-            ax.axhline(y = yspace[nj//2])
-            ax.axvline(x = xspace[ni//2])
-            
+
             Vx_Relative = fields["vx"](prim).T + 0.5 * np.sin(chkpt["time"])
             Vy_Relative = fields["vy"](prim).T - 0.5 * np.cos(chkpt["time"])
 
@@ -336,6 +330,11 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
+            ni, nj = mesh.shape
+            xspace = np.linspace(mesh.x0,mesh.x1,ni)
+            yspace = np.linspace(mesh.y0,mesh.y1,nj)
+            ax.axhline(y = yspace[nj//2])
+            ax.axvline(x = xspace[ni//2])
             import os
             CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
             pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(np.round(100*CurrentTime,3)):04d}.png"
