@@ -281,7 +281,10 @@ def main_cbdiso_2d():
             prim = chkpt["solution"]
 
         if args.field == 'speed':
-            f = np.sqrt( (fields["vx"](prim).T)**2 + (fields["vy"](prim).T)**2 )
+            Vx_Relative = fields["vx"](prim).T + 0.5 * np.sin(chkpt["time"])
+            Vy_Relative = fields["vy"](prim).T - 0.5 * np.cos(chkpt["time"])
+
+            f = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
 
         else:
             f = fields[args.field](prim).T
