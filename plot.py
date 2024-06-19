@@ -281,6 +281,13 @@ def main_cbdiso_2d():
             prim = chkpt["solution"]
 
         if args.field == 'speed':
+            #fig, ax = plt.subplots(figsize=[12, 9])
+            ni, nj = mesh.shape
+            xspace = np.linspace(mesh.x0,mesh.x1,ni)
+            yspace = np.linspace(mesh.y0,mesh.y1,nj)
+            ax.axhline(y = yspace[nj//2])
+            ax.axvline(x = xspace[ni//2])
+            
             Vx_Relative = fields["vx"](prim).T + 0.5 * np.sin(chkpt["time"])
             Vy_Relative = fields["vy"](prim).T - 0.5 * np.cos(chkpt["time"])
 
@@ -336,14 +343,15 @@ def main_cbdiso_2d():
 
             if args.field == 'speed':
                 fig, ax = plt.subplots(figsize=[12, 9])
-                ni, nj = mesh.shape
-                xspace = np.linspace(mesh.x0,mesh.x1,ni)
-                yspace = np.linspace(mesh.y0,mesh.y1,nj)
+                #ni, nj = mesh.shape
+                #xspace = np.linspace(mesh.x0,mesh.x1,ni)
+                #yspace = np.linspace(mesh.y0,mesh.y1,nj)
                 ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
                 ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
                 plt.legend()
-                plt.title('Gas Speed')
-                plt.ylabel(r'$a\Omega$')
+                plt.title('Velocity Profile for a Retrograde Disk')
+                plt.ylabel(r'$\|v_\mathrm{gas}\|~\left[a\Omega\right]$')
+                plt.xlabel(r'$x, y~\left[a_0\right]$')
                 plt.xlim([-2,2])
                 pngname     = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(np.round(100*CurrentTime,3)):04d}.png"
                 fig.savefig(pngname, dpi=400)
