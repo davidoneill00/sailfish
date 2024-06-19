@@ -333,8 +333,22 @@ def main_cbdiso_2d():
             CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
             pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(np.round(100*CurrentTime,3)):04d}.png"
             fig.savefig(pngname, dpi=400)
+
+            if args.field == 'speed':
+                fig, ax = plt.subplots(figsize=[12, 9])
+                ni, nj = mesh.shape
+                xspace = np.linspace(mesh.x0,mesh.x1,ni)
+                yspace = np.linspace(mesh.y0,mesh.y1,nj)
+                ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
+                ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
+                plt.legend()
+                plt.title('Gas Speed')
+                pngname     = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(np.round(100*CurrentTime,3)):04d}.png"
+                fig.savefig(pngname, dpi=400)
+
     if not args.save:
         plt.show()
+
 
 
 def main_cbdisodg_2d():
