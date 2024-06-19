@@ -330,11 +330,11 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
-            ni, nj = mesh.shape
-            xspace = np.linspace(mesh.x0,mesh.x1,ni)
-            yspace = np.linspace(mesh.y0,mesh.y1,nj)
-            ax.axhline(y = yspace[nj//2], c = '#1f77b4', linestyle = 'dashed')
-            ax.axvline(x = xspace[ni//2], c = '#ff7f0e', linestyle = 'dashed')
+            #ni, nj = mesh.shape
+            #xspace = np.linspace(mesh.x0,mesh.x1,ni)
+            #yspace = np.linspace(mesh.y0,mesh.y1,nj)
+            #ax.axhline(y = yspace[nj//2], c = '#1f77b4', linestyle = 'dashed')
+            #ax.axvline(x = xspace[ni//2], c = '#ff7f0e', linestyle = 'dashed')
             import os
             CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
             pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(np.round(100*CurrentTime,3)):04d}.png"
