@@ -343,6 +343,8 @@ def main_cbdiso_2d():
                 ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
                 plt.legend()
                 plt.title('Gas Speed')
+                plt.ylabel(r'$a\Omega$')
+                plt.xlim([-2,2])
                 pngname     = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(np.round(100*CurrentTime,3)):04d}.png"
                 fig.savefig(pngname, dpi=400)
 
