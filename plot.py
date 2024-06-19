@@ -280,7 +280,11 @@ def main_cbdiso_2d():
             # the cbdiso_2d solver uses primitive data as the solution array
             prim = chkpt["solution"]
 
-        f = fields[args.field](prim).T
+        if args.field == 'speed':
+            f = np.sqrt( (fields[args.vx](prim).T)**2 + (fields[args.vy](prim).T)**2 )
+
+        else:
+            f = fields[args.field](prim).T
 
         if args.print_model_parameters:
             print(chkpt["model_parameters"])
@@ -317,7 +321,6 @@ def main_cbdiso_2d():
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
         fig.colorbar(cm)
-        #fig.suptitle(filename)
         fig.suptitle(chkpt["time"]/2/np.pi)
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
@@ -326,8 +329,6 @@ def main_cbdiso_2d():
             import os
             CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
             pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(np.round(100*CurrentTime,3)):04d}.png"
-            #pngname     = os.getcwd() + "/Outputs/DensityMap{}.png".format(int(np.round(10*CurrentTime,2)))#(round(CurrentTime,4))
-            #print(pngname)
             fig.savefig(pngname, dpi=400)
     if not args.save:
         plt.show()
@@ -404,28 +405,6 @@ def main_cbdgam_2d():
         fig.suptitle(filename)
 
     plt.show()
-
-'''
-if __name__ == "__main__":
-    chkpt = load_checkpoint(file)
-    if chkpt["solver"] == "srhd_1d":
-        print("plotting for srhd_1d solver")
-        exit(main_srhd_1d())
-    if chkpt["solver"] == "srhd_2d":
-        print("plotting for srhd_2d solver")
-        exit(main_srhd_2d())
-    if chkpt["solver"] == "cbdiso_2d":
-        print("plotting for cbdiso_2d solver")
-        exit(main_cbdiso_2d())
-    if chkpt["solver"] == "cbdisodg_2d":
-        print("plotting for cbdisodg_2d solver")
-        exit(main_cbdisodg_2d())
-    if chkpt["solver"] == "cbdgam_2d":
-        print("plotting for cbdgam_2d solver")
-        exit(main_cbdgam_2d())
-    else:
-        print(f"Unknown solver {chkpt['solver']}")
-'''
 
 if __name__ == "__main__":
     for arg in sys.argv:
