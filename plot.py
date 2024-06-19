@@ -166,7 +166,7 @@ def main_cbdiso_2d():
         "-f",
         type=str,
         default="sigma",
-        choices=fields.keys(),
+        #choices=fields.keys(),
         help="which field to plot",
     )
     parser.add_argument("--poly", type=int, nargs=2, default=None)
@@ -281,7 +281,7 @@ def main_cbdiso_2d():
             prim = chkpt["solution"]
 
         if args.field == 'speed':
-            f = np.sqrt( (fields[args.vx](prim).T)**2 + (fields[args.vy](prim).T)**2 )
+            f = np.sqrt( (fields["vx"](prim).T)**2 + (fields["vy"](prim).T)**2 )
 
         else:
             f = fields[args.field](prim).T
