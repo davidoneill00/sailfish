@@ -342,9 +342,9 @@ def main_cbdiso_2d():
 
             if args.field == 'speed':
                 fig, ax = plt.subplots(figsize=[12, 9])
-                #ni, nj = mesh.shape
-                #xspace = np.linspace(mesh.x0,mesh.x1,ni)
-                #yspace = np.linspace(mesh.y0,mesh.y1,nj)
+                ni, nj = mesh.shape
+                xspace = np.linspace(mesh.x0,mesh.x1,ni)
+                yspace = np.linspace(mesh.y0,mesh.y1,nj)
                 ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
                 ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
                 ax.axvline(y = 0.53, linewidth = 0.1, c = 'black')
