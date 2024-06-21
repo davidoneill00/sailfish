@@ -353,7 +353,7 @@ def main_cbdiso_2d():
                 plt.title('Velocity Profile for a Retrograde Disk')
                 plt.ylabel(r'$\|v_\mathrm{gas}\|~\left[a\Omega\right]$')
                 plt.xlabel(r'$x, y~\left[a_0\right]$')
-                plt.xlim([-2,2])
+                plt.xlim([-1,1])
                 pngname     = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(np.round(100*CurrentTime,3)):04d}.png"
                 fig.savefig(pngname, dpi=400)
 
