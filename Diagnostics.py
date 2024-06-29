@@ -117,12 +117,6 @@ if __name__ == '__main__':
         default=False,
         help="whether to plot the power exerted on the binary",
     )
-    parser.add_argument(
-        "--Density",
-        "-d",
-        default=False,
-        help="whether to plot the power exerted on the binary",
-    )
     args = parser.parse_args()
     
 
