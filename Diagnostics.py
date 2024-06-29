@@ -130,7 +130,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 1400.
+    Number_of_Orbits    = 800.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
     print(TimeBins)
@@ -194,7 +194,8 @@ if __name__ == '__main__':
         plt.figure()
         MeanPower = [np.mean(Normalised_Power[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.figure()
-        plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Power Mean', c = 'black')
+        plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Means', c = 'black')
+        plt.plot(Final_Orbits,Normalised_Power, c = 'red', label = 'Power', linewidth = 0.5,)
         plt.legend(loc = 'upper right')
         savename = os.getcwd() +  "/Outputs/MeanPower.%04d.png"%(CurrentTime)
         plt.title('Power')
@@ -225,16 +226,7 @@ if __name__ == '__main__':
 
 
         AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
-        #TimeBins      = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
-        #hist, edges   = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
-        #CumulativeAcc = np.cumsum(hist)
         MeanAccretion = [np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
-        #Nbins        = 2
-        #TimeBins     = 
-        #bins         = np.array_split(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):], Number_of_Orbits#/Nbins)
-        #bin_means    = [np.mean(bin) for bin in bins]
-        #
-
         plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.legend(loc = 'upper right')
         savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
