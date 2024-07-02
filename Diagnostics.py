@@ -90,31 +90,32 @@ if __name__ == '__main__':
     parser.add_argument(
         "--Disk_Momentum",
         "-jd",
-        default=False,
+        action='store_true',
         help="whether to plot the total change in momentum timeseries",
     )
+
     parser.add_argument(
         "--Torque_Components",
         "-t",
-        default=False,
+        action='store_true',
         help="whether to plot the torque components from the binary",
     )
     parser.add_argument(
         "--Accretion",
         "-a",
-        default=False,
+        action='store_true',
         help="whether to plot the binary's accretion timeseries",
     )
     parser.add_argument(
         "--Orbital_Elements",
         "-o",
-        default=False,
+        action='store_true',
         help="whether to plot the binary's changing orbital elements",
     )
     parser.add_argument(
         "--Power_Components",
         "-p",
-        default=False,
+        action='store_true',
         help="whether to plot the power exerted on the binary",
     )
     args = parser.parse_args()
@@ -130,7 +131,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 800.
+    Number_of_Orbits    = 1400.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
     print(TimeBins)
