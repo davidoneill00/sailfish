@@ -328,7 +328,7 @@ def main_cbdiso_2d():
 
             import os
             CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
-            pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(100*CurrentTime):04d}.png"
+            pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(100*CurrentTime)}.png"
             print(CurrentTime)
             fig.savefig(pngname, dpi=400)
 
