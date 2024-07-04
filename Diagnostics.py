@@ -131,10 +131,10 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 1400.
+    Number_of_Orbits    = 2000.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
-    print(TimeBins)
+
     hist, edges         = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
     CumulativeTimeBin   = np.cumsum(hist)
     viscosity           = Model_Parameters["nu"]
@@ -225,7 +225,7 @@ if __name__ == '__main__':
         plt.title(r'Retrograde Accretion Rate e = %g, $\nu=%g$'%(np.round(OrbitalEccentricity,3),viscosity))
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
 
-
+        plt.ylim([0,2])
         AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
         MeanAccretion = [np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
