@@ -5,13 +5,8 @@ import sys
 sys.path.insert(1,"/groups/astro/davidon/sailfish/")
 import sailfish
 
-#filepath = '/lustre/astro/davidon/Storage/sfish-test/'
-#file     = filepath + 'chkpt.%04d.pk'%(int(sys.argv[1]))
-
 
 sys.path.insert(1, ".")
-#file_dir  = '/lustre/astro/davidon/Storage/sfish-test/'
-#file_name = 'chkpt.000.pk'
 
 
 def load_checkpoint(filename, require_solver=None):
@@ -116,7 +111,7 @@ def main_srhd_2d():
         mesh = chkpt["mesh"]
         prim = chkpt["primitive"]
 
-        t = chkpt["time"]
+        t    = chkpt["time"]
         r, q = np.meshgrid(mesh.radial_vertices(t), mesh.polar_vertices)
         z = r * np.cos(q)
         x = r * np.sin(q)
@@ -262,7 +257,7 @@ def main_cbdiso_2d():
 
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
-        chkpt = load_checkpoint(filename)
+        chkpt   = load_checkpoint(filename)
         
 
         mesh = chkpt["mesh"]
@@ -330,21 +325,18 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
         if args.save:
-            #ni, nj = mesh.shape
-            #xspace = np.linspace(mesh.x0,mesh.x1,ni)
-            #yspace = np.linspace(mesh.y0,mesh.y1,nj)
-            #ax.axhline(y = yspace[nj//2], c = '#1f77b4', linestyle = 'dashed')
-            #ax.axvline(x = xspace[ni//2], c = '#ff7f0e', linestyle = 'dashed')
+
             import os
             CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
-            pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(np.round(100*CurrentTime,3)):04d}.png"
+            pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(100*CurrentTime):04d}.png"
+            print(CurrentTime)
             fig.savefig(pngname, dpi=400)
 
             if args.field == 'speed':
                 fig, ax = plt.subplots(figsize=[12, 9])
-                ni, nj = mesh.shape
-                xspace = np.linspace(mesh.x0,mesh.x1,ni)
-                yspace = np.linspace(mesh.y0,mesh.y1,nj)
+                ni, nj  = mesh.shape
+                xspace  = np.linspace(mesh.x0,mesh.x1,ni)
+                yspace  = np.linspace(mesh.y0,mesh.y1,nj)
                 ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
                 ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
                 ax.axvline(x = 0.53, linewidth = 0.1, c = 'black')
@@ -354,7 +346,7 @@ def main_cbdiso_2d():
                 plt.ylabel(r'$\|v_\mathrm{gas}\|~\left[a\Omega\right]$')
                 plt.xlabel(r'$x, y~\left[a_0\right]$')
                 plt.xlim([-1,1])
-                pngname     = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(np.round(100*CurrentTime,3)):04d}.png"
+                pngname = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(100*CurrentTime):04d}.png"
                 fig.savefig(pngname, dpi=400)
 
     if not args.save:
