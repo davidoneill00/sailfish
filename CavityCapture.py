@@ -204,7 +204,6 @@ if __name__ == "__main__":
 				CavityState = pool.map(MP_Cavity_Properties, batch)
 
 	
-	
 	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = LoadCavityFiles()
 
 	fig, ax = plt.subplots(figsize=[12, 9])
