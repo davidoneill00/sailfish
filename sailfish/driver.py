@@ -139,6 +139,13 @@ def update_where_none(new, old, frozen=[]):
 #     else:
 #         return d
 
+def clean_state(state):
+    saved_model_parameters = state
+    for key in ['semi_major_axis_list', 'eccentricity_list', 'inspiral_time_list', 'Fixed_Phases']:
+        if key in saved_model_parameters:
+            del saved_model_parameters[key]
+    return saved_model_parameters
+
 
 def write_checkpoint(number, outdir, state):
     """
@@ -155,6 +162,7 @@ def write_checkpoint(number, outdir, state):
         pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(outdir, filename)
 
+
     state_checkpoint_dict = dict(
         iteration=state.iteration,
         time=state.solver.time,
@@ -167,7 +175,7 @@ def write_checkpoint(number, outdir, state):
         solver_options=state.solver.options,
         event_states=state.event_states,
         driver=state.driver,
-        model_parameters=state.setup.model_parameter_dict(),
+        model_parameters=clean_state(state.setup.model_parameter_dict()),#saved_model_parameters,#state.setup.model_parameter_dict(),
         setup_name=state.setup.dash_case_class_name(),
         mesh=state.mesh,
         **state.setup.checkpoint_diagnostics(state.solver.time),
@@ -476,6 +484,12 @@ def simulate(driver,inspiral_end_time = None):
         Collect items from the driver and solver state, as well as run
         details, sufficient for restarts and post processing.
         """
+        
+        driver.model_parameters['semi_major_axis_list'] = []
+        driver.model_parameters['eccentricity_list']    = []
+        driver.model_parameters['inspiral_time_list']   = []
+        driver.model_parameters['Fixed_Phases']         = []
+        
         return DriverState(
             iteration=iteration,
             driver=driver,
@@ -888,12 +902,12 @@ def main():
                 
                 inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
-                if (driver.setup_name == 'binary-inspiral'):
-                    driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
-                    driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
-                    driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
-                    driver.model_parameters["Fixed_Phases"]         = FixedPhases___
-                    driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time()
+                #if (driver.setup_name == 'binary-inspiral'):
+                driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
+                driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
+                driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
+                driver.model_parameters["Fixed_Phases"]         = FixedPhases___
+                driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time()
 
                 #elif chkpt["setup_name"] == 'binary-inspiral':
                 #    cmp_ = chkpt["model_parameters"]
