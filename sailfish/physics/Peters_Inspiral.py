@@ -28,38 +28,29 @@ class Orbital_Inspiral():
             eccentricity_factor = 1 + 121/304 * e**2
             return -gamma * eccentricity_factor / a**4 / ((1-e**2) ** 2.5) #* 1
 
-        def Circular_Inspiral_Time():
-            a0   = 1.
-            beta = 64. / 5. * GM**3 * mass_ratio / (1 + mass_ratio)**2 / speed_of_light**5
-            return a0**4 / (4. * beta)
-
-        self.a_array = [SemiMajorAxis0]
-        self.e_array = [eccentricity0]
-        self.T       = np.arange(0,Circular_Inspiral_Time(),timestep)
+        self.a_array    = [SemiMajorAxis0]
+        self.e_array    = [eccentricity0]
+        
+        
+        self.TimeDomain = [0.]
+        current_time    = 0.
 
         a_old        = SemiMajorAxis0
         e_old        = eccentricity0
 
-        for i in range(1,len(self.T)):
+        while a_old>0.03:
             a_new = a_old + Semi_Major_Axis_Decay_Rate(a_old,e_old) * timestep 
             e_new = e_old + Eccentricity_Decay_Rate(a_old,e_old) * timestep 
 
-            if a_new < 0:
-                a_new = 1e-5
-                e_new = 0.
-                self.a_array.append(a_new)
-                self.e_array.append(e_new)
-                # Merger has occured. We fix a small semi-major axis to avoid
-                # divergences of an a = 0 binary
-                break
+            self.a_array.append(a_new)
+            self.e_array.append(e_new)
 
-            else:
-                self.a_array.append(a_new)
-                self.e_array.append(e_new)
-                a_old = a_new
-                e_old = e_new
+            a_old = a_new
+            e_old = e_new
 
-        self.TimeDomain    = self.T[0:len(self.a_array)]
+            current_time += timestep
+            self.TimeDomain.append(current_time) 
+
 
 
         if plot_inspiral:

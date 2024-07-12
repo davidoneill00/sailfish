@@ -126,7 +126,10 @@ class OrbitalState(NamedTuple):
 
     @property
     def semimajor_axis(self) -> float:
-        return  -0.5 * NEWTON_G * self[0].mass * self[1].mass / self.total_energy
+        try:
+            return  -0.5 * NEWTON_G * self[0].mass * self[1].mass / self.total_energy
+        except:
+            return 0.
 
     @property
     def eccentricity(self):
@@ -137,8 +140,11 @@ class OrbitalState(NamedTuple):
         mu  = self.reduced_mass
         a   = self.semimajor_axis
         L   = self.angular_momentum
-        ecc = sqrt(1 - clamp_between_zero_and_one(L**2 / M / mu**2 / a))
-        return ecc
+        try:
+            ecc = sqrt(1 - clamp_between_zero_and_one(L**2 / M / mu**2 / a))
+            return ecc
+        except:
+            return 0.
     
     @property
     def total_energy(self) -> float:

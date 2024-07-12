@@ -795,11 +795,16 @@ class BinaryInspiral(SetupBase):
         return 2.0 * pi
 
     def do_inspiral(self, time):
-        return (time >= self.inspiral_start_time * self.reference_time_scale)
+        if (self.inspiral_start_time * self.reference_time_scale <= time <= self.inspiral_time_list[-1]):
+            return 'Inspiralling'
+        elif (time <= self.inspiral_start_time * self.reference_time_scale):
+            return 'Burn-in'
+        elif (self.inspiral_time_list[-1] <= time):
+            return 'Merged'
 
     def Orbital_Elements_for_Inspiral(self, time):
         flag = self.do_inspiral(time)
-        if flag:
+        if flag == 'Inspiralling':
             Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
 
             Inspiral_Progress         = Inspiral_t/self.integration_timestep
@@ -821,15 +826,19 @@ class BinaryInspiral(SetupBase):
                 return [Interpolated_SMA,Interpolated_ECC]
             
             except IndexError as e:
-                return [1e-5,0.]
+                return 'Merged'#[1e-5,0.]
 
-        else:
+        elif flag == 'Burn-in':
             return [self.a0,self.init_eccentricity]
+
+        elif flag == 'Merged':
+            return 'Merged'
+
 
     def Interpolated_Phase(self,time):
         flag = self.do_inspiral(time)
         
-        if flag:
+        if flag == 'Inspiralling':
             Inspiral_t = time - self.inspiral_start_time * self.reference_time_scale
 
             Inspiral_Progress         = Inspiral_t/self.integration_timestep
@@ -847,59 +856,39 @@ class BinaryInspiral(SetupBase):
                 return Interpolated_Phase + self.inspiral_start_time * self.reference_time_scale
 
             except IndexError as e:
-                return 0.
+                return 'Merged'
 
 
-        else:
+        elif flag == 'Burn-in':
             from math import sqrt
             return sqrt(self.GM/self.a0/self.a0/self.a0) * time
 
-
-    #def PlotInterpolated_Orbital_Elements_for_Inspiral(self, time):
-    #    import numpy as np
-    #    import matplotlib.pyplot as plt
-    #    timegrid    = np.linspace(0,2 * np.pi * 2 + 2 * np.pi * 1244, 1000)
-    #    outputelems = [self.PreOrbital_Elements_for_Inspiral(tttttt)[0] for tttttt in timegrid]
-    #    plt.plot(timegrid,outputelems)
-    #    plt.show()
+        elif flag == 'Merged':
+            return 'Merged'
         
 
     def orbital_elements(self, time):
-        OEI = self.Orbital_Elements_for_Inspiral(time)
-        return OrbitalElements(
-                semimajor_axis=OEI[0],
-                total_mass=1.0,
-                mass_ratio=self.mass_ratio,
-                eccentricity=OEI[1],
-            )
+        flag = self.do_inspiral(time)
+        OEI  = self.Orbital_Elements_for_Inspiral(time)
+        if OEI!='Merged':
+            return OrbitalElements(
+                    semimajor_axis=OEI[0],
+                    total_mass=1.0,
+                    mass_ratio=self.mass_ratio,
+                    eccentricity=OEI[1],
+                )
+        elif flag == 'Merged':
+            return 'Merged'
 
-    '''
-    def point_masses(self, time):
-        m1, m2 = self.orbital_elements(time).orbital_state(time)
 
-        return (
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m1._asdict(),
-            ),
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m2._asdict(),
-            ),
-        )
-    '''
     def point_masses(self, time):
         from math import cos, sin, sqrt
-        m1 = 0.5
-        m2 = 0.5
-        semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)
-        if semi_major>0.0001:
+        m1  = 0.5
+        m2  = 0.5
+        OEI = self.Orbital_Elements_for_Inspiral(time)
+        if OEI !='Merged':
+            semi_major, eccen = self.Orbital_Elements_for_Inspiral(time)
+
             omega_b = sqrt(self.GM / semi_major/ semi_major/ semi_major)
             
             x1 = 0.5 * semi_major * cos (self.Interpolated_Phase(time))
@@ -912,7 +901,7 @@ class BinaryInspiral(SetupBase):
             vy2 = -vy1
 
             
-        else:
+        elif OEI =='Merged':
             x1      = 0.
             x2      = 0.
             y1      = 0.
@@ -923,8 +912,8 @@ class BinaryInspiral(SetupBase):
             vy2     = 0.
 
 
-        c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length=self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius=self.sink_radius,)
-        c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length=self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius=self.sink_radius,)
+        c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length= 2 * self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= 2 * self.sink_radius,)
+        c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length= 2 * self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= 2 * self.sink_radius,)
         #m1, m2 = OrbitalState(c1, c2)    
 
         return (c1,c2)

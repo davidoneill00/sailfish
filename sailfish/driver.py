@@ -303,7 +303,7 @@ class DriverState(NamedTuple):
     timestep_dt: float
 
 
-def simulate(driver,inspiral_end_time = None):
+def simulate(driver):#,inspiral_end_time = None):
     """
     Main generator for running simulations.
 
@@ -432,8 +432,8 @@ def simulate(driver,inspiral_end_time = None):
     mesh = setup.mesh(driver.resolution)
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
     
-    if inspiral_end_time != None:
-        end_time = min(inspiral_end_time, driver.end_time, float("inf"))
+    ##########if inspiral_end_time != None:
+    ##########    end_time = min(inspiral_end_time, driver.end_time, float("inf"))
         
 
     reference_time = setup.reference_time_scale
@@ -537,13 +537,18 @@ def simulate(driver,inspiral_end_time = None):
         if (driver.setup_name == 'binary-inspiral') & (iteration % 100 == 0):
             OEI = setup.Orbital_Elements_for_Inspiral(siml_time)
             
-            ab = OEI[0]
-            eb = OEI[1]
+            if OEI != 'Merged':
+                ab = OEI[0]
+                eb = OEI[1]
 
-            nrg = ab * driver.model_parameters["init_separation_rg"] #* setup.speed_of_light**2 / setup.GM
-            main_logger.info(
-                f"[orbit] a={ab:0.2f}  e={eb:.2f}  nrg={nrg:.2f}"
-            )
+                nrg = ab * driver.model_parameters["init_separation_rg"] #* setup.speed_of_light**2 / setup.GM
+                main_logger.info(
+                    f"[orbit] a={ab:0.2f}  e={eb:.2f}  nrg={nrg:.2f}"
+                )
+            else:
+                main_logger.info(
+                    f"[orbit] a={0.:0.2f}  e={0.:.2f}  nrg={0.:.2f}  Post Merger"
+                )
 
     yield "end", None, grab_state()
 
@@ -863,7 +868,7 @@ def main():
                 with open(driver.chkpt_file, "rb") as file:
                     chkpt = pk.load(file)
                     
-
+            #print('------------------------------')
 
             if (driver.setup_name == 'binary-inspiral') or (chkpt["setup_name"] == 'binary-inspiral'):
 
@@ -871,11 +876,6 @@ def main():
 
                 Inspiral_Model_Parameters = driver.model_parameters
                 speed_of_light            = Inspiral_Model_Parameters["init_separation_rg"]**0.5
-
-                def Circular_Inspiral_Time():
-                    a0 = 1.
-                    beta           = 64. / 5. * Inspiral_Model_Parameters["GM"]**3 * Inspiral_Model_Parameters["mass_ratio"] / (1 + Inspiral_Model_Parameters["mass_ratio"])**2 / speed_of_light**5
-                    return a0**4 / (4. * beta)
 
                 def Integrate_Inspiral(a0):
                     Peters_OI = Orbital_Inspiral(GM=Inspiral_Model_Parameters["GM"],
@@ -895,6 +895,7 @@ def main():
                     return Inspiral_Dict
 
                 Integrated_Orbit = Integrate_Inspiral(1.)
+                print('Final Semi-Major Axis',Integrated_Orbit['SemiMajorAxis'][-1])
 
                 from numpy import pi, sqrt, cumsum
 
@@ -907,7 +908,7 @@ def main():
                 driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
                 driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
                 driver.model_parameters["Fixed_Phases"]         = FixedPhases___
-                driver.model_parameters["gw_inspiral_time"]     = Circular_Inspiral_Time()
+                driver.model_parameters["gw_inspiral_time"]     = Integrated_Orbit["TimeDomain"][-1]#Circular_Inspiral_Time()
 
                 #elif chkpt["setup_name"] == 'binary-inspiral':
                 #    cmp_ = chkpt["model_parameters"]
@@ -934,7 +935,7 @@ def main():
             else:
                 events_dict = dict()
 
-            for name, number, state in simulate(driver,inspiral_end_time):
+            for name, number, state in simulate(driver):#,inspiral_end_time):
                 if name == "timeseries":
                     append_timeseries(state)
                 elif name == "checkpoint":
