@@ -50,6 +50,8 @@ def MaxDist(points):
 	Dist_Vectors_i = np.zeros([Npoints,Npoints])
 	Dist_Vectors_j = np.zeros([Npoints,Npoints])
 	Distance       = np.zeros([Npoints,Npoints])
+
+	firstloop = time.time()
 	for j in range(0,Npoints-2):
 		for i in range(j+1,Npoints-1):
 			xdist                = points[i,0] - points[j,0]
@@ -57,16 +59,19 @@ def MaxDist(points):
 			Dist_Vectors_i[i][j] = xdist
 			Dist_Vectors_j[i][j] = ydist
 			Distance[i][j]       = np.sqrt(xdist**2+ydist**2)
+	print(time.time()-firstloop)
 
 	Semi_major_axis = np.max(Distance) / 2.
 	k, l            = np.where(Distance == 2 * Semi_major_axis)
 	Max_Slope       = np.arctan2(Dist_Vectors_j[k[0]][l[0]],Dist_Vectors_i[k[0]][l[0]])
 	Minor_Distance  = np.zeros([Npoints,Npoints])
+	secondloop = time.time()
 	for j in range(0,Npoints-2):
 		for i in range(j+1,Npoints-1):
 			proj_x = Dist_Vectors_i[i][j] * np.cos(Max_Slope+np.pi/2)
 			proj_y = Dist_Vectors_j[i][j] * np.sin(Max_Slope+np.pi/2)
 			Minor_Distance[i][j] = proj_x + proj_y
+	print(time.time()-secondloop)
 
 	Semi_minor_axis     = np.max(Minor_Distance) / 2.
 	Cavity_Eccentricity = np.sqrt(1-(Semi_minor_axis/Semi_major_axis)**2)
