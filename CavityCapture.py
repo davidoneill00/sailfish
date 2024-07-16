@@ -38,8 +38,9 @@ def CavityContour(chkpt):
 	extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1	
 	p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
 	v = p.vertices
+	v_resampled = scipy.signal.resample(v, 200)
 	print('CavityContour took',time.time()-start)
-	return v
+	return v_resampled
 
 
 def MaxDist(points):
