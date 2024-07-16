@@ -176,7 +176,7 @@ def write_checkpoint(number, outdir, state):
         solver_options=state.solver.options,
         event_states=state.event_states,
         driver=state.driver,
-        model_parameters=clean_state(state.setup.model_parameter_dict()),#saved_model_parameters,#state.setup.model_parameter_dict(),
+        model_parameters=clean_state(state.setup.model_parameter_dict()),
         setup_name=state.setup.dash_case_class_name(),
         mesh=state.mesh,
         **state.setup.checkpoint_diagnostics(state.solver.time),
@@ -305,7 +305,7 @@ class DriverState(NamedTuple):
     timestep_dt: float
 
 
-def simulate(driver):#,inspiral_end_time = None):
+def simulate(driver):
     """
     Main generator for running simulations.
 
@@ -433,9 +433,6 @@ def simulate(driver):#,inspiral_end_time = None):
     fold = driver.fold or 10
     mesh = setup.mesh(driver.resolution)
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
-    
-    ##########if inspiral_end_time != None:
-    ##########    end_time = min(inspiral_end_time, driver.end_time, float("inf"))
         
 
     reference_time = setup.reference_time_scale
@@ -539,11 +536,12 @@ def simulate(driver):#,inspiral_end_time = None):
         if (driver.setup_name == 'binary-inspiral') & (iteration % 100 == 0):
             OEI = setup.Orbital_Elements_for_Inspiral(siml_time)
             
+
             if OEI != 'Merged':
                 ab = OEI[0]
                 eb = OEI[1]
 
-                nrg = ab * driver.model_parameters["init_separation_rg"] #* setup.speed_of_light**2 / setup.GM
+                nrg = ab * driver.model_parameters["init_separation_rg"]
                 main_logger.info(
                     f"[orbit] a={ab:0.2f}  e={eb:.2f}  nrg={nrg:.2f}"
                 )
@@ -899,14 +897,12 @@ def main():
                 from numpy import pi, sqrt, cumsum, round
 
                 FixedPhases___ = list(cumsum([sqrt(Inspiral_Model_Parameters["GM"] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i] / Integrated_Orbit["SemiMajorAxis"][i]) for i in range(0,len(Integrated_Orbit["SemiMajorAxis"]))]) * driver.model_parameters["integration_timestep"])
-                
-                #inspiral_end_time = Integrated_Orbit["TimeDomain"][-1]/2/pi + driver.model_parameters["inspiral_start_time"]
 
                 driver.model_parameters["semi_major_axis_list"] = Integrated_Orbit["SemiMajorAxis"]
                 driver.model_parameters["eccentricity_list"]    = Integrated_Orbit["Eccentricity"]
                 driver.model_parameters["inspiral_time_list"]   = list(Integrated_Orbit["TimeDomain"])
                 driver.model_parameters["Fixed_Phases"]         = FixedPhases___
-                driver.model_parameters["gw_inspiral_time"]     = float(round(Integrated_Orbit["TimeDomain"][-1],1))#Circular_Inspiral_Time()
+                driver.model_parameters["gw_inspiral_time"]     = float(round(Integrated_Orbit["TimeDomain"][-1],1))
                 
 
 
@@ -923,7 +919,7 @@ def main():
             else:
                 events_dict = dict()
 
-            for name, number, state in simulate(driver):#,inspiral_end_time):
+            for name, number, state in simulate(driver):
                 if name == "timeseries":
                     append_timeseries(state)
                 elif name == "checkpoint":

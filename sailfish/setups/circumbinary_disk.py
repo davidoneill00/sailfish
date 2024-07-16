@@ -795,11 +795,11 @@ class BinaryInspiral(SetupBase):
         return 2.0 * pi
 
     def do_inspiral(self, time):
-        if (self.inspiral_start_time * self.reference_time_scale <= time <= self.inspiral_time_list[-1]):
+        if (self.inspiral_start_time * self.reference_time_scale <= time <= self.inspiral_start_time * self.reference_time_scale + self.inspiral_time_list[-1]):
             return 'Inspiralling'
         elif (time <= self.inspiral_start_time * self.reference_time_scale):
             return 'Burn-in'
-        elif (self.inspiral_time_list[-1] <= time):
+        elif (self.inspiral_time_list[-1] + self.inspiral_start_time * self.reference_time_scale <= time):
             return 'Merged'
 
     def Orbital_Elements_for_Inspiral(self, time):
