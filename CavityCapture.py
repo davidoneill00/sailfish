@@ -10,6 +10,7 @@ import os
 import re
 import fnmatch
 import gc
+import scipy
 
 Plot = True
 
