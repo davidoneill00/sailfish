@@ -17,15 +17,12 @@ Plot = True
 import time
 
 def load_checkpoint(filename):
-    start = time.time()
     with open(filename, "rb") as file:
         chkpt = pk.load(file)
-        print('Importing file took',time.time()-start)
         return chkpt
 
 
 def CavityContour(chkpt):
-	start = time.time()
 	fields = {
 	"sigma": lambda p: p[:, :, 0],
 	"vx": lambda p: p[:, :, 1],
@@ -39,16 +36,11 @@ def CavityContour(chkpt):
 	extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1	
 	p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
 	v = p.vertices
-	v_resampled = scipy.signal.resample(v, 200)
-	print('CavityContour took',time.time()-start)
+	v_resampled = scipy.signal.resample(v, 500)
 	return v_resampled
 
 
 def MaxDist(points):
-	start = time.time()
-
-	Npoints = len(points)
-	print('Number of points is',Npoints)
 
 	Dist_Vectors_i = np.zeros([Npoints,Npoints])
 	Dist_Vectors_j = np.zeros([Npoints,Npoints])
@@ -84,13 +76,11 @@ def MaxDist(points):
 	"Cavity_Slope_Radians":Max_Slope,
 	"Cavity_Slope_Degrees":Max_Slope*180/np.pi,
 	}
-	print('Maxdist took', time.time()-start)
 	return Properties
 
 
 
 def main_cbdiso_2d(chkpt,points):
-	start = time.time()
 	fields = {
 		"sigma": lambda p: p[:, :, 0],
 		"vx": lambda p: p[:, :, 1],
@@ -132,11 +122,9 @@ def main_cbdiso_2d(chkpt,points):
 	ax.set_xlim(-4, 4)
 	ax.set_ylim(-4, 4)
 	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
-	print('CBDISO took', time.time()-start)
 
 
 def MP_Cavity_Properties(arg):
-	start = time.time()
 	chkpt             = load_checkpoint(arg)
 
 	contour_lines     = CavityContour(chkpt)
@@ -149,7 +137,6 @@ def MP_Cavity_Properties(arg):
 	cavity_properties["viscosity"]            = chkpt["model_parameters"]["nu"]
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines)
-	print('MP_Cavity_Properties done', time.time()-start)
 	return cavity_properties
 
 
