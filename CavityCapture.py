@@ -114,7 +114,7 @@ def main_cbdiso_2d(chkpt,points):
 	plt.plot(Position_List[:,0],Position_List[:,1],c = 'black', linestyle = 'dashed', linewidth = 2)
 	
 	fig.suptitle('Orbit %g'%(chkpt["time"] / 2 / np.pi))
-	FigDirectory =  sys.argv[2]
+	FigDirectory =  sys.argv[1]
 	ax.set_xlim(-4, 4)
 	ax.set_ylim(-4, 4)
 	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
@@ -136,53 +136,6 @@ def MP_Cavity_Properties(arg):
 		main_cbdiso_2d(chkpt,contour_lines)
 	
 	return cavity_properties
-
-"""
-def CheckForCavityFileExistence():
-	nu             = load_checkpoint(os.listdir(directory)[0])["viscosity"]
-    directory      = Path(sys.argv[1])
-    chkpt_pattern  = re.compile(r'chkpt\.(\d{4})\.pk')
-    cavity_pattern = 'CavityProperties%g_nu.{:04d}.pk'%(nu)
-	Missing_cavity = []
-
-	for filename in os.listdir(directory):
-		match = chkpt_pattern.match(filename)
-		if match:
-			number = int(match.group(1))
-			corresponding_file = cavity_pattern.format(number)
-			full_path = os.path.join(directory, filename)
-			if os.path.exists(os.path.join(directory, corresponding_file)):
-				pass
-			else:
-				Missing_cavity.append(full_path)
-
-	if Missing_cavity == []:
-		return True
-	else:
-		return Missing_cavity
-"""
-
-"""
-def LoadCavityFiles():
-	Cavity_Checkpoints = [i for i in Path(sys.argv[1]).iterdir() if fnmatch.fnmatch(i, '*CavityProperties*.pk')]
-	Time_Snapshots     = []
-	Semi_Major_Axis    = []
-	Eccentricity       = []
-	Argument_Apses     = []
-	BinarySMA          = []
-	for cc in Cavity_Checkpoints:
-		cav_props = load_checkpoint(cc)
-
-		Time_Snapshots.append(cav_props["CurrentTime"])
-		Semi_Major_Axis.append(cav_props["SemiMajorAxis"])
-		Eccentricity.append(cav_props["Eccentricity"])
-		Argument_Apses.append(cav_props["Cavity_Slope_Radians"])
-		BinarySMA.append(cav_props["Binary_SemiMajorAxis"])
-
-
-"""
-
-
 
 
 if __name__ == "__main__":
@@ -215,7 +168,6 @@ if __name__ == "__main__":
 			Argument_Apses.append(cav_props["Cavity_Slope_Radians"])
 			BinarySMA.append(cav_props["Binary_SemiMajorAxis"])
 
-			#	print('Error for',sys.argv[1] + '/' + file)
 		else:
 			pass
 
@@ -226,11 +178,18 @@ if __name__ == "__main__":
 
 	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = zip(*sorted_lists)
 
-	print('Sorted_times',sorted_times)
-	print('Sorted_SMA',sorted_SMA)
-	print('sorted_ecc',sorted_ecc)
-	print('sorted_Apses',sorted_Apses)
-	print('sorted_Binary_SMA',sorted_Binary_SMA)
+	Cavity = {
+	'Timeseries':sorted_times,
+	'SemiMajor_Axis':sorted_SMA,
+	'Eccentricity':sorted_ecc,
+	'Inclination':sorted_Apses,
+	'Binary_SMA':sorted_Binary_SMA
+	}
+
+
+	CavityFileName = sys.argv[1] + '/CavityProperties_nu.%g.pk'%(nu)
+	with open(CavityFileName, "wb") as cvt:
+		pk.dump(Cavity, cvt)
 
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Properties')
@@ -242,7 +201,7 @@ if __name__ == "__main__":
 	plt.scatter(sorted_times,sorted_Apses, c = 'silver', s = 50)
 	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
 	plt.legend()
-	FigDirectory =  sys.argv[2]
+	FigDirectory =  sys.argv[1]
 	pngname = FigDirectory + f"{'/CavityProperties'}.{int(sorted_times[-1]):04d}.png"
 	fig.savefig(pngname, dpi=400)
 
