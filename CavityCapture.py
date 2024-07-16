@@ -16,6 +16,7 @@ Plot = True
 def load_checkpoint(filename):
     with open(filename, "rb") as file:
         chkpt = pk.load(file)
+        print('imported file')
         return chkpt
 
 
@@ -33,6 +34,7 @@ def CavityContour(chkpt):
 	extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1	
 	p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
 	v = p.vertices
+	print('CavityContour done')
 	return v
 
 
@@ -72,6 +74,7 @@ def MaxDist(points):
 	"Cavity_Slope_Radians":Max_Slope,
 	"Cavity_Slope_Degrees":Max_Slope*180/np.pi,
 	}
+	print('Maxdist done')
 	return Properties
 
 
@@ -118,7 +121,7 @@ def main_cbdiso_2d(chkpt,points):
 	ax.set_xlim(-4, 4)
 	ax.set_ylim(-4, 4)
 	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
-
+	print('CBDISO done')
 
 
 def MP_Cavity_Properties(arg):
@@ -134,7 +137,7 @@ def MP_Cavity_Properties(arg):
 	cavity_properties["viscosity"]            = chkpt["model_parameters"]["nu"]
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines)
-	
+	print('MP_Cavity_Properties done')
 	return cavity_properties
 
 
