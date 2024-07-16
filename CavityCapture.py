@@ -42,6 +42,8 @@ def CavityContour(chkpt):
 
 def MaxDist(points):
 
+	Npoints = len(points)
+
 	Dist_Vectors_i = np.zeros([Npoints,Npoints])
 	Dist_Vectors_j = np.zeros([Npoints,Npoints])
 	Distance       = np.zeros([Npoints,Npoints])
