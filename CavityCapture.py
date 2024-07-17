@@ -245,7 +245,7 @@ def Plot_Properties_of_Cavity(Cavity,FigDirectory):
 	
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Properties')
-	
+
 	plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown',linewidth = 2, label = r'Semi Major Axis $[a_0]$')
 	plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
 	plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', linestyle = 'dotted',linewidth = 2, label = 'Apsidal Inclination (Radians)')
@@ -255,7 +255,8 @@ def Plot_Properties_of_Cavity(Cavity,FigDirectory):
 
 	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
 	plt.legend()
-	
+	plt.xlim([1000,plt.gca().get_xlim()[1]])
+
 	pngname = FigDirectory + f"{'/CavityProperties_nu'}.{Cavity['nu']}.png"
 	fig.savefig(pngname, dpi=400)
 
