@@ -145,17 +145,21 @@ def MP_Cavity_Properties(arg,in_dir):
 
 def FitCavityCheck(in_dir):
 	
-	directory = Path(in_dir)
-	#print(os.listdir(directory))
+	directory    = Path(in_dir)
+	Fit_Cavities = True
+	nu           = False
+
 	for i in os.listdir(directory):
 		if fnmatch.fnmatch(in_dir + '/' + i, '*.pk'):
 			if fnmatch.fnmatch(in_dir + '/' + i, 'CavityProperties_nu*.pk'):
 				Fit_Cavities = False
-			else:
-				Fit_Cavities = True
-
-				nu        = load_checkpoint(in_dir + '/' + i)['model_parameters']['nu']
 				break
+			else:
+				pass
+
+			while nu == False:
+				nu = load_checkpoint(in_dir + '/' + i)['model_parameters']['nu']
+			
 		else:
 			pass
 	
@@ -205,7 +209,6 @@ def CavityEvolution(in_dir):
 		'Retrograde':cav_props['Retrograde'],
 		}
 
-		
 		with open(CavityFileName, "wb") as cvt:
 			pk.dump(Cavity, cvt)
 
@@ -213,15 +216,6 @@ def CavityEvolution(in_dir):
 		pass
 
 	return CavityFileName
-
-"""
-def extract_number_from_pattern(string, pattern):
-	if re.match(pattern, string):
-		match = re.search(r'\d+', string)
-		if match:
-			return int(match.group())
-	return None
-"""
 
 def Load_Cavity_Files(parent_dir):
 	subdirs = [parent_dir + '/' + name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
