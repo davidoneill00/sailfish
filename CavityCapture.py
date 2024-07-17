@@ -222,7 +222,7 @@ def Plot_Cavitites(Cavity):
 
 	if Cavity['Retrograde'] == False:
 		Linestyle = 'dotted'
-		Marger    = '*'
+		Marker    = '*'
 	elif Cavity['Retrograde'] == True:
 		Linestyle = 'solid'
 		Marker    = 'o'
