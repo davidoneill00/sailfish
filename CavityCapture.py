@@ -174,7 +174,7 @@ def CavityEvolution(in_dir):
 		Argument_Apses  = []
 		BinarySMA       = []
 
-		for file in os.listdir(directory):
+		for file in os.listdir(in_dir):
 
 			if fnmatch.fnmatch(in_dir + '/' + file, '*chkpt*.pk'):
 				
@@ -225,7 +225,7 @@ def extract_number_from_pattern(string, pattern):
 
 def Load_Cavity_Files(parent_dir):
 	subdirs = [parent_dir + '/' + name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
-	print(subdirs)
+	
 	for in_dir in subdirs:
 		
 		CavityFileName = CavityEvolution(in_dir)
