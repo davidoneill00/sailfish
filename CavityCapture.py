@@ -158,6 +158,7 @@ def FitCavityCheck(in_dir):
 				pass
 
 			while nu == False:
+				print('WE ARE LOOKING AT',in_dir + '/' + i)
 				nu = load_checkpoint(in_dir + '/' + i)['model_parameters']['nu']
 			
 		else:
