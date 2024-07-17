@@ -262,7 +262,7 @@ def Compare_Cavities(parent_dir):
 	plt.gca().invert_xaxis()
 	ax.set_yscale('log')
 	ax.set_xscale('log')
-	plt.yticks([10,1,0.1,0.01])
+	plt.yticks([10,1,0.1,0.05])
 	plt.xticks([1,0.1,0.01])
 
 
