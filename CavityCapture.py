@@ -163,7 +163,6 @@ def FitCavityCheck(in_dir):
 		else:
 			pass
 	print('Are we gonna run a cavity fit for',in_dir,'?',Fit_Cavities)
-	print('Looking in',os.listdir(directory))
 
 	return Fit_Cavities, nu
 
