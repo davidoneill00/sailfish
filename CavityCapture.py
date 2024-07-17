@@ -224,7 +224,7 @@ def extract_number_from_pattern(string, pattern):
 """
 
 def Load_Cavity_Files(parent_dir):
-	subdirs = [parent_dir + name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
+	subdirs = [parent_dir + '/' + name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
 	print(subdirs)
 	for in_dir in subdirs:
 		
