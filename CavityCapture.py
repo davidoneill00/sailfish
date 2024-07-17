@@ -225,9 +225,9 @@ def extract_number_from_pattern(string, pattern):
 
 def Load_Cavity_Files(parent_dir):
 	subdirs = [name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
-    
+    print(subdirs)
 	for in_dir in subdirs:
-		print(in_dir)
+		
 		CavityFileName = CavityEvolution(in_dir)
 		Cavity         = load_checkpoint(parent_dir + in_dir + CavityFileName)
 		
