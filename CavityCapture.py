@@ -218,25 +218,62 @@ def CavityEvolution(in_dir):
 
 	return CavityFileName
 
-def Load_Cavity_Files(parent_dir):
+def Plot_Cavitites(Cavity):
+
+	if Cavity['Retrograde'] == False:
+		Linestyle = 'dotted'
+	elif Cavity['Retrograde'] == True:
+		Linestyle = 'solid'
+
+	if Cavity['nu'] == 0.01:
+		Colour = 'blue'
+	elif Cavity['nu'] == 0.003:
+		Colour = 'orange'
+	elif Cavity['nu'] == 0.001:
+		Colour = 'green'
+	elif Cavity['nu'] == 0.0003:
+		Colour = 'red'
+	elif Cavity['nu'] == 0.0001:
+		Colour = 'purple'
+
+	#plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = Colour, linestyle = Linestyle,linewidth = 2, label = r'Semi Major Axis $[a_0]$')
+	#plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = Colour, linestyle = Linestyle,linewidth = 2, label = 'Eccentricity')
+	#plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = Colour, linestyle = Linestyle,linewidth = 2, label = 'Apsidal Inclination (Radians)')
+	plt.plot(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour)
+	plt.scatter(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour,marker='*')
+
+
+def Compare_Cavities(parent_dir):
 	subdirs = [parent_dir + '/' + name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
 	
+	fig, ax = plt.subplots(figsize=[12, 9])
+	plt.title('Cavity Semi Major Axis',fontsize=25)
+	plt.xlabel(r'$\log_{10} a_\mathrm{bin}~[a_0]$',fontsize=20)
+	plt.ylabel(r'$\log_{10} a_\mathrm{cav}~[a_0]$',fontsize=20)
+
 	for in_dir in subdirs:
 		
 		CavityFileName = CavityEvolution(in_dir)
 		Cavity         = load_checkpoint(CavityFileName)
 		
+		Plot_Cavitites(Cavity)
+		
 
+	plt.gca().invert_xaxis()
+	ax.set_yscale('log')
+	ax.set_xscale('log')
+	plt.yticks([10,1,0.1,0.001])
+	plt.xticks([1,0.1,0.01])
 
-
+	
 		# extract nu from child direct
 		# load pk file saved with nu
 		# save pk and nu to dict
 
 	# return all dictionaries
+	plt.savefig(parent_dir + '/Decoupling.png', dpi=400)
 
-
-Load_Cavity_Files(sys.argv[1])
+Compare_Cavities(sys.argv[1])
 
 
 
