@@ -241,10 +241,12 @@ def Plot_Cavitites(Cavity):
 	plt.plot(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, linestyle=Linestyle)
 	plt.scatter(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, marker=Marker, s = 50)
 
+
+
 def Plot_Properties_of_Cavity(Cavity,FigDirectory):
 	
 	fig, ax = plt.subplots(figsize=[12, 9])
-	plt.title('Cavity Properties')
+	plt.title('Cavity Properties nu = %g'%(Cavity['nu']))
 
 	plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown',linewidth = 2, label = r'Semi Major Axis $[a_0]$')
 	plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
