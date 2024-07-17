@@ -224,7 +224,7 @@ def Load_Cavity_Files(parent_dir):
 	for in_dir in subdirs:
 		
 		CavityFileName = CavityEvolution(in_dir)
-		Cavity         = load_checkpoint(parent_dir + in_dir + CavityFileName)
+		Cavity         = load_checkpoint(CavityFileName)
 		
 
 
