@@ -150,9 +150,8 @@ def FitCavityCheck(in_dir):
 	nu           = False
 
 	for i in os.listdir(directory):
-		if fnmatch.fnmatch(in_dir + '/' + i, '*.pk'):
-			if fnmatch.fnmatch(in_dir + '/' + i, 'CavityProperties_nu.*.pk'):
-				print('We have found pk file with pattern')
+		if fnmatch.fnmatch(i, '*.pk'):
+			if fnmatch.fnmatch(i, 'CavityProperties_nu.*.pk'):
 				Fit_Cavities = False
 				break
 			else:
