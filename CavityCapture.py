@@ -262,10 +262,10 @@ def Compare_Cavities(parent_dir):
 	plt.gca().invert_xaxis()
 	ax.set_yscale('log')
 	ax.set_xscale('log')
-	plt.yticks([10,1,0.1,0.001])
+	plt.yticks([10,1,0.1,0.01])
 	plt.xticks([1,0.1,0.01])
 
-	
+
 		# extract nu from child direct
 		# load pk file saved with nu
 		# save pk and nu to dict
