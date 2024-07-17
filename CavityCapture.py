@@ -222,8 +222,10 @@ def Plot_Cavitites(Cavity):
 
 	if Cavity['Retrograde'] == False:
 		Linestyle = 'dotted'
+		Marger    = '*'
 	elif Cavity['Retrograde'] == True:
 		Linestyle = 'solid'
+		Marker    = 'o'
 
 	if Cavity['nu'] == 0.01:
 		Colour = 'blue'
@@ -236,11 +238,23 @@ def Plot_Cavitites(Cavity):
 	elif Cavity['nu'] == 0.0001:
 		Colour = 'purple'
 
-	#plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = Colour, linestyle = Linestyle,linewidth = 2, label = r'Semi Major Axis $[a_0]$')
-	#plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = Colour, linestyle = Linestyle,linewidth = 2, label = 'Eccentricity')
-	#plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = Colour, linestyle = Linestyle,linewidth = 2, label = 'Apsidal Inclination (Radians)')
-	plt.plot(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour)
-	plt.scatter(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour,marker='*')
+	plt.plot(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, linestyle=Linestyle)
+	plt.scatter(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, marker=Marker, s = 50)
+
+def Plot_Properties_of_Cavity(Cavity,FigDirectory):
+	
+	plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown', linestyle = Linestyle,linewidth = 2, label = r'Semi Major Axis $[a_0]$')
+	plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', linestyle = Linestyle,linewidth = 2, label = 'Eccentricity')
+	plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', linestyle = Linestyle,linewidth = 2, label = 'Apsidal Inclination (Radians)')
+	plt.scatter(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown', s=50)
+	plt.scatter(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', s=50)
+	plt.scatter(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', s=50)
+
+	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
+	plt.legend()
+	
+	pngname = FigDirectory + f"{'/CavityProperties_nu'}.{Cavity['nu']}.png"
+	fig.savefig(pngname, dpi=400)
 
 
 def Compare_Cavities(parent_dir):
@@ -262,16 +276,18 @@ def Compare_Cavities(parent_dir):
 	plt.gca().invert_xaxis()
 	ax.set_yscale('log')
 	ax.set_xscale('log')
-	plt.yticks([10,1,0.1,0.05])
+	plt.yticks([10,1,0.1,0.05 ])
 	plt.xticks([1,0.1,0.01])
 
 
-		# extract nu from child direct
-		# load pk file saved with nu
-		# save pk and nu to dict
-
-	# return all dictionaries
 	plt.savefig(parent_dir + '/Decoupling.png', dpi=400)
+
+	for in_dir in subdirs:
+		CavityFileName = CavityEvolution(in_dir)
+		Cavity         = load_checkpoint(CavityFileName)
+
+		Plot_Properties_of_Cavity(Cavity,parent_dir)
+
 
 Compare_Cavities(sys.argv[1])
 
