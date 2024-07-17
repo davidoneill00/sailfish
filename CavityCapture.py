@@ -146,7 +146,7 @@ def MP_Cavity_Properties(arg,in_dir):
 def FitCavityCheck(in_dir):
 	
 	directory = Path(in_dir)
-
+	print(os.listdir(directory))
 	for i in os.listdir(directory):
 		if fnmatch.fnmatch(in_dir + '/' + i, '*.pk'):
 			if fnmatch.fnmatch(in_dir + '/' + i, 'CavityProperties_nu*.pk'):
@@ -230,7 +230,7 @@ def Load_Cavity_Files(parent_dir):
 
 		CavityFileName = CavityEvolution(in_dir)
 		Cavity         = load_checkpoint(parent_dir + in_dir + CavityFileName)
-
+		print()
 
 
 
