@@ -243,9 +243,9 @@ def Plot_Cavitites(Cavity):
 
 def Plot_Properties_of_Cavity(Cavity,FigDirectory):
 	
-	plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown', linestyle = Linestyle,linewidth = 2, label = r'Semi Major Axis $[a_0]$')
-	plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', linestyle = Linestyle,linewidth = 2, label = 'Eccentricity')
-	plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', linestyle = Linestyle,linewidth = 2, label = 'Apsidal Inclination (Radians)')
+	plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown',linewidth = 2, label = r'Semi Major Axis $[a_0]$')
+	plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
+	plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', linestyle = 'dotted',linewidth = 2, label = 'Apsidal Inclination (Radians)')
 	plt.scatter(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown', s=50)
 	plt.scatter(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', s=50)
 	plt.scatter(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', s=50)
