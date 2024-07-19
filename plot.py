@@ -211,6 +211,11 @@ def main_cbdiso_2d():
         "--draw-lindblad31-radius",
         action="store_true",
     )
+    parser.add_argument(
+        "--include_vmap",
+        action="store_true",
+        help="plot velocity vectors",
+    )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
@@ -280,10 +285,42 @@ def main_cbdiso_2d():
             Vx_Relative = fields["vx"](prim).T + 0.5 * np.sin(chkpt["time"])
             Vy_Relative = fields["vy"](prim).T - 0.5 * np.cos(chkpt["time"])
 
+            ## MESH 
+            #extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
+            dx = (mesh.x1 - mesh.x0) / np.shape(fields["vx"](prim).T)[0]
+            dy = (mesh.y1 - mesh.y0) / np.shape(fields["vx"](prim).T)[1]
+            xspace = np.arange(mesh.x0, mesh.x1 + dx, dx)
+            yspace = np.arange(mesh.y0, mesh.y1 + dy, dy)
+
+            Cartesian_Mesh = np.meshgrid(xspace,yspace)
+
+            Omega_Gas = Vx_Relative 
+
             f = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
 
         else:
             f = fields[args.field](prim).T
+
+        if args.include_vmap:
+            Vx = fields["vx"](prim).T
+            Vy = fields["vy"](prim).T
+
+
+            dx = (mesh.x1 - mesh.x0) / np.shape(fields["vx"](prim).T)[0]
+            dy = (mesh.y1 - mesh.y0) / np.shape(fields["vx"](prim).T)[1]
+            xspace = np.arange(mesh.x0, mesh.x1 + dx, dx)
+            yspace = np.arange(mesh.y0, mesh.y1 + dy, dy)
+
+            X, Y                 = np.meshgrid(xspace, yspace)
+            Sampling             = range(0, len(xspace)-1, 20)
+            X_sampled, Y_sampled = np.meshgrid(xspace[Sampling], yspace[Sampling])
+
+
+            Vx_sampled = Vx[::20, ::20]
+            Vy_sampled = Vy[::20, ::20]
+
+            #plt.quiver(Cartesian_Mesh, Vx[::100], Vy[::100])
+            plt.quiver(X_sampled, Y_sampled, Vx_sampled, Vy_sampled,width=0.001)
 
         if args.print_model_parameters:
             print(chkpt["model_parameters"])
@@ -329,7 +366,7 @@ def main_cbdiso_2d():
             import os
             CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
             pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(100*CurrentTime)}.png"
-            print(CurrentTime)
+            print('Figure at time', f"{int(1000*CurrentTime):04d}")
             fig.savefig(pngname, dpi=400)
 
             if args.field == 'speed':
@@ -430,6 +467,9 @@ if __name__ == "__main__":
     for arg in sys.argv:
         if arg.endswith(".pk"):
             chkpt = load_checkpoint(arg)
+            from sailfish.physics.kepler import OrbitalState
+            prim, sec = chkpt['point_masses']
+            #print(OrbitalState(prim, sec).orbital_parameters(0.5))
             if chkpt["solver"] == "srhd_1d":
                 print("plotting for srhd_1d solver")
                 exit(main_srhd_1d())
