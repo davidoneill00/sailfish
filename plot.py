@@ -311,13 +311,15 @@ def main_cbdiso_2d():
             xspace = np.arange(mesh.x0, mesh.x1 + dx, dx)
             yspace = np.arange(mesh.y0, mesh.y1 + dy, dy)
 
+            Number_of_Vectors    = 100
+
             X, Y                 = np.meshgrid(xspace, yspace)
-            Sampling             = range(0, len(xspace)-1, 20)
+            Sampling             = range(0, len(xspace)-1, len(xspace)//Number_of_Vectors)
             X_sampled, Y_sampled = np.meshgrid(xspace[Sampling], yspace[Sampling])
 
 
-            Vx_sampled = Vx[::20, ::20]
-            Vy_sampled = Vy[::20, ::20]
+            Vx_sampled = Vx[::len(xspace)//Number_of_Vectors, ::len(xspace)//Number_of_Vectors]
+            Vy_sampled = Vy[::len(xspace)//Number_of_Vectors, ::len(xspace)//Number_of_Vectors]
 
             #plt.quiver(Cartesian_Mesh, Vx[::100], Vy[::100])
             plt.quiver(X_sampled, Y_sampled, Vx_sampled, Vy_sampled,width=0.001)
