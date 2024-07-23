@@ -207,6 +207,35 @@ class OrbitalState(NamedTuple):
             self[1].perturb_mass_and_momentum(dm2, dpx2, dpy2),
         )
 
+    def true_anomaly(self, t: float) -> float:
+        from numpy import arctan2
+        """
+        This function determines the true anomaly from the
+        orbital state vector and an absolute time.
+        """
+        c1 = self[0]
+        c2 = self[1]
+
+        # component masses, total mass, and mass ratio
+        m1 = c1.mass
+        m2 = c2.mass
+        m = m1 + m2
+        q = m2 / m1
+
+        # position and velocity of the CM frame
+        x_cm = (c1.position_x * c1.mass + c2.position_x * c2.mass) / m
+        y_cm = (c1.position_y * c1.mass + c2.position_y * c2.mass) / m
+        vx_cm = (c1.velocity_x * c1.mass + c2.velocity_x * c2.mass) / m
+        vy_cm = (c1.velocity_y * c1.mass + c2.velocity_y * c2.mass) / m
+
+        # positions and velocities of the components in the CM frame
+        x1 = c1.position_x - x_cm
+        y1 = c1.position_y - y_cm
+        x2 = c2.position_x - x_cm
+        y2 = c2.position_y - y_cm
+
+        return arctan2(y1,x1)
+
     def orbital_parameters(self, t: float) -> ("OrbitalElements", "OrbitalOrientation"):
         """
         Compute the inverse Kepler two-body problem.
