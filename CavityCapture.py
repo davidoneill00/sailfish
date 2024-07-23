@@ -11,6 +11,7 @@ import re
 import fnmatch
 import gc
 import scipy
+from sailfish.physics.kepler import OrbitalState
 
 Plot = True
 
@@ -82,7 +83,7 @@ def MaxDist(points):
 
 
 
-def main_cbdiso_2d(chkpt,points,in_dir):
+def main_cbdiso_2d(chkpt,points,in_dir,filename):
 	fields = {
 		"sigma": lambda p: p[:, :, 0],
 		"vx": lambda p: p[:, :, 1],
@@ -112,6 +113,9 @@ def main_cbdiso_2d(chkpt,points,in_dir):
 	apses_y  = CavityProperties["Apsidal_Y_Positions"]
 	arg_aps  = CavityProperties["Cavity_Slope_Radians"]
 
+	#primary, secondary = chkpt["point_masses"]
+	#true_anomaly       = OrbitalState(primary, secondary).true_anomaly(chkpt["time"])
+
 	def Parameterisation(a,e,f,w):
 		r = a * (1-e**2) / (1+e*np.cos(f-w))
 		return apses_x[0] - a*(1-e)*np.cos(w) + r * (np.cos(f)), apses_y[0] -a*(1-e)*np.sin(w) + r * (np.sin(f))
@@ -123,24 +127,35 @@ def main_cbdiso_2d(chkpt,points,in_dir):
 	FigDirectory =  in_dir
 	ax.set_xlim(-4, 4)
 	ax.set_ylim(-4, 4)
-	plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
+	#plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
+	plt.savefig(filename.replace(".pk", ".png"), dpi = 400)
 
 
 def MP_Cavity_Properties(arg,in_dir):
 	chkpt             = load_checkpoint(arg)
 	contour_lines     = CavityContour(chkpt)
-
-
 	cavity_properties = MaxDist(contour_lines)
+
 	Binary_SMA        = np.array([s[ 1] for s in chkpt['timeseries']])[-1]
 	cavity_properties["Binary_SemiMajorAxis"] = Binary_SMA
 	cavity_properties["CurrentTime"]          = chkpt["time"] / 2 / np.pi
 	cavity_properties["viscosity"]            = chkpt["model_parameters"]["nu"]
 	cavity_properties["Retrograde"]           = chkpt["model_parameters"]["retrograde"]
-	
+
+	point_mass1, point_mass2 = chkpt["point_masses"]
+	TrueAnomaly = OrbitalState(point_mass1, point_mass2).true_anomaly(cavity_properties["CurrentTime"] * 2 * np.pi)
+	cavity_properties["Cavity_Slope_Radians"] += -TrueAnomaly
+
 	if Plot:
-		main_cbdiso_2d(chkpt,contour_lines,in_dir)
+		main_cbdiso_2d(chkpt,contour_lines,in_dir,arg)
 	return cavity_properties
+
+
+
+
+
+
+
 
 
 def FitCavityCheck(in_dir):
@@ -158,7 +173,6 @@ def FitCavityCheck(in_dir):
 				pass
 
 			while nu == False:
-				print('WE ARE LOOKING AT',in_dir + '/' + i)
 				nu = load_checkpoint(in_dir + '/' + i)['model_parameters']['nu']
 			
 		else:
@@ -227,7 +241,6 @@ def Plot_Cavitites(Cavity):
 	elif Cavity['Retrograde'] == True:
 		Linestyle = 'solid'
 		Marker    = 'o'
-
 	if Cavity['nu'] == 0.01:
 		Colour = 'blue'
 	elif Cavity['nu'] == 0.003:
@@ -245,24 +258,42 @@ def Plot_Cavitites(Cavity):
 
 
 def Plot_Properties_of_Cavity(Cavity,FigDirectory):
-	
+
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Properties nu = %g'%(Cavity['nu']))
-
 	plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown',linewidth = 2, label = r'Semi Major Axis $[a_0]$')
 	plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
 	plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', linestyle = 'dotted',linewidth = 2, label = 'Apsidal Inclination (Radians)')
 	plt.scatter(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown', s=50)
 	plt.scatter(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', s=50)
 	plt.scatter(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', s=50)
-
 	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
 	plt.legend()
 	plt.xlim([1000,plt.gca().get_xlim()[1]])
-
 	pngname = FigDirectory + f"{'/CavityProperties_nu'}.{Cavity['nu']}.png"
 	fig.savefig(pngname, dpi=400)
 
+
+def ReProcessCavityPickleFile(Cavity,in_dir):
+	if excluded_names[Cavity['nu']] !=[]:
+		excluded_files = [in_dir + "/" + i for i in excluded_names[Cavity['nu']]]
+		print('All files being excluded from nu ',Cavity['nu'],' are: ',excluded_files)
+		skip_index     = []
+		for i in excluded_files:
+			chkpt = load_checkpoint(i)
+			skip_index.append(np.where(np.isclose(Cavity['Timeseries'], chkpt["time"]/2/np.pi, atol=0.001))[0][0])
+
+		ProcessedCavity = {}
+		ProcessedCavity['nu']         = Cavity['nu']
+		ProcessedCavity['Retrograde'] = Cavity['Retrograde']
+		for k in Cavity.keys():
+			if k!='nu' and k!='Retrograde':
+				for ind in skip_index:
+					ProcessedCavity[k] = np.delete(Cavity[k], ind)
+	else:
+		ProcessedCavity = Cavity
+
+	return ProcessedCavity
 
 def Compare_Cavities(parent_dir):
 	subdirs = [parent_dir + '/' + name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
@@ -273,62 +304,34 @@ def Compare_Cavities(parent_dir):
 	plt.ylabel(r'$\log_{10} a_\mathrm{cav}~[a_0]$',fontsize=20)
 
 	for in_dir in subdirs:
+		CavityFileName    = CavityEvolution(in_dir)
+		Cavity            = load_checkpoint(CavityFileName)
+		ReprocessedCavity = ReProcessCavityPickleFile(Cavity,in_dir)
+		Plot_Cavitites(ReprocessedCavity)
 		
-		CavityFileName = CavityEvolution(in_dir)
-		Cavity         = load_checkpoint(CavityFileName)
-		
-		Plot_Cavitites(Cavity)
-		
-
 	plt.gca().invert_xaxis()
 	ax.set_yscale('log')
 	ax.set_xscale('log')
 	plt.yticks([10,1,0.1,0.05 ])
 	plt.xticks([1,0.1,0.01])
-
-
 	plt.savefig(parent_dir + '/Decoupling.png', dpi=400)
 
 	for in_dir in subdirs:
-		CavityFileName = CavityEvolution(in_dir)
-		Cavity         = load_checkpoint(CavityFileName)
+		CavityFileName    = CavityEvolution(in_dir)
+		Cavity            = load_checkpoint(CavityFileName)
+		ReprocessedCavity = ReProcessCavityPickleFile(Cavity,in_dir)
+		Plot_Properties_of_Cavity(ReprocessedCavity,parent_dir)
 
-		Plot_Properties_of_Cavity(Cavity,parent_dir)
 
+
+excluded_names = {}
+excluded_names[0.0001] = []
+excluded_names[0.0003] = []
+excluded_names[0.001]  = []
+excluded_names[0.003]  = []
 
 Compare_Cavities(sys.argv[1])
 
 
-
-"""
-
-fig, ax = plt.subplots(figsize=[12, 9])
-plt.title('Cavity Properties')
-plt.plot(sorted_times,sorted_SMA, c = 'brown', linewidth = 2, label = r'Semi Major Axis $[a_0]$')
-plt.plot(sorted_times,sorted_ecc, c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
-plt.plot(sorted_times,sorted_Apses, c = 'silver', linestyle = 'dotted',linewidth = 2, label = 'Apsidal Inclination (Radians)')
-plt.scatter(sorted_times,sorted_SMA, c = 'brown', s = 50)
-plt.scatter(sorted_times,sorted_ecc, c = 'blue', s = 50)
-plt.scatter(sorted_times,sorted_Apses, c = 'silver', s = 50)
-plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
-plt.legend()
-FigDirectory =  sys.argv[1]
-pngname = FigDirectory + f"{'/CavityProperties'}.{int(sorted_times[-1]):04d}.png"
-fig.savefig(pngname, dpi=400)
-
-
-fig, ax = plt.subplots(figsize=[12, 9])
-plt.title('Cavity Semi Major Axis',fontsize=25)
-plt.xlabel(r'$\log_{10} a_\mathrm{bin}~[a_0]$',fontsize=20)
-plt.ylabel(r'$\log_{10} a_\mathrm{cav}~[a_0]$',fontsize=20)
-plt.plot(np.array(sorted_Binary_SMA),np.array(sorted_SMA),c='black')
-plt.scatter(np.array(sorted_Binary_SMA),np.array(sorted_SMA),c='black',marker='*')
-plt.gca().invert_xaxis()
-ax.set_yscale('log')
-ax.set_xscale('log')
-plt.yticks([10,1,0.1,0.001])
-plt.xticks([1,0.1,0.01])
-plt.savefig(FigDirectory + '/Decoupling.png', dpi=400)
-"""
 
 exit()
