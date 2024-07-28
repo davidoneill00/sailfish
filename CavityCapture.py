@@ -197,7 +197,6 @@ def CavityEvolution(in_dir):
 		for file in os.listdir(in_dir):
 
 			if fnmatch.fnmatch(in_dir + '/' + file, '*chkpt*.pk'):
-				
 				cav_props = MP_Cavity_Properties(in_dir + '/' + file, in_dir)
 				
 				Time_Snapshots.append(cav_props["CurrentTime"])
@@ -238,9 +237,11 @@ def Plot_Cavitites(Cavity):
 	if Cavity['Retrograde'] == False:
 		Linestyle = 'dotted'
 		Marker    = '*'
+		Label     = 'Prograde'
 	elif Cavity['Retrograde'] == True:
 		Linestyle = 'solid'
 		Marker    = 'o'
+		Label     = 'Retrograde'
 	if Cavity['nu'] == 0.01:
 		Colour = 'blue'
 	elif Cavity['nu'] == 0.003:
@@ -253,14 +254,20 @@ def Plot_Cavitites(Cavity):
 		Colour = 'purple'
 
 	plt.plot(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, linestyle=Linestyle)
-	plt.scatter(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, marker=Marker, s = 50)
+	plt.scatter(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, marker=Marker, s = 50, label = Label)
 
 
 
 def Plot_Properties_of_Cavity(Cavity,FigDirectory):
 
 	fig, ax = plt.subplots(figsize=[12, 9])
-	plt.title('Cavity Properties nu = %g'%(Cavity['nu']))
+	if Cavity['Retrograde']:
+		plt.title('Cavity Properties Retrograde nu = %g'%(Cavity['nu']))
+		pngname = FigDirectory + f"{'/CavityProperties_Prograde_nu'}.{Cavity['nu']}.png"
+	else:
+		plt.title('Cavity Properties Prograde nu = %g'%(Cavity['nu']))
+		pngname = FigDirectory + f"{'/CavityProperties_Retrograde_nu'}.{Cavity['nu']}.png"
+
 	plt.plot(Cavity['Timeseries'],Cavity['SemiMajor_Axis'], c = 'brown',linewidth = 2, label = r'Semi Major Axis $[a_0]$')
 	plt.plot(Cavity['Timeseries'],Cavity['Eccentricity'], c = 'blue', linestyle = 'dashed',linewidth = 2, label = 'Eccentricity')
 	plt.plot(Cavity['Timeseries'],Cavity['Inclination'], c = 'silver', linestyle = 'dotted',linewidth = 2, label = 'Apsidal Inclination (Radians)')
@@ -270,7 +277,6 @@ def Plot_Properties_of_Cavity(Cavity,FigDirectory):
 	plt.xlabel(r'Time $2\pi\Omega_0^{-1}$')
 	plt.legend()
 	plt.xlim([1000,plt.gca().get_xlim()[1]])
-	pngname = FigDirectory + f"{'/CavityProperties_nu'}.{Cavity['nu']}.png"
 	fig.savefig(pngname, dpi=400)
 
 
@@ -308,7 +314,8 @@ def Compare_Cavities(parent_dir):
 		Cavity            = load_checkpoint(CavityFileName)
 		ReprocessedCavity = ReProcessCavityPickleFile(Cavity,in_dir)
 		Plot_Cavitites(ReprocessedCavity)
-		
+
+	plt.legend()
 	plt.gca().invert_xaxis()
 	ax.set_yscale('log')
 	ax.set_xscale('log')
@@ -323,6 +330,9 @@ def Compare_Cavities(parent_dir):
 		Plot_Properties_of_Cavity(ReprocessedCavity,parent_dir)
 
 
+Exclusion_List =
+for i in range():
+	'chkpt.0'
 
 excluded_names = {}
 excluded_names[0.0001] = []
