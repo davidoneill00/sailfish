@@ -237,21 +237,28 @@ def Plot_Cavitites(Cavity):
 	if Cavity['Retrograde'] == False:
 		Linestyle = 'dotted'
 		Marker    = '*'
-		Label     = 'Prograde'
+		Label1     = 'Prograde '
 	elif Cavity['Retrograde'] == True:
 		Linestyle = 'solid'
 		Marker    = 'o'
-		Label     = 'Retrograde'
+		Label1     = 'Retrograde '
 	if Cavity['nu'] == 0.01:
 		Colour = 'blue'
+		Label2 = 'nu 1e-2'
 	elif Cavity['nu'] == 0.003:
 		Colour = 'orange'
+		Label2 = 'nu 3e-3'
 	elif Cavity['nu'] == 0.001:
 		Colour = 'green'
+		Label2 = 'nu 1e-3'
 	elif Cavity['nu'] == 0.0003:
 		Colour = 'red'
+		Label2 = 'nu 3e-4'
 	elif Cavity['nu'] == 0.0001:
 		Colour = 'purple'
+		Label2 = 'nu 1e-4'
+
+	Label = Label1 + Label2
 
 	plt.plot(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, linestyle=Linestyle)
 	plt.scatter(np.array(Cavity['Binary_SMA']),Cavity['SemiMajor_Axis'],c=Colour, marker=Marker, s = 50, label = Label)
