@@ -244,19 +244,19 @@ def Plot_Cavitites(Cavity):
 		Label1     = 'Retrograde '
 	if Cavity['nu'] == 0.01:
 		Colour = 'blue'
-		Label2 = 'nu 1e-2'
+		Label2 = 'nu=1e-2'
 	elif Cavity['nu'] == 0.003:
 		Colour = 'orange'
-		Label2 = 'nu 3e-3'
+		Label2 = 'nu=3e-3'
 	elif Cavity['nu'] == 0.001:
 		Colour = 'green'
-		Label2 = 'nu 1e-3'
+		Label2 = 'nu=1e-3'
 	elif Cavity['nu'] == 0.0003:
 		Colour = 'red'
-		Label2 = 'nu 3e-4'
+		Label2 = 'nu=3e-4'
 	elif Cavity['nu'] == 0.0001:
 		Colour = 'purple'
-		Label2 = 'nu 1e-4'
+		Label2 = 'nu=1e-4'
 
 	Label = Label1 + Label2
 

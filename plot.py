@@ -1,6 +1,7 @@
 import argparse
 import pickle
 import sys
+from sailfish.physics.kepler import OrbitalState
 
 sys.path.insert(1,"/groups/astro/davidon/sailfish/")
 import sailfish
@@ -212,12 +213,14 @@ def main_cbdiso_2d():
         action="store_true",
     )
     parser.add_argument(
-        "--include_vmap",
+        "--vmap",
         action="store_true",
         help="plot velocity vectors",
     )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
+
+
 
     class TorqueCalculation:
         def __init__(self, mesh, masses):
@@ -301,7 +304,7 @@ def main_cbdiso_2d():
         else:
             f = fields[args.field](prim).T
 
-        if args.include_vmap:
+        if args.vmap:
             Vx = fields["vx"](prim).T
             Vy = fields["vy"](prim).T
 
@@ -342,6 +345,11 @@ def main_cbdiso_2d():
             extent=extent,
         )
 
+        primary, secondary = chkpt['point_masses']
+
+        ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 100, c = 'white', label = 'Point Mass')
+        ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 100, c = 'white')
+        ax.legend()
         if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
             y1 = chkpt["point_masses"][0].position_y
@@ -469,9 +477,11 @@ if __name__ == "__main__":
     for arg in sys.argv:
         if arg.endswith(".pk"):
             chkpt = load_checkpoint(arg)
-            from sailfish.physics.kepler import OrbitalState
-            prim, sec = chkpt['point_masses']
-            #print(OrbitalState(prim, sec).orbital_parameters(0.5))
+            
+            #prim, sec = chkpt['point_masses']
+            import numpy as np
+            print('Time',chkpt['time']/2/np.pi)
+            print('Semi-Major axis',np.array([s[ 1] for s in chkpt['timeseries']])[-1])
             if chkpt["solver"] == "srhd_1d":
                 print("plotting for srhd_1d solver")
                 exit(main_srhd_1d())

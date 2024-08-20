@@ -37,8 +37,8 @@ class DavidTimeseries:
         self.torque_b       = np.array([s[ 8] for s in ts])
         self.mdot_b         = np.array([s[ 9] for s in ts])
         self.disk_ecc       = np.array([s[10] for s in ts])
-        self.Inspiral_Times = Checkpoint["model_parameters"]["inspiral_time_list"]
-        self.Orbital_Phase  = Checkpoint["model_parameters"]["Fixed_Phases"]
+        #self.Inspiral_Times = Checkpoint["model_parameters"]["inspiral_time_list"]
+        #self.Orbital_Phase  = Checkpoint["model_parameters"]["Fixed_Phases"]
 
 
         if Checkpoint["model_parameters"]["which_diagnostics"] == "david_new":
@@ -88,6 +88,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoints", type=str, nargs="+")
     parser.add_argument(
+        "--Output",
+        "-o",
+        default=None,
+        type=str,
+        help="Where to save the output png files",
+    )
+    parser.add_argument(
         "--Disk_Momentum",
         "-jd",
         action='store_true',
@@ -108,7 +115,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--Orbital_Elements",
-        "-o",
+        "-OE",
         action='store_true',
         help="whether to plot the binary's changing orbital elements",
     )
@@ -142,21 +149,17 @@ if __name__ == '__main__':
     M_dot_0             = 3 * np.pi * viscosity * Sigma_0
     
 
-    #plt.figure()
-    #plt.title('Orbital Phase')
-    #plt.ylabel(r'$\phi$ Radians')
-    #plt.xlabel('Time from inspiral')
-    #plt.plot(np.array(ts.Inspiral_Times[0:15624999])/2/np.pi,ts.Orbital_Phase[0:15624999])
-    #plt.savefig(os.getcwd() + '/Outputs/OrbitalPhase.png',dpi = 400)
-
 
     if args.Disk_Momentum:
         plt.figure()
         plt.plot(Final_Orbits, ts.total_angular_momentum[-len(Final_Orbits):], c = 'black')
         plt.xlabel('time')
         plt.title('Total Angular Momentum e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
-        savename = os.getcwd() + "/Outputs/TotalAngularMomentum.%04d.png"%(CurrentTime)
-        plt.savefig(savename, dpi=400)
+        try:
+            savename = os.getcwd() + "/Outputs/TotalAngularMomentum.%04d.png"%(CurrentTime)
+            plt.savefig(savename, dpi=400)
+        except:
+            plt.show()
 
     if args.Torque_Components:
         plt.figure()
@@ -174,8 +177,11 @@ if __name__ == '__main__':
         plt.plot(Final_Orbits,Normalised_Torque)
         plt.legend(loc = 'upper right')
         plt.title('Torque')
-        savename = os.getcwd() +  "/Outputs/MeanTorque.%04d.png"%(CurrentTime)
-        plt.savefig(savename, dpi=400)
+        try:
+            savename = args.Output +  "/Outputs/MeanTorque.%04d.png"%(CurrentTime)
+            plt.savefig(savename, dpi=400)
+        except:
+            plt.show()
 
         
         #plt.plot(Final_Orbits,InnerClipped_Torque,c = 'red',label = 'r<a')
@@ -198,10 +204,13 @@ if __name__ == '__main__':
         plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.plot(Final_Orbits,Normalised_Power, c = 'red', label = 'Power', linewidth = 0.5,)
         plt.legend(loc = 'upper right')
-        savename = os.getcwd() +  "/Outputs/MeanPower.%04d.png"%(CurrentTime)
         plt.title('Power')
         plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
-        plt.savefig(savename, dpi=400)
+        try:
+            savename = args.Output +  "/Outputs/MeanPower.%04d.png"%(CurrentTime)
+            plt.savefig(savename, dpi=400)
+        except:
+            plt.show()
 
 
         #plt.figure()
@@ -222,7 +231,7 @@ if __name__ == '__main__':
         plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.1, c = 'red')
         plt.xlabel('Time [P]')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
-        plt.title(r'Retrograde Accretion Rate e = %g, $\nu=%g$'%(np.round(OrbitalEccentricity,3),viscosity))
+        plt.title(r'Accretion Rate e = %g, $\nu=%g$'%(np.round(OrbitalEccentricity,3),viscosity))
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
 
         plt.ylim([0,2])
@@ -230,8 +239,11 @@ if __name__ == '__main__':
         MeanAccretion = [np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.legend(loc = 'upper right')
-        savename = os.getcwd() +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
-        plt.savefig(savename, dpi=400)
+        try:
+            savename = args.Output +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
+            plt.savefig(savename, dpi=400)
+        except:
+            plt.show()
 
     if args.Orbital_Elements:
         plt.figure()
@@ -241,8 +253,11 @@ if __name__ == '__main__':
         plt.xlabel('Time')
         plt.ylabel('Orbital Elements')
         plt.legend()
-        savename = os.getcwd() +  "/Outputs/OrbitalElements.%04d.png"%(CurrentTime)
-        plt.savefig(savename, dpi=400)
+        try:
+            savename = args.Output +  "/Outputs/OrbitalElements.%04d.png"%(CurrentTime)
+            plt.savefig(savename, dpi=400)
+        except:
+            plt.show()
 
 
 
