@@ -138,7 +138,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 2000.
+    Number_of_Orbits    = 1500.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
 
@@ -156,74 +156,68 @@ if __name__ == '__main__':
         plt.xlabel('time')
         plt.title('Total Angular Momentum e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
         try:
-            savename = os.getcwd() + "/Outputs/TotalAngularMomentum.%04d.png"%(CurrentTime)
+            savename = os.getcwd() + "/TotalAngularMomentum.%04d.png"%(CurrentTime)
             plt.savefig(savename, dpi=400)
         except:
             plt.show()
 
     if args.Torque_Components:
-        plt.figure()
-        plt.xlabel('time')
-        #plt.title(r'Torque Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
-        plt.ylabel(r'$\tau/\dot{M}_0$')
-
         InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
         OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
         Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
 
-        MeanTorque = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.figure()
+        plt.xlabel('time')
+        if Model_Parameters['retrograde']:
+            plt.title(r'Torque Retrograde $\nu = %g$'%(viscosity))
+        else:
+            plt.title(r'Torque Prograde $\nu = %g$'%(viscosity))
+        
+        MeanTorque = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+
+        plt.plot(Final_Orbits,Normalised_Torque, c = 'blue', linewidth = 0.1)
         plt.plot(TimeBins[1:],MeanTorque,linewidth = 0.5, label = 'Binned Torque Mean', c = 'black')
-        plt.plot(Final_Orbits,Normalised_Torque)
+        plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
         plt.legend(loc = 'upper right')
-        plt.title('Torque')
+        #plt.ylim([-2.5,5])
+        plt.ylabel(r'$\tau/\dot{M}_0$')
         try:
-            savename = args.Output +  "/Outputs/MeanTorque.%04d.png"%(CurrentTime)
+            savename = args.Output +  "/MeanTorque.%04d_nu%g.png"%(CurrentTime,viscosity)
             plt.savefig(savename, dpi=400)
         except:
             plt.show()
 
-        
-        #plt.plot(Final_Orbits,InnerClipped_Torque,c = 'red',label = 'r<a')
-        #plt.axhline(y=np.mean(InnerClipped_Torque),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
-        #plt.plot(Final_Orbits,OuterClipped_Torque,c = 'blue',label = 'r>a')
-        #plt.axhline(y=np.mean(OuterClipped_Torque),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
-        #plt.legend()
-        #savename = os.getcwd() + "/Outputs/TorqueComponents.%04d.png"%(CurrentTime)
-        #plt.savefig(savename, dpi=400)
+
+
 
     if args.Power_Components:
         Normalised_Power    = (ts.power_g1[-len(Final_Orbits):]+ts.power_g2[-len(Final_Orbits):]) / M_dot_0
         InnerClipped_Power  = (ts.innerpower_1[-len(Final_Orbits):]+ts.innerpower_2[-len(Final_Orbits):]) / M_dot_0
         OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) / M_dot_0
         
-        
         plt.figure()
+        plt.xlabel('time')
+        if Model_Parameters['retrograde']:
+            plt.title(r'Power Retrograde $\nu = %g$'%(viscosity))
+        else:
+            plt.title(r'Power Prograde $\nu = %g$'%(viscosity))
+
         MeanPower = [np.mean(Normalised_Power[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
-        plt.figure()
+        
+        plt.plot(Final_Orbits,Normalised_Power, c = 'Purple', label = 'Power', linewidth = 0.1,)
         plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Means', c = 'black')
-        plt.plot(Final_Orbits,Normalised_Power, c = 'red', label = 'Power', linewidth = 0.5,)
+        plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
         plt.legend(loc = 'upper right')
-        plt.title('Power')
+        #plt.ylim([-10,10])
         plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
         try:
-            savename = args.Output +  "/Outputs/MeanPower.%04d.png"%(CurrentTime)
+            savename = args.Output +  "/MeanPower.%04d_nu%g.png"%(CurrentTime,viscosity)
             plt.savefig(savename, dpi=400)
         except:
             plt.show()
 
 
-        #plt.figure()
-        #plt.xlabel('time')
-        #plt.title(r'Power Retrograde e = %g'%(np.round(OrbitalEccentricity,3)))
-        #plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
-        #plt.plot(Final_Orbits,InnerClipped_Power,c = 'red',label = ' r<a')
-        #plt.axhline(y=np.mean(InnerClipped_Power),c = 'red',label = 'Mean r<a',linestyle = 'dashed')
-        #plt.plot(Final_Orbits,OuterClipped_Power,c = 'blue',label = 'r>a')
-        #plt.axhline(y=np.mean(OuterClipped_Power),c = 'blue',label = 'Mean r>a',linestyle = 'dashed')
-        #plt.legend()
-        #savename = os.getcwd() + "/Outputs/PowerComponents.%04d.png"%(CurrentTime)
-        #plt.savefig(savename, dpi=400)
+
 
     if args.Accretion:
 
@@ -240,10 +234,12 @@ if __name__ == '__main__':
         plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.legend(loc = 'upper right')
         try:
-            savename = args.Output +  "/Outputs/AccretionRate.%04d.png"%(CurrentTime)
+            savename = args.Output +  "/AccretionRate.%04d_nu%g.png"%(CurrentTime,viscosity)
             plt.savefig(savename, dpi=400)
         except:
             plt.show()
+
+
 
     if args.Orbital_Elements:
         plt.figure()
@@ -254,7 +250,7 @@ if __name__ == '__main__':
         plt.ylabel('Orbital Elements')
         plt.legend()
         try:
-            savename = args.Output +  "/Outputs/OrbitalElements.%04d.png"%(CurrentTime)
+            savename = args.Output +  "/OrbitalElements.%04d.png"%(CurrentTime)
             plt.savefig(savename, dpi=400)
         except:
             plt.show()
