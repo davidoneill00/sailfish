@@ -900,6 +900,8 @@ class BinaryInspiral(SetupBase):
             vx2 = -vx1
             vy2 = -vy1
 
+            c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length= self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= self.sink_radius,)
+            c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length= self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= self.sink_radius,)
             
         elif OEI =='Merged':
             x1      = 0.
@@ -912,9 +914,8 @@ class BinaryInspiral(SetupBase):
             vy2     = 0.
 
 
-        c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length= 2 * self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= 2 * self.sink_radius,)
-        c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length= 2 * self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= 2 * self.sink_radius,)
-        #m1, m2 = OrbitalState(c1, c2)    
+            c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length= 2 * self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= 2 * self.sink_radius,)
+            c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length= 2 * self.softening_length,sink_model=SinkModel[self.sink_model.upper()],sink_rate=self.sink_rate,sink_radius= 2 * self.sink_radius,)
 
         return (c1,c2)
 
