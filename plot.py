@@ -217,6 +217,12 @@ def main_cbdiso_2d():
         action="store_true",
         help="plot velocity vectors",
     )
+    parser.add_argument(
+        "--print_model_parameters",
+        "-params",
+        action="store_true",
+        help="plot the parameters used for making this checkpoint",
+    )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
@@ -263,13 +269,67 @@ def main_cbdiso_2d():
             print("total torque:", t.sum())
             return np.abs(t) ** 0.125 * np.sign(t)
 
+
+
+    class VelocityQuantities():
+        
+        def __init__(self, mesh, Vx, Vy):
+            self.mesh = mesh
+            self.Vx   = Vx
+            self.Vy   = Vy
+
+
+        def Mesh(self):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            return x,y
+
+        def VMap(self, Number_of_Vectors=400):
+            x, y                 = self.Mesh()
+            X, Y                 = np.meshgrid(x, y)
+            Sampling             = np.arange(0, len(x)-1, len(x)//Number_of_Vectors)
+            
+            X_sampled = x[Sampling,0]
+            #print(x[Sampling])
+            Y_sampled =  y[0,Sampling]
+            #print(np.shape(y))
+
+            Vx_sampled = self.Vx[::len(x)//Number_of_Vectors, ::len(x)//Number_of_Vectors] 
+            Vy_sampled = self.Vy[::len(y[0])//Number_of_Vectors, ::len(y[0])//Number_of_Vectors]
+
+            plt.quiver(X_sampled, Y_sampled, Vx_sampled, Vy_sampled,width=0.001, color = 'lightcyan', scale=100)
+
+        def Speed(self,t):
+            Vx_Relative = self.Vx + 0.5 * np.sin(t)
+            Vy_Relative = self.Vy - 0.5 * np.cos(t)
+
+            f = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
+
+            # Make radial and aximuthal?
+            return f
+
+        def Vortensity(self):
+            x, y = self.Mesh()
+
+            #x * self.Vy - y * self.Vx
+        
+
+            #dx = (mesh.x1 - mesh.x0) / np.shape(fields["vx"](prim).T)[0]
+            #dy = (mesh.y1 - mesh.y0) / np.shape(fields["vx"](prim).T)[1]
+
+
+
+
+
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt   = load_checkpoint(filename)
         
-
-        mesh = chkpt["mesh"]
+        mesh             = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
+        
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
@@ -283,52 +343,41 @@ def main_cbdiso_2d():
             # the cbdiso_2d solver uses primitive data as the solution array
             prim = chkpt["solution"]
 
+
+        Vx               = fields["vx"](prim).T
+        Vy               = fields["vy"](prim).T
+        Velocities       = VelocityQuantities(mesh, Vx, Vy)
+
         if args.field == 'speed':
-
-            Vx_Relative = fields["vx"](prim).T + 0.5 * np.sin(chkpt["time"])
-            Vy_Relative = fields["vy"](prim).T - 0.5 * np.cos(chkpt["time"])
-
-            ## MESH 
-            #extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
-            dx = (mesh.x1 - mesh.x0) / np.shape(fields["vx"](prim).T)[0]
-            dy = (mesh.y1 - mesh.y0) / np.shape(fields["vx"](prim).T)[1]
-            xspace = np.arange(mesh.x0, mesh.x1 + dx, dx)
-            yspace = np.arange(mesh.y0, mesh.y1 + dy, dy)
-
-            Cartesian_Mesh = np.meshgrid(xspace,yspace)
-
-            Omega_Gas = Vx_Relative 
-
-            f = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
+            f    = Velocities.Speed(chkpt["time"])
+            
+        elif args.field == 'vortensity':
+            pass
 
         else:
             f = fields[args.field](prim).T
 
+
         if args.vmap:
-            Vx = fields["vx"](prim).T
-            Vy = fields["vy"](prim).T
-
-
-            dx = (mesh.x1 - mesh.x0) / np.shape(fields["vx"](prim).T)[0]
-            dy = (mesh.y1 - mesh.y0) / np.shape(fields["vx"](prim).T)[1]
-            xspace = np.arange(mesh.x0, mesh.x1 + dx, dx)
-            yspace = np.arange(mesh.y0, mesh.y1 + dy, dy)
-
-            Number_of_Vectors    = 100
-
-            X, Y                 = np.meshgrid(xspace, yspace)
-            Sampling             = range(0, len(xspace)-1, len(xspace)//Number_of_Vectors)
-            X_sampled, Y_sampled = np.meshgrid(xspace[Sampling], yspace[Sampling])
-
-
-            Vx_sampled = Vx[::len(xspace)//Number_of_Vectors, ::len(xspace)//Number_of_Vectors]
-            Vy_sampled = Vy[::len(xspace)//Number_of_Vectors, ::len(xspace)//Number_of_Vectors]
-
-            #plt.quiver(Cartesian_Mesh, Vx[::100], Vy[::100])
-            plt.quiver(X_sampled, Y_sampled, Vx_sampled, Vy_sampled,width=0.001)
+            Velocities.VMap()
 
         if args.print_model_parameters:
+            print('Iteration Number.........',chkpt['iteration'])
+            print('Timestep_dt..............',chkpt['timestep_dt'])
+            print('cfl_number...............',chkpt['cfl_number'])
+            print('Solver options...........',chkpt['solver_options'])
+            print('Event states.............',chkpt['event_states'])
+            print('------------------Driver------------------')
+            print(chkpt['driver'])
+            print('-------------Model Parameters-------------')
             print(chkpt["model_parameters"])
+            print('---------------Point Masses---------------')
+            print(chkpt["point_masses"])
+            print('------------------------------------------')
+
+
+
+            
 
         if args.scale_by_power is not None:
             f = f**args.scale_by_power
