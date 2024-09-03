@@ -227,7 +227,6 @@ def main_cbdiso_2d():
     args = parser.parse_args()
 
 
-
     class TorqueCalculation:
         def __init__(self, mesh, masses):
             self.mesh = mesh
@@ -268,8 +267,6 @@ def main_cbdiso_2d():
             t = t1 + t2
             print("total torque:", t.sum())
             return np.abs(t) ** 0.125 * np.sign(t)
-
-
 
     class VelocityQuantities():
         
@@ -313,11 +310,11 @@ def main_cbdiso_2d():
         def Vortensity(self):
             x, y = self.Mesh()
 
-            #x * self.Vy - y * self.Vx
-        
+            dVy_dx = np.gradient(self.Vy, axis=1)  # Partial derivative of Vy with respect to x
+            dVx_dy = np.gradient(self.Vx, axis=0)  # Partial derivative of Vx with respect to y
+            f      = dVy_dx - dVx_dy
 
-            #dx = (mesh.x1 - mesh.x0) / np.shape(fields["vx"](prim).T)[0]
-            #dy = (mesh.y1 - mesh.y0) / np.shape(fields["vx"](prim).T)[1]
+            return f #Ignoring 1/Sigma here
 
 
 
@@ -352,7 +349,8 @@ def main_cbdiso_2d():
             f    = Velocities.Speed(chkpt["time"])
             
         elif args.field == 'vortensity':
-            pass
+            sigma = fields['sigma'](prim).T
+            f     = Velocities.Vortensity()/sigma
 
         else:
             f = fields[args.field](prim).T
@@ -377,27 +375,51 @@ def main_cbdiso_2d():
 
 
 
-            
-
-        if args.scale_by_power is not None:
-            f = f**args.scale_by_power
-        if args.log:
-            f = np.log10(f)
-
         extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
-        cm     = ax.imshow(
-            f,
-            origin="lower",
-            vmin=args.vmin,
-            vmax=args.vmax,
-            cmap=args.cmap,
-            extent=extent,
-        )
+        if args.field == 'vortensity' and args.log:
+            cm     = ax.imshow(
+                np.log10(f),
+                origin="lower",
+                vmin=args.vmin,
+                vmax=args.vmax,
+                cmap='Reds',
+                extent=extent,
+            )
+            cm2     = ax.imshow(
+                np.log10(-f),
+                origin="lower",
+                vmin=args.vmin,
+                vmax=args.vmax,
+                cmap='Blues',
+                extent=extent,
+            )
+            #cbar_ax  = fig.add_axes([0.76, 0.64, 0.03, 0.24])
+            colorbar1      = fig.colorbar(cm , cax=fig.add_axes([0.85, 0.51, 0.03, 0.42]))
+            colorbar1.set_label(r'$\log_{10}(\zeta)$', rotation=0, labelpad =30)
+            colorbar2      = fig.colorbar(cm2, cax=fig.add_axes([0.85, 0.07, 0.03, 0.42]))
+            colorbar2.set_label(r'$\log_{10}(-\zeta)$', rotation=0, labelpad =30)
+            colorbar2.ax.invert_yaxis()
+
+        else:
+            if args.scale_by_power is not None:
+                f = f**args.scale_by_power
+            if args.log:
+                f = np.log10(f)
+
+            cm     = ax.imshow(
+                f,
+                origin="lower",
+                vmin=args.vmin,
+                vmax=args.vmax,
+                cmap=args.cmap,
+                extent=extent,
+            )
+            
+            fig.colorbar(cm)
+                
 
         primary, secondary = chkpt['point_masses']
 
-        #ax.scatter(primary.position_x, primary.position_y, marker = 'o', s = 30, c = 'black')
-        #ax.scatter(secondary.position_x, secondary.position_y, marker = 'o', s = 30, c = 'black')
         ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 40, c = 'white', label = 'Point Mass')
         ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 40, c = 'white')
         ax.legend()
@@ -417,7 +439,6 @@ def main_cbdiso_2d():
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
-        fig.colorbar(cm)
         fig.suptitle(chkpt["time"]/2/np.pi)
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
