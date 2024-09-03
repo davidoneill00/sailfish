@@ -385,7 +385,7 @@ def main_cbdiso_2d():
             f = np.log10(f)
 
         extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
-        cm = ax.imshow(
+        cm     = ax.imshow(
             f,
             origin="lower",
             vmin=args.vmin,
@@ -396,8 +396,10 @@ def main_cbdiso_2d():
 
         primary, secondary = chkpt['point_masses']
 
-        ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 100, c = 'white', label = 'Point Mass')
-        ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 100, c = 'white')
+        #ax.scatter(primary.position_x, primary.position_y, marker = 'o', s = 30, c = 'black')
+        #ax.scatter(secondary.position_x, secondary.position_y, marker = 'o', s = 30, c = 'black')
+        ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 40, c = 'white', label = 'Point Mass')
+        ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 40, c = 'white')
         ax.legend()
         if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
