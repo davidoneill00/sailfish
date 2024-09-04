@@ -5,3 +5,7 @@ __pycache__
 /doc/build
 Outputs/
 sfish-test/
+*.mp4
+myenv/
+sailfish/__init__.pyc
+test_venv/
