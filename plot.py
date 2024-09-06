@@ -310,8 +310,8 @@ def main_cbdiso_2d():
         def Vortensity(self):
             x, y = self.Mesh()
 
-            dVy_dx = np.gradient(self.Vy, axis=1)  # Partial derivative of Vy with respect to x
-            dVx_dy = np.gradient(self.Vx, axis=0)  # Partial derivative of Vx with respect to y
+            dVy_dx = np.gradient(self.Vy, axis=1)  # Partial derivative of Vy with respect to x. Axis swapped before transpose
+            dVx_dy = np.gradient(self.Vx, axis=0)  # Partial derivative of Vx with respect to y. Axis swapped before transpose
             f      = dVy_dx - dVx_dy
 
             return f #Ignoring 1/Sigma here
