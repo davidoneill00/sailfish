@@ -138,7 +138,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 1500.
+    Number_of_Orbits    = 100.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
 
@@ -175,6 +175,7 @@ if __name__ == '__main__':
         
         MeanTorque = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
 
+        plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
         plt.plot(Final_Orbits,Normalised_Torque, c = 'blue', linewidth = 0.1)
         plt.plot(TimeBins[1:],MeanTorque,linewidth = 0.5, label = 'Binned Torque Mean', c = 'black')
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
@@ -204,6 +205,7 @@ if __name__ == '__main__':
 
         MeanPower = [np.mean(Normalised_Power[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         
+        plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
         plt.plot(Final_Orbits,Normalised_Power, c = 'Purple', label = 'Power', linewidth = 0.1,)
         plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
@@ -228,7 +230,8 @@ if __name__ == '__main__':
         plt.title(r'Accretion Rate e = %g, $\nu=%g$'%(np.round(OrbitalEccentricity,3),viscosity))
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
 
-        plt.ylim([0,2])
+        #plt.ylim([0,2])
+        plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
         AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
         MeanAccretion = [np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')

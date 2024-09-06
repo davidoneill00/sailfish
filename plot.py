@@ -204,9 +204,11 @@ def main_cbdiso_2d():
         help="plot the domain out to this radius",
     )
     parser.add_argument(
-        "--save",
-        action="store_true",
-        help="save PNG files instead of showing a window",
+        "--Outputs",
+        "-o",
+        default=None,
+	    type=str,
+	    help="Where to save the output png files",
     )
     parser.add_argument(
         "--draw-lindblad31-radius",
@@ -443,33 +445,33 @@ def main_cbdiso_2d():
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
-        if args.save:
 
-            import os
-            CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
-            pngname     = os.getcwd() + f"{'/Outputs/DensityMap'}.{int(100*CurrentTime)}.png"
-            print('Figure at time', f"{int(1000*CurrentTime):04d}")
+
+
+        import os
+        CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
+        try:
+            pngname     = args.Outputs + f"{'/DensityMap'}.{int(100*CurrentTime)}.png"
             fig.savefig(pngname, dpi=400)
 
-            if args.field == 'speed':
-                fig, ax = plt.subplots(figsize=[12, 9])
-                ni, nj  = mesh.shape
-                xspace  = np.linspace(mesh.x0,mesh.x1,ni)
-                yspace  = np.linspace(mesh.y0,mesh.y1,nj)
-                ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
-                ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
-                ax.axvline(x = 0.53, linewidth = 0.1, c = 'black')
-                ax.axvline(x = 0.47, linewidth = 0.1, c = 'black')
-                plt.legend()
-                plt.title('Velocity Profile for a Retrograde Disk')
-                plt.ylabel(r'$\|v_\mathrm{gas}\|~\left[a\Omega\right]$')
-                plt.xlabel(r'$x, y~\left[a_0\right]$')
-                plt.xlim([-1,1])
-                pngname = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(100*CurrentTime):04d}.png"
-                fig.savefig(pngname, dpi=400)
-
-    if not args.save:
-        plt.show()
+            #if args.field == 'speed':
+            #    fig, ax = plt.subplots(figsize=[12, 9])
+            #    ni, nj  = mesh.shape
+            #    xspace  = np.linspace(mesh.x0,mesh.x1,ni)
+            #    yspace  = np.linspace(mesh.y0,mesh.y1,nj)
+            #    ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
+            #    ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
+            #    ax.axvline(x = 0.53, linewidth = 0.1, c = 'black')
+            #    ax.axvline(x = 0.47, linewidth = 0.1, c = 'black')
+            #    plt.legend()
+            #    plt.title('Velocity Profile for a Retrograde Disk')
+            #    plt.ylabel(r'$\|v_\mathrm{gas}\|~\left[a\Omega\right]$')
+            #    plt.xlabel(r'$x, y~\left[a_0\right]$')
+            #    plt.xlim([-1,1])
+            #    pngname = args.Outputs + f"{'VelocityCuts'}.{int(100*CurrentTime):04d}.png"
+            #    fig.savefig(pngname, dpi=400)
+        except:
+            plt.show()
 
 
 
