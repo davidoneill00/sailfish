@@ -425,6 +425,7 @@ excluded_names[0.0001] = []
 excluded_names[0.0003] = []
 excluded_names[0.001]  = []
 excluded_names[0.003]  = []
+excluded_names[0.01]   = []
 
 try:
 	Compare_Cavities(parent_dir = sys.argv[1], thread = int(sys.argv[2]))
