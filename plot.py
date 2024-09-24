@@ -220,6 +220,13 @@ def main_cbdiso_2d():
         help="plot velocity vectors",
     )
     parser.add_argument(
+        "--CorotatingFrame",
+        "-cf",
+        action="store_true",
+        default=False,
+        help="plot velocity vectors",
+    )
+    parser.add_argument(
         "--print_model_parameters",
         "-params",
         action="store_true",
@@ -272,17 +279,29 @@ def main_cbdiso_2d():
 
     class VelocityQuantities():
         
-        def __init__(self, mesh, Vx, Vy):
-            self.mesh = mesh
-            self.Vx   = Vx
-            self.Vy   = Vy
+        def __init__(self, mesh, Vx, Vy, t, Corotating):
+            self.mesh       = mesh
+            self.Corotating = Corotating
+            self.t          = 2*np.pi*t
+            
+            if self.Corotating:
+                self.Vx   = Vx + 0.5 * np.sin(self.t)
+                self.Vy   = Vy - 0.5 * np.cos(self.t)
+            else:
+                self.Vx   = Vx
+                self.Vy   = Vy
 
 
         def Mesh(self):
             mesh = self.mesh
             ni, nj = mesh.shape
-            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
-            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+
+            if self.Corotating:
+                x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)]) #+ 0.5 * np.cos(self.t)
+                y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)]) #+ 0.5 * np.sin(self.t)
+            else:
+                x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
+                y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
             return x,y
 
         def VMap(self, Number_of_Vectors=400):
@@ -290,19 +309,17 @@ def main_cbdiso_2d():
             X, Y                 = np.meshgrid(x, y)
             Sampling             = np.arange(0, len(x)-1, len(x)//Number_of_Vectors)
             
-            X_sampled = x[Sampling,0]
-            #print(x[Sampling])
-            Y_sampled =  y[0,Sampling]
-            #print(np.shape(y))
+            X_sampled =  x[Sampling]#x[Sampling,0]
+            Y_sampled =  y[Sampling]#y[0,Sampling]
 
             Vx_sampled = self.Vx[::len(x)//Number_of_Vectors, ::len(x)//Number_of_Vectors] 
-            Vy_sampled = self.Vy[::len(y[0])//Number_of_Vectors, ::len(y[0])//Number_of_Vectors]
+            Vy_sampled = self.Vy[::len(y)//Number_of_Vectors, ::len(y)//Number_of_Vectors]
 
             plt.quiver(X_sampled, Y_sampled, Vx_sampled, Vy_sampled,width=0.001, color = 'lightcyan', scale=100)
 
-        def Speed(self,t):
-            Vx_Relative = self.Vx + 0.5 * np.sin(t)
-            Vy_Relative = self.Vy - 0.5 * np.cos(t)
+        def Speed(self):
+            Vx_Relative = self.Vx #+ 0.5 * np.sin(self.t)
+            Vy_Relative = self.Vy #- 0.5 * np.cos(self.t)
 
             f = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
 
@@ -323,8 +340,9 @@ def main_cbdiso_2d():
 
 
     for filename in args.checkpoints:
-        fig, ax = plt.subplots(figsize=[12, 9])
-        chkpt   = load_checkpoint(filename)
+        fig, ax     = plt.subplots(figsize=[12, 9])
+        chkpt       = load_checkpoint(filename)
+        CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
         
         mesh             = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
@@ -345,17 +363,23 @@ def main_cbdiso_2d():
 
         Vx               = fields["vx"](prim).T
         Vy               = fields["vy"](prim).T
-        Velocities       = VelocityQuantities(mesh, Vx, Vy)
+        Velocities       = VelocityQuantities(mesh, Vx, Vy, t = CurrentTime, Corotating = args.CorotatingFrame)
 
         if args.field == 'speed':
-            f    = Velocities.Speed(chkpt["time"])
+            f    = Velocities.Speed()
             
         elif args.field == 'vortensity':
             sigma = fields['sigma'](prim).T
             f     = Velocities.Vortensity()/sigma
 
         else:
+            #if args.CorotatingFrame:
+            #    #xprim = chkpt['point']
+            #    #yprim = 
+            #    f = fields[args.field](prim).T[]
+            #else:
             f = fields[args.field](prim).T
+
 
 
         if args.vmap:
@@ -446,10 +470,16 @@ def main_cbdiso_2d():
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
 
+        #if args.CorotatingFrame:
+        #    xmin, xmax = ax.get_xlim()
+        #    ymin, ymax = ax.get_ylim()
 
+        #    xprim = primary.position_x
+        #    yprim = primary.position_y
+        #    ax.set_xlim(xmin + xprim, xmax + xprim)
+        #    ax.set_ylim(ymin + yprim, ymax + yprim)
 
         import os
-        CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
         try:
             pngname     = args.Outputs + f"{'/DensityMap'}.{int(100*CurrentTime)}.png"
             fig.savefig(pngname, dpi=400)
@@ -555,7 +585,7 @@ if __name__ == "__main__":
             #prim, sec = chkpt['point_masses']
             import numpy as np
             print('Time',chkpt['time']/2/np.pi)
-            print('Semi-Major axis',np.array([s[ 1] for s in chkpt['timeseries']])[-1])
+            #print('Semi-Major axis',np.array([s[ 1] for s in chkpt['timeseries']])[-1])
             if chkpt["solver"] == "srhd_1d":
                 print("plotting for srhd_1d solver")
                 exit(main_srhd_1d())
