@@ -162,7 +162,6 @@ def main_cbdiso_2d():
         "-f",
         type=str,
         default="sigma",
-        #choices=fields.keys(),
         help="which field to plot",
     )
     parser.add_argument("--poly", type=int, nargs=2, default=None)
@@ -232,6 +231,11 @@ def main_cbdiso_2d():
         action="store_true",
         help="plot the parameters used for making this checkpoint",
     )
+    parser.add_argument(
+        "--AngularSpeed",
+        action="store_true",
+        help="plot the orbital speed of a minidisk",
+    )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
@@ -242,20 +246,20 @@ def main_cbdiso_2d():
             self.masses = masses
 
         def __call__(self, primitive):
-            mesh = self.mesh
+            mesh   = self.mesh
             ni, nj = mesh.shape
-            dx = mesh.dx
-            dy = mesh.dy
-            da = dx * dy
-            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
-            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            dx     = mesh.dx
+            dy     = mesh.dy
+            da     = dx * dy
+            x      = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y      = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
 
-            x1 = self.masses[0].position_x
-            y1 = self.masses[0].position_y
-            x2 = self.masses[1].position_x
-            y2 = self.masses[1].position_y
-            m1 = self.masses[0].mass
-            m2 = self.masses[1].mass
+            x1  = self.masses[0].position_x
+            y1  = self.masses[0].position_y
+            x2  = self.masses[1].position_x
+            y2  = self.masses[1].position_y
+            m1  = self.masses[0].mass
+            m2  = self.masses[1].mass
             rs1 = self.masses[0].softening_length
             rs2 = self.masses[1].softening_length
 
@@ -291,7 +295,6 @@ def main_cbdiso_2d():
                 self.Vx   = Vx
                 self.Vy   = Vy
 
-
         def Mesh(self):
             mesh = self.mesh
             ni, nj = mesh.shape
@@ -304,31 +307,59 @@ def main_cbdiso_2d():
                 y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
             return x,y
 
-        def VMap(self, Number_of_Vectors=400):
-            x, y                 = self.Mesh()
-            X, Y                 = np.meshgrid(x, y)
-            Sampling             = np.arange(0, len(x)-1, len(x)//Number_of_Vectors)
+        def VMap(self, Number_of_Vectors=40):
+            x, y        = self.Mesh()
+
+            try:
+                rescaled_x = [ix for ix in x if np.abs(ix) < args.radius]
+                xmin, xmax = np.where(x == np.min(rescaled_x))[0][0], np.where(x == np.max(rescaled_x))[0][0]
+            except:
+                rescaled_x = x
+                xmin, xmax = 0,len(x)-1
+
+            Sampling = (xmax-xmin)//Number_of_Vectors
+
+            if len(rescaled_x)//Number_of_Vectors == 0:
+                #raise ZeroDivisionError("Too many Vectors in this domain")
+                Sampling = 1
+
+            X, Y       = np.meshgrid(x[xmin:xmax:Sampling], y[xmin:xmax:Sampling])
+
+            Vx_sampled = self.Vx[xmin:xmax:Sampling, xmin:xmax:Sampling] 
+            Vy_sampled = self.Vy[xmin:xmax:Sampling, xmin:xmax:Sampling]# - 0.5
+
+            #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=200)
+            plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=60, color = 'lightblue')
+
             
-            X_sampled =  x[Sampling]#x[Sampling,0]
-            Y_sampled =  y[Sampling]#y[0,Sampling]
 
-            Vx_sampled = self.Vx[::len(x)//Number_of_Vectors, ::len(x)//Number_of_Vectors] 
-            Vy_sampled = self.Vy[::len(y)//Number_of_Vectors, ::len(y)//Number_of_Vectors]
 
-            plt.quiver(X_sampled, Y_sampled, Vx_sampled, Vy_sampled,width=0.001, color = 'lightcyan', scale=100)
+        def AngularSpeed(self):
+            x, y        = self.Mesh()
 
-        def Speed(self):
-            Vx_Relative = self.Vx #+ 0.5 * np.sin(self.t)
-            Vy_Relative = self.Vy #- 0.5 * np.cos(self.t)
+            primary, secondary = chkpt['point_masses']
+            xprim,yprim        = primary.position_x, primary.position_y
+            xsec,ysec          = secondary.position_x, secondary.position_y
 
-            f = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
+            XSecCent  = np.array(x)[:,0] + xsec
+            YSecCent  = np.array(y)[0,:] + ysec
+            XPrimCent = np.array(x)[:,0] + xsec
+            YPrimCent = np.array(y)[0,:] + ysec
 
-            # Make radial and aximuthal?
+            XCent, YCent = np.meshgrid(XPrimCent,YPrimCent)
+            #XCent, YCent = np.meshgrid(XSecCent,YSecCent)
+
+            Vx_Relative = self.Vx 
+            Vy_Relative = self.Vy 
+
+            f = (XCent * Vy_Relative - YCent * Vx_Relative)/(XCent**2 + YCent**2) # w = (r x v) / r^2
+            
             return f
 
-        def Vortensity(self):
-            x, y = self.Mesh()
 
+
+        def Vortensity(self):
+            x, y   = self.Mesh()
             dVy_dx = np.gradient(self.Vy, axis=1)  # Partial derivative of Vy with respect to x
             dVx_dy = np.gradient(self.Vx, axis=0)  # Partial derivative of Vx with respect to y
             f      = dVy_dx - dVx_dy
@@ -346,7 +377,6 @@ def main_cbdiso_2d():
         
         mesh             = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
-        
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
@@ -360,13 +390,12 @@ def main_cbdiso_2d():
             # the cbdiso_2d solver uses primitive data as the solution array
             prim = chkpt["solution"]
 
-
         Vx               = fields["vx"](prim).T
         Vy               = fields["vy"](prim).T
         Velocities       = VelocityQuantities(mesh, Vx, Vy, t = CurrentTime, Corotating = args.CorotatingFrame)
 
         if args.field == 'speed':
-            f    = Velocities.Speed()
+            f    = Velocities.AngularSpeed()
             
         elif args.field == 'vortensity':
             sigma = fields['sigma'](prim).T
@@ -447,8 +476,18 @@ def main_cbdiso_2d():
         primary, secondary = chkpt['point_masses']
 
         ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 40, c = 'white', label = 'Point Mass')
+        #ax.axhline(y=0, linestyle='dashed', c = 'gray', label = 'x cut')
         ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 40, c = 'white')
-        ax.legend()
+        #ax.legend()
+        ax.text(
+                0.8, 0.95,  # Relative coordinates (x=5% from left, y=95% from bottom)
+                r'$t = %g$'%(int(chkpt["time"]/ 2 / np.pi)),
+                fontsize=24,
+                transform=ax.transAxes,  
+                verticalalignment='top',  
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.75)
+            )
+
         if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
             y1 = chkpt["point_masses"][0].position_y
@@ -466,6 +505,7 @@ def main_cbdiso_2d():
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
         fig.suptitle(chkpt["time"]/2/np.pi)
+        #fig.suptitle(r'Angular Speed of a Retrograde Minidisk $\log_{10}{\Omega(r)}$')
         fig.subplots_adjust(
             left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
@@ -484,24 +524,30 @@ def main_cbdiso_2d():
             pngname     = args.Outputs + f"{'/DensityMap'}.{int(100*CurrentTime)}.png"
             fig.savefig(pngname, dpi=400)
 
-            #if args.field == 'speed':
-            #    fig, ax = plt.subplots(figsize=[12, 9])
-            #    ni, nj  = mesh.shape
-            #    xspace  = np.linspace(mesh.x0,mesh.x1,ni)
-            #    yspace  = np.linspace(mesh.y0,mesh.y1,nj)
-            #    ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
-            #    ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
-            #    ax.axvline(x = 0.53, linewidth = 0.1, c = 'black')
-            #    ax.axvline(x = 0.47, linewidth = 0.1, c = 'black')
-            #    plt.legend()
-            #    plt.title('Velocity Profile for a Retrograde Disk')
-            #    plt.ylabel(r'$\|v_\mathrm{gas}\|~\left[a\Omega\right]$')
-            #    plt.xlabel(r'$x, y~\left[a_0\right]$')
-            #    plt.xlim([-1,1])
-            #    pngname = args.Outputs + f"{'VelocityCuts'}.{int(100*CurrentTime):04d}.png"
-            #    fig.savefig(pngname, dpi=400)
         except:
             plt.show()
+
+
+
+        if args.AngularSpeed:
+            x,y = Velocities.Mesh()
+            plt.figure()
+            plt.plot(x,f[1500,:], label = r'Angular Speed $x =0$ cut')
+            plt.plot(x,[1/np.sqrt(2 * np.abs(ix-0.5)**3) for ix in x], label = r'$\Omega_K(r)$')
+            plt.ylim([-1,150])
+            plt.xlim([0.,1])
+            plt.axvline(x = 0.47, linestyle='dashed', c = 'gray', label = 'Sink radius', linewidth = 0.5)
+            plt.axvline(x = 0.53, linestyle='dashed', c = 'gray', linewidth = 0.5)
+            plt.axvline(x = 0.45, linestyle='dashed', c = 'red', label = 'Minidisk radius', linewidth = 0.5)
+            plt.axvline(x = 0.55, linestyle='dashed', c = 'red', linewidth = 0.5)
+            plt.legend()
+            plt.savefig(args.Outputs + "/AngularSpeed_of_RetrogradeMinidisk.png", dpi = 300)
+
+
+        
+        #with open(args.Outputs + "/SavedData_nu%g_t%g.txt"%(chkpt["model_parameters"]["nu"],int(CurrentTime)), "w") as file:
+        #    np.savetxt(file, f.flatten(), fmt="%f")
+        #    file.close()
 
 
 
