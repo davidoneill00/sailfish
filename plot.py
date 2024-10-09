@@ -319,7 +319,78 @@ def main_cbdiso_2d():
             return f #Ignoring 1/Sigma here
 
 
+    class DensityAverages():
+        def __init__(self, mesh):
+            self.mesh = mesh
 
+        def Mesh(self):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+            return x,y
+
+        def MeshBins(self,Sigma):
+            x,y  = self.Mesh()
+            X, Y = np.meshgrid(x, y)
+
+            Radial_Bins = np.linspace(0,10,1000)
+            Mesh_Bins   = {}
+            for r in Radial_Bins:
+                Mesh_Bins[r] = []
+
+            xvals = x[:,0]
+            yvals = y[0,:]
+
+            for i in range(0,len(xvals)-1):
+                for j in range(0,len(yvals)-1):
+                    radius        = np.sqrt(xvals[i]**2 + yvals[j]**2)
+                    closest_index = np.abs(Radial_Bins - radius).argmin()
+                
+                    Mesh_Bins[Radial_Bins[closest_index]].append(Sigma[i,j])
+                
+            f = []
+            for r in Radial_Bins:
+                f.append(np.mean(Mesh_Bins[r]))
+
+            plt.figure(figsize=(12,6))
+            plt.plot(Radial_Bins,f, linewidth = 2, label = 'Azimuthally Averaged Surface Density')
+            plt.xlabel(r'Radius $[a_0]$', fontsize = 16)
+            plt.legend()
+            plt.show()
+
+            print('density',f)
+
+        def Axisymmetry(self,Sigma):
+            x,y  = self.Mesh()
+            X, Y = np.meshgrid(x, y)
+
+            Radial_Bins = np.linspace(0,10,1000)
+            Mesh_Bins   = {}
+            for r in Radial_Bins:
+                Mesh_Bins[r] = []
+
+            xvals = x[:,0]
+            yvals = y[0,:]
+
+            for i in range(0,len(xvals)-1):
+                for j in range(0,len(yvals)-1):
+                    radius        = np.sqrt(xvals[i]**2 + yvals[j]**2)
+                    closest_index = np.abs(Radial_Bins - radius).argmin()
+                
+                    Mesh_Bins[Radial_Bins[closest_index]].append(Sigma[i,j])
+                
+            f = []
+            for r in Radial_Bins:
+                f.append(np.std(Mesh_Bins[r]))
+
+            plt.figure(figsize=(12,6))
+            plt.plot(Radial_Bins,f, linewidth = 2, label = 'Surface Density Standard Deviation')
+            plt.xlabel(r'Radius $[a_0]$', fontsize = 16)
+            plt.legend()
+            plt.show()
+
+            print('Standard Deviations',f)
 
 
     for filename in args.checkpoints:
@@ -354,8 +425,21 @@ def main_cbdiso_2d():
             sigma = fields['sigma'](prim).T
             f     = Velocities.Vortensity()/sigma
 
+        elif args.field == 'AverageDensity':
+            AD = DensityAverages(mesh)
+            Sigma = fields['sigma'](prim).T
+            AD.MeshBins(Sigma)
+            sys.exit()
+
+        elif args.field == 'Axisymmetry':
+            AD = DensityAverages(mesh)
+            Sigma = fields['sigma'](prim).T
+            AD.Axisymmetry(Sigma)
+            sys.exit()
+
         else:
             f = fields[args.field](prim).T
+
 
 
         if args.vmap:
@@ -367,6 +451,7 @@ def main_cbdiso_2d():
             print('cfl_number...............',chkpt['cfl_number'])
             print('Solver options...........',chkpt['solver_options'])
             print('Event states.............',chkpt['event_states'])
+
             print('------------------Driver------------------')
             print(chkpt['driver'])
             print('-------------Model Parameters-------------')
