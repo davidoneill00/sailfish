@@ -329,7 +329,7 @@ def main_cbdiso_2d():
             Vy_sampled = self.Vy[xmin:xmax:Sampling, xmin:xmax:Sampling]# - 0.5
 
             #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=200)
-            plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=60, color = 'lightblue')
+            plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=100, color = 'lightblue')
 
             
 
