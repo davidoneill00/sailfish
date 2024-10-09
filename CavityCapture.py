@@ -24,6 +24,9 @@ def load_checkpoint(filename):
 
 
 def CavityContour(chkpt):
+	"""
+	Extract the density contour points from surface density plot
+	"""
 	fields = {
 	"sigma": lambda p: p[:, :, 0],
 	"vx": lambda p: p[:, :, 1],
@@ -35,13 +38,19 @@ def CavityContour(chkpt):
 	prim   = chkpt["solution"]
 	f      = fields["sigma"](prim).T
 	extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1	
-	p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
+	try:
+		p = plt.contour(f,levels = [0.2],extent=extent).collections[0].get_paths()[0]
+	except:
+		raise ValueError('chkpt is',chkpt['model_parameters']["nu"],chkpt['time']/2/np.pi)
 	v = p.vertices
 	v_resampled = scipy.signal.resample(v, 500)
 	return v_resampled
 
 
 def MaxDist(points):
+	"""
+	Based on surface density contour, fit with an ellipse, with the properties of the ellipse returned as a .pk file
+	"""
 
 	Npoints = len(points)
 
@@ -84,6 +93,9 @@ def MaxDist(points):
 
 
 def main_cbdiso_2d(chkpt,points,in_dir,filename):
+	"""
+	Optional step, save the figure with the density contour overplotted
+	"""
 	fields = {
 		"sigma": lambda p: p[:, :, 0],
 		"vx": lambda p: p[:, :, 1],
@@ -127,11 +139,17 @@ def main_cbdiso_2d(chkpt,points,in_dir,filename):
 	FigDirectory =  in_dir
 	ax.set_xlim(-4, 4)
 	ax.set_ylim(-4, 4)
-	#plt.savefig(FigDirectory + '/CavityFit_%g.png'%(chkpt["time"] / 2 / np.pi), dpi = 400)
 	plt.savefig(filename.replace(".pk", ".png"), dpi = 400)
+	plt.close(fig)
 
 
 def MP_Cavity_Properties(arg,in_dir):
+	"""
+	This .pk only knows about the properties of the cavity so far.
+	We want to give it information on the orbital state of the system too.
+	"""
+
+
 	chkpt             = load_checkpoint(arg)
 	contour_lines     = CavityContour(chkpt)
 	cavity_properties = MaxDist(contour_lines)
@@ -142,10 +160,15 @@ def MP_Cavity_Properties(arg,in_dir):
 	cavity_properties["viscosity"]            = chkpt["model_parameters"]["nu"]
 	cavity_properties["Retrograde"]           = chkpt["model_parameters"]["retrograde"]
 
-	point_mass1, point_mass2 = chkpt["point_masses"]
-	TrueAnomaly = OrbitalState(point_mass1, point_mass2).true_anomaly(cavity_properties["CurrentTime"] * 2 * np.pi)
-	cavity_properties["Cavity_Slope_Radians"] += -TrueAnomaly
+	match                             = re.search(r'chkpt\.(\d+)', arg)
+	Number                            = match.group(1)
+	cavity_properties["ChkptNumbers"] = Number
 
+	point_mass1, point_mass2 = chkpt["point_masses"]
+	#TrueAnomaly              = OrbitalState(point_mass1, point_mass2).true_anomaly(cavity_properties["CurrentTime"] * 2 * np.pi)
+	TrueAnomaly              = np.arctan2(point_mass1.position_y, point_mass1.position_x)
+	CurrentAngle             = np.copy(cavity_properties["Cavity_Slope_Radians"]) #+= -TrueAnomaly
+	cavity_properties["Cavity_Slope_Radians"] = CurrentAngle - TrueAnomaly
 	if Plot:
 		main_cbdiso_2d(chkpt,contour_lines,in_dir,arg)
 	return cavity_properties
@@ -155,65 +178,102 @@ def MP_Cavity_Properties(arg,in_dir):
 
 
 
-
-
-
 def FitCavityCheck(in_dir):
+	"""
+	If rerunning the this file, we want to be able to skip completed checkpoints.
+	This function returns 'which_ones' to run as well as the viscosity (for convenience).
+	"""
+
+	import re
+
+	directory          = Path(in_dir)
+	Checkpoint_Numbers = []
+	nu                 = None
 	
-	directory    = Path(in_dir)
-	Fit_Cavities = True
-	nu           = False
-
 	for i in os.listdir(directory):
-		if fnmatch.fnmatch(i, '*.pk'):
-			if fnmatch.fnmatch(i, 'CavityProperties_nu.*.pk'):
-				Fit_Cavities = False
-				break
-			else:
-				pass
+		if fnmatch.fnmatch(i, 'CavityProperties_nu.*.pk'):
+			Cavity_Loaded_ = load_checkpoint(in_dir + '/' + i)
+		elif fnmatch.fnmatch(i, '*chkpt*.pk'):
+			match  = re.search(r'chkpt\.(\d+)', i)
+			Number = match.group(1)
+			Checkpoint_Numbers.append(Number)
 
-			while nu == False:
+			if nu == None:
 				nu = load_checkpoint(in_dir + '/' + i)['model_parameters']['nu']
-			
-		else:
-			pass
-	print('Are we gonna run a cavity fit for',in_dir,'?',Fit_Cavities)
 
-	return Fit_Cavities, nu
+
+
+	try:
+		MissingNumbers = list(set(Checkpoint_Numbers) - set(list(Cavity_Loaded_["ChkptNumbers"])))
+
+	except:
+		MissingNumbers = Checkpoint_Numbers
+
+	which_ones = [f"chkpt.{int(number):04d}.pk" for number in MissingNumbers]
+	return nu, which_ones
+
+
+
+
 
 
 def CavityEvolution(in_dir):
 
-	Fit_Cavities, nu = FitCavityCheck(in_dir)
-	CavityFileName   = in_dir + '/CavityProperties_nu.%g.pk'%(nu)
+	"""
+	Given a list of 'which_ones' to run, the cavities are profiled below and appended to the existing (or not)
+	cavity properties file. This dictionary then overwrites any pre existing cavity property files
+	"""
 
-	if Fit_Cavities:
+	print('Looking at directory:',in_dir)
+	nu, which_ones = FitCavityCheck(in_dir)
+	CavityFileName = in_dir + '/CavityProperties_nu.%g.pk'%(nu)
+
+	print(which_ones)
+	try:
+		Cavity_Loaded_  = load_checkpoint(CavityFileName)
+		Time_Snapshots  = Cavity_Loaded_["Timeseries"]
+		Semi_Major_Axis = Cavity_Loaded_["SemiMajor_Axis"]
+		Eccentricity    = Cavity_Loaded_["Eccentricity"]
+		Argument_Apses  = Cavity_Loaded_["Inclination"]
+		BinarySMA       = Cavity_Loaded_["Binary_SMA"]
+		ChkptNumbers    = Cavity_Loaded_["ChkptNumbers"]
+		print('Found Pre existing File')
+
+	except:
 		Time_Snapshots  = []
 		Semi_Major_Axis = []
 		Eccentricity    = []
 		Argument_Apses  = []
 		BinarySMA       = []
-
-		for file in os.listdir(in_dir):
-
-			if fnmatch.fnmatch(in_dir + '/' + file, '*chkpt*.pk'):
-				cav_props = MP_Cavity_Properties(in_dir + '/' + file, in_dir)
-				
-				Time_Snapshots.append(cav_props["CurrentTime"])
-				Semi_Major_Axis.append(cav_props["SemiMajorAxis"])
-				Eccentricity.append(cav_props["Eccentricity"])
-				Argument_Apses.append(cav_props["Cavity_Slope_Radians"])
-				BinarySMA.append(cav_props["Binary_SemiMajorAxis"])
-
-			else:
-				pass
+		ChkptNumbers    = []
 
 
-		lists         = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses,BinarySMA))
-		sorted_lists  = sorted(lists, key=lambda x: x[0])
+	for file in which_ones:
+		
+		if fnmatch.fnmatch(in_dir + '/' + file, '*chkpt*.pk'):
+			cav_props = MP_Cavity_Properties(in_dir + '/' + file, in_dir)
+			
+			Time_Snapshots.append(cav_props["CurrentTime"])
+			Semi_Major_Axis.append(cav_props["SemiMajorAxis"])
+			Eccentricity.append(cav_props["Eccentricity"])
+			Argument_Apses.append(cav_props["Cavity_Slope_Radians"])
+			BinarySMA.append(cav_props["Binary_SemiMajorAxis"])
+			match  = re.search(r'chkpt\.(\d+)', file)
+			Number = match.group(1)
+			ChkptNumbers.append(Number)
 
-		sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA = zip(*sorted_lists)
+			print('Finished Processing checkpoint number',Number)
+			
+		else:
+			pass
 
+
+	lists         = list(zip(Time_Snapshots, Semi_Major_Axis, Eccentricity, Argument_Apses,BinarySMA,ChkptNumbers))
+	sorted_lists  = sorted(lists, key=lambda x: x[0])
+
+	sorted_times, sorted_SMA, sorted_ecc, sorted_Apses, sorted_Binary_SMA, sorted_ChkptNumbers = zip(*sorted_lists)
+
+	if which_ones != []:
 		Cavity = {
 		'Timeseries':sorted_times,
 		'SemiMajor_Axis':sorted_SMA,
@@ -221,16 +281,17 @@ def CavityEvolution(in_dir):
 		'Inclination':sorted_Apses,
 		'Binary_SMA':sorted_Binary_SMA,
 		'nu':nu,
-		'Retrograde':cav_props['Retrograde'],
+		'Retrograde':True,
+		'ChkptNumbers':sorted_ChkptNumbers
 		}
 
 		with open(CavityFileName, "wb") as cvt:
 			pk.dump(Cavity, cvt)
 
-	else:
-		pass
-
 	return CavityFileName
+
+
+
 
 def Plot_Cavitites(Cavity):
 
@@ -285,6 +346,7 @@ def Plot_Properties_of_Cavity(Cavity,FigDirectory):
 	plt.legend()
 	plt.xlim([1000,plt.gca().get_xlim()[1]])
 	fig.savefig(pngname, dpi=400)
+	plt.close(fig)
 
 
 def ReProcessCavityPickleFile(Cavity,in_dir):
@@ -308,15 +370,31 @@ def ReProcessCavityPickleFile(Cavity,in_dir):
 
 	return ProcessedCavity
 
-def Compare_Cavities(parent_dir):
+def Compare_Cavities(parent_dir,thread=None):
+	"""
+	Final function to run, putting all of the above together. Additional option 'thread' means a number of 
+	independent 'threads' can be run simultaneously. The thread number basically just sets the directory which each 
+	process will work on individually.
+	"""
+
 	subdirs = [parent_dir + '/' + name for name in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, name))]
-	
 	fig, ax = plt.subplots(figsize=[12, 9])
 	plt.title('Cavity Semi Major Axis',fontsize=25)
 	plt.xlabel(r'$\log_{10} a_\mathrm{bin}~[a_0]$',fontsize=20)
 	plt.ylabel(r'$\log_{10} a_\mathrm{cav}~[a_0]$',fontsize=20)
 
-	for in_dir in subdirs:
+	if thread == None:
+		Evaluate = subdirs
+		print('-----------------------------------------------------')
+		print('Running all directories',Evaluate)
+		print('-----------------------------------------------------')
+	else:
+		Evaluate = subdirs[thread:thread+1]
+		print('-----------------------------------------------------')
+		print('Thread',thread,'Corresponding to subdirectory',Evaluate)
+		print('-----------------------------------------------------')
+
+	for in_dir in Evaluate:
 		CavityFileName    = CavityEvolution(in_dir)
 		Cavity            = load_checkpoint(CavityFileName)
 		ReprocessedCavity = ReProcessCavityPickleFile(Cavity,in_dir)
@@ -329,25 +407,30 @@ def Compare_Cavities(parent_dir):
 	plt.yticks([10,1,0.1,0.05 ])
 	plt.xticks([1,0.1,0.01])
 	plt.savefig(parent_dir + '/Decoupling.png', dpi=400)
+	plt.close(fig)
 
-	for in_dir in subdirs:
-		CavityFileName    = CavityEvolution(in_dir)
-		Cavity            = load_checkpoint(CavityFileName)
-		ReprocessedCavity = ReProcessCavityPickleFile(Cavity,in_dir)
-		Plot_Properties_of_Cavity(ReprocessedCavity,parent_dir)
+	#for in_dir in subdirs:
+	#	CavityFileName    = CavityEvolution(in_dir)
+	#	Cavity            = load_checkpoint(CavityFileName)
+	#	ReprocessedCavity = ReProcessCavityPickleFile(Cavity,in_dir)
+	#	Plot_Properties_of_Cavity(ReprocessedCavity,parent_dir)
 
 
-Exclusion_List =
-for i in range():
-	'chkpt.0'
+#Exclusion_List =
+#for i in range():
+#	'chkpt.0'
 
 excluded_names = {}
 excluded_names[0.0001] = []
 excluded_names[0.0003] = []
 excluded_names[0.001]  = []
 excluded_names[0.003]  = []
+excluded_names[0.01]   = []
 
-Compare_Cavities(sys.argv[1])
+try:
+	Compare_Cavities(parent_dir = sys.argv[1], thread = int(sys.argv[2]))
+except:
+	Compare_Cavities(parent_dir = sys.argv[1])
 
 
 
