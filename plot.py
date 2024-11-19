@@ -307,7 +307,7 @@ def main_cbdiso_2d():
                 y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
             return x,y
 
-        def VMap(self, Number_of_Vectors=40):
+        def VMap(self, Number_of_Vectors=15):
             x, y        = self.Mesh()
 
             try:
@@ -329,8 +329,8 @@ def main_cbdiso_2d():
             Vy_sampled = self.Vy[xmin:xmax:Sampling, xmin:xmax:Sampling]# - 0.5
 
             #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=200)
-            plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=100, color = 'lightblue')
-
+            #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.003, angles='xy', scale_units='xy', scale=200, color = 'white')
+            plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.0025, angles='xy', scale_units='xy', scale=40, color = 'darkgrey')
             
 
 
@@ -561,18 +561,36 @@ def main_cbdiso_2d():
 
         primary, secondary = chkpt['point_masses']
 
-        ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 40, c = 'white', label = 'Point Mass')
-        #ax.axhline(y=0, linestyle='dashed', c = 'gray', label = 'x cut')
-        ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 40, c = 'white')
-        #ax.legend()
+        #ax.scatter(primary.position_x, primary.position_y, marker = 'o', s = 800, c = 'white')
+        #ax.scatter(secondary.position_x, secondary.position_y, marker = 'o', s = 800, c = 'white')
+        #ax.scatter(primary.position_x, primary.position_y, marker='o', s=2607/9, facecolors='none', edgecolors='black', linewidths=1, alpha=0.8)
+        #ax.scatter(secondary.position_x, secondary.position_y, marker='o', s=2607/9, facecolors='none', edgecolors='black', linewidths=1, alpha=0.8)
+
+        #ax.scatter(primary.position_x, primary.position_y, marker = 'o', s = 100, c = 'black')
+        #ax.scatter(secondary.position_x, secondary.position_y, marker = 'o', s = 100, c = 'black')
+
+
         ax.text(
-                0.8, 0.95,  # Relative coordinates (x=5% from left, y=95% from bottom)
-                r'$t = %g$'%(int(chkpt["time"]/ 2 / np.pi)),
-                fontsize=24,
+                0.1, 0.95,  # Relative coordinates (x=5% from left, y=95% from bottom)
+                r'$t = %g$'%(np.round(chkpt["time"]/ 2 / np.pi,2)),
+                fontsize=28,
                 transform=ax.transAxes,  
                 verticalalignment='top',  
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.75)
             )
+
+        from matplotlib.patches import Circle
+        primarycenter   = (primary.position_x, primary.position_y)
+        secondarycenter = (secondary.position_x, secondary.position_y)
+        radius = 0.03         # Radius of the circle
+
+        # Create a circle
+        primarysink   = Circle(primarycenter, radius, color='white', fill=True, alpha=0.5)
+        secondarysink = Circle(secondarycenter, radius, color='white', fill=True, alpha=0.5)
+
+        # Add the circle to the axes
+        ax.add_patch(primarysink)
+        ax.add_patch(secondarysink)
 
         if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
@@ -590,6 +608,8 @@ def main_cbdiso_2d():
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
+            #ax.set_xlim(0.3, 0.6)
+            #ax.set_ylim(-0.15, 0.15)
         fig.suptitle(chkpt["time"]/2/np.pi)
         #fig.suptitle(r'Angular Speed of a Retrograde Minidisk $\log_{10}{\Omega(r)}$')
         fig.subplots_adjust(
