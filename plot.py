@@ -236,6 +236,11 @@ def main_cbdiso_2d():
         action="store_true",
         help="plot the orbital speed of a minidisk",
     )
+    parser.add_argument(
+        "--pressure",
+        action="store_true",
+        help="plot the orbital speed of a minidisk",
+    )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
@@ -368,6 +373,33 @@ def main_cbdiso_2d():
 
             return f #Ignoring 1/Sigma here
 
+        def Pressure(self):
+            x, y = self.Mesh()
+
+            primary, secondary = chkpt['point_masses']
+            xprim,yprim        = primary.position_x, primary.position_y
+            xsec,ysec          = secondary.position_x, secondary.position_y
+
+            XSecCent  = np.array(x) + xsec
+            YSecCent  = np.array(y) + ysec
+            XPrimCent = np.array(x) + xprim
+            YPrimCent = np.array(y) + yprim
+
+            XPrim, YPrim = np.meshgrid(XPrimCent,YPrimCent)
+            XSec, YSec   = np.meshgrid(XSecCent,YSecCent)
+
+            rs1       = primary.softening_length
+            rs2       = secondary.softening_length
+
+            rprim2    = XPrim**2 + YPrim**2
+            rsec2     = XSec**2  + YSec**2
+            Potential =  - 0.5 / (rprim2 + rs1**2) - 0.5 / (rsec2 + rs2**2)
+            #cs2       = - Potential / (MACH**2)
+
+            f =  - Potential / 100
+            
+            return f
+
 
     class DensityAverages():
         def __init__(self, mesh):
@@ -470,6 +502,10 @@ def main_cbdiso_2d():
         if args.field == 'speed':
             f    = Velocities.AngularSpeed()
             
+        elif args.field == 'pressure':
+            sigma = fields['sigma'](prim).T
+            f     = sigma * Velocities.Pressure()
+            #f     = Velocities.Pressure()
         elif args.field == 'vortensity':
             sigma = fields['sigma'](prim).T
             f     = Velocities.Vortensity()/sigma
@@ -561,32 +597,23 @@ def main_cbdiso_2d():
 
         primary, secondary = chkpt['point_masses']
 
-        #ax.scatter(primary.position_x, primary.position_y, marker = 'o', s = 800, c = 'white')
-        #ax.scatter(secondary.position_x, secondary.position_y, marker = 'o', s = 800, c = 'white')
-        #ax.scatter(primary.position_x, primary.position_y, marker='o', s=2607/9, facecolors='none', edgecolors='black', linewidths=1, alpha=0.8)
-        #ax.scatter(secondary.position_x, secondary.position_y, marker='o', s=2607/9, facecolors='none', edgecolors='black', linewidths=1, alpha=0.8)
-
-        #ax.scatter(primary.position_x, primary.position_y, marker = 'o', s = 100, c = 'black')
-        #ax.scatter(secondary.position_x, secondary.position_y, marker = 'o', s = 100, c = 'black')
-
-
-        ax.text(
-                0.1, 0.95,  # Relative coordinates (x=5% from left, y=95% from bottom)
-                r'$t = %g$'%(np.round(chkpt["time"]/ 2 / np.pi,2)),
-                fontsize=28,
-                transform=ax.transAxes,  
-                verticalalignment='top',  
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.75)
-            )
+        #ax.text(
+        #        0.1, 0.95,  # Relative coordinates (x=5% from left, y=95% from bottom)
+        #        r'$t = %g ~ [2\pi\Omega_0^{-1}]$'%(np.round(chkpt["time"]/ 2 / np.pi,2)),
+        #        fontsize=28,
+        #        transform=ax.transAxes,  
+        #        verticalalignment='top',  
+        #        bbox=dict(boxstyle='round', facecolor='white', alpha=0.75)
+        #    )
 
         from matplotlib.patches import Circle
         primarycenter   = (primary.position_x, primary.position_y)
         secondarycenter = (secondary.position_x, secondary.position_y)
-        radius = 0.03         # Radius of the circle
+        radius          = primary.sink_radius         # Radius of the circle
 
         # Create a circle
-        primarysink   = Circle(primarycenter, radius, color='white', fill=True, alpha=0.5)
-        secondarysink = Circle(secondarycenter, radius, color='white', fill=True, alpha=0.5)
+        primarysink   = Circle(primarycenter, radius, color='white', fill=True, alpha=0.7)
+        secondarysink = Circle(secondarycenter, radius, color='white', fill=True, alpha=0.7)
 
         # Add the circle to the axes
         ax.add_patch(primarysink)
