@@ -340,25 +340,41 @@ def main_cbdiso_2d():
 
 
         def AngularSpeed(self):
-            x, y        = self.Mesh()
+
+            #TotalSpeed = np.sqrt( self.Vx**2 + self.Vy**2 )
+            TotalSpeed = self.Vy
+
+            x, y = self.Mesh()
+            ni, nj = mesh.shape
 
             primary, secondary = chkpt['point_masses']
-            xprim,yprim        = primary.position_x, primary.position_y
+            xprim,yprim        = primary.position_x , primary.position_y
             xsec,ysec          = secondary.position_x, secondary.position_y
 
-            XSecCent  = np.array(x)[:,0] + xsec
-            YSecCent  = np.array(y)[0,:] + ysec
-            XPrimCent = np.array(x)[:,0] + xsec
-            YPrimCent = np.array(y)[0,:] + ysec
+            XSecCent  = np.array(x) #+ xsec
+            YSecCent  = np.array(y) #+ ysec
+            XPrimCent = np.array(x) - xprim
+            YPrimCent = np.array(y) #+ yprim
 
             XCent, YCent = np.meshgrid(XPrimCent,YPrimCent)
             #XCent, YCent = np.meshgrid(XSecCent,YSecCent)
 
-            Vx_Relative = self.Vx 
-            Vy_Relative = self.Vy 
-
-            f = (XCent * Vy_Relative - YCent * Vx_Relative)/(XCent**2 + YCent**2) # w = (r x v) / r^2
+            f = (XCent * self.Vy - YCent * self.Vx)/(XCent**2 + YCent**2) # w = (r x v) / r^2
             
+            plt.figure(figsize = (6,6))
+            plt.plot(XPrimCent, TotalSpeed[nj//2,:]/XPrimCent, c = 'black', linewidth = 2, label = r'$\Omega(r)$')
+            plt.plot(XPrimCent, [- np.sqrt(np.sign(xpos) / xpos /xpos /xpos) for xpos in XPrimCent], c = 'red', label = r'$\Omega_K(r)$')
+            plt.plot(XPrimCent, [np.sqrt(np.sign(xpos) / xpos /xpos /xpos) for xpos in XPrimCent], c = 'red', linestyle='dashed', label = r'$-\Omega_K(r)$')
+            plt.xlim([-0.5, 0.5])
+            plt.ylim([-200,200])
+            plt.axvline(x = primary.softening_length, c ='grey', linestyle = 'dashed')
+            plt.axvline(x = -primary.softening_length, c ='grey', linestyle = 'dashed')
+            plt.legend()
+            plt.xlabel(r'$r~[a_0]$', fontsize = 12)
+            plt.title(r'Angular Speed of Minidisk', fontsize = 12)
+            plt.ylabel(r'$\Omega(r)$', fontsize = 12, rotation = 0)
+            plt.savefig('/home/do2364/sailfish/NEW.png', dpi = 300)
+
             return f
 
 
