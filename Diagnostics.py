@@ -146,7 +146,7 @@ if __name__ == '__main__':
     CumulativeTimeBin   = np.cumsum(hist)
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
-    M_dot_0             = 3 * np.pi * viscosity * Sigma_0
+    M_dot_0             = -3 * np.pi * viscosity * Sigma_0
     
 
 
@@ -233,7 +233,8 @@ if __name__ == '__main__':
     if args.Accretion:
 
         plt.figure()
-        plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.1, c = 'red')
+        #plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),label='mdot',linewidth = 0.1, c = 'red')
+        plt.plot(Final_Orbits,(ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/M_dot_0,label='mdot',linewidth = 0.1, c = 'red')
         plt.xlabel('Time [P]')
         plt.ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         plt.title(r'Accretion Rate e = %g, $\nu=%g$'%(np.round(OrbitalEccentricity,3),viscosity))
@@ -241,9 +242,9 @@ if __name__ == '__main__':
 
         #plt.ylim([0,2])
         plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
-        AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
+        AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/M_dot_0
         MeanAccretion = [np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
-        plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
+        plt.plot(TimeBins[1:],MeanAccretion,linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.legend(loc = 'upper right')
         try:
             savename = args.Output +  "/AccretionRate.%04d_nu%g.png"%(CurrentTime,viscosity)
