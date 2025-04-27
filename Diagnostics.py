@@ -138,7 +138,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 70.
+    Number_of_Orbits    = 1000.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
 
@@ -146,7 +146,7 @@ if __name__ == '__main__':
     CumulativeTimeBin   = np.cumsum(hist)
     viscosity           = Model_Parameters["nu"]
     Sigma_0             = Model_Parameters["initial_sigma"]
-    M_dot_0             = 3 * np.pi * viscosity * Sigma_0
+    M_dot_0             = -3 * np.pi * viscosity * Sigma_0
     
 
 
@@ -164,7 +164,9 @@ if __name__ == '__main__':
     if args.Torque_Components:
         InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
         OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
-        Normalised_Torque   = ts.torque_g[-len(Final_Orbits):] / M_dot_0
+        Normalised_Torque_g = ts.torque_g[-len(Final_Orbits):] / M_dot_0
+        Normalised_Torque_a = ts.torque_a[-len(Final_Orbits):] / M_dot_0
+
 
         plt.figure()
         plt.xlabel('time')
@@ -173,11 +175,18 @@ if __name__ == '__main__':
         else:
             plt.title(r'Torque Prograde $\nu = %g$'%(viscosity))
         
-        MeanTorque = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        MeanTorque_g = [np.mean(Normalised_Torque_g[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        MeanTorque_a = [np.mean(Normalised_Torque_a[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
 
-        plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
-        plt.plot(Final_Orbits,Normalised_Torque, c = 'blue', linewidth = 0.1)
-        plt.plot(TimeBins[1:],MeanTorque,linewidth = 0.5, label = 'Binned Torque Mean', c = 'black')
+        
+        #plt.plot(Final_Orbits,Normalised_Torque_g, c = 'blue', linewidth = 0.1)
+        #plt.plot(TimeBins[1:],MeanTorque_g,linewidth = 1.5, label = 'Binned Torque Mean Gravitational', c = 'black')
+        plt.plot(TimeBins[1:],MeanTorque_a,linewidth = 1.5, label = 'Binned Torque Mean Accretion',linestyle = 'dashed', c = 'black')
+        
+        #plt.plot(ts.time, ts.jdisk)
+        #plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
+
+
         plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
         plt.legend(loc = 'upper right')
         #plt.ylim([-2.5,5])
@@ -235,9 +244,9 @@ if __name__ == '__main__':
         plt.axvline(x = 1491.09, c = 'gray')
         #plt.ylim([0,2])
         plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
-        AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
+        AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])/M_dot_0
         MeanAccretion = [np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
-        plt.plot(TimeBins[1:],MeanAccretion/np.mean(ts.mdot1[-len(Final_Orbits)-100:-len(Final_Orbits)]+ts.mdot2[-len(Final_Orbits)-100:-len(Final_Orbits)]),linewidth = 0.5, label = 'Binned Means', c = 'black')
+        plt.plot(TimeBins[1:],MeanAccretion,linewidth = 0.5, label = 'Binned Means', c = 'black')
         plt.legend(loc = 'upper right')
         try:
             savename = args.Output +  "/AccretionRate.%04d_nu%g.png"%(CurrentTime,viscosity)

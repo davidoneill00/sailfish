@@ -236,6 +236,11 @@ def main_cbdiso_2d():
         action="store_true",
         help="plot the orbital speed of a minidisk",
     )
+    parser.add_argument(
+        "--pressure",
+        action="store_true",
+        help="plot the orbital speed of a minidisk",
+    )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
@@ -305,9 +310,11 @@ def main_cbdiso_2d():
             else:
                 x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
                 y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
+
             return x,y
 
-        def VMap(self, Number_of_Vectors=40):
+
+        def VMap(self, Number_of_Vectors=26):
             x, y        = self.Mesh()
 
             try:
@@ -329,30 +336,97 @@ def main_cbdiso_2d():
             Vy_sampled = self.Vy[xmin:xmax:Sampling, xmin:xmax:Sampling]# - 0.5
 
             #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=200)
-            plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=100, color = 'lightblue')
+            #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.003, angles='xy', scale_units='xy', scale=200, color = 'white')
+            plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.0025, angles='xy', scale_units='xy', scale=40, color = 'darkgrey')
 
             
 
 
         def AngularSpeed(self):
+
+            Vx_Relative = self.Vx
+            Vy_Relative = self.Vy
+
+            TotalSpeed = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
+
+
+            fig, ax = plt.subplots(figsize=[12, 9])
+            #ni, nj = mesh.shape
+            #xspace = np.linspace(mesh.x0,mesh.x1,ni)
+            #yspace = np.linspace(mesh.y0,mesh.y1,nj)
+            ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
+            ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
+            plt.legend()
+            plt.title('Velocity Profile for a Retrograde Disk')
+            plt.ylabel(r'$\|v_\mathrm{gas}\|~\left[a\Omega\right]$')
+            plt.xlabel(r'$x, y~\left[a_0\right]$')
+            plt.xlim([-2,2])
+            pngname     = os.getcwd() + f"{'/Outputs/VelocityCuts'}.{int(np.round(100*CurrentTime,3)):04d}.png"
+            fig.savefig(pngname, dpi=400)
+
+
+
+
+
+
             x, y        = self.Mesh()
+            #TotalSpeed = np.sqrt( self.Vx**2 + self.Vy**2 )
+            TotalSpeed = self.Vy
+
+            primary, secondary = chkpt['point_masses']
+            xprim,yprim        = primary.position_x , primary.position_y
+            xsec,ysec          = secondary.position_x, secondary.position_y
+
+            XSecCent  = np.array(x) #+ xsec
+            YSecCent  = np.array(y) #+ ysec
+            XPrimCent = np.array(x) - xprim
+            YPrimCent = np.array(y) #+ yprim
+
+            XCent, YCent = np.meshgrid(XPrimCent,YPrimCent)
+            #XCent, YCent = np.meshgrid(XSecCent,YSecCent)
+
+            f = (XCent * self.Vy - YCent * self.Vx)/(XCent**2 + YCent**2) # w = (r x v) / r^2
+            
+            plt.figure(figsize = (6,6))
+            plt.plot(XPrimCent, TotalSpeed[nj//2,:]/XPrimCent, c = 'black', linewidth = 2, label = r'$\Omega(r)$')
+            plt.plot(XPrimCent, [- np.sqrt(np.sign(xpos) / xpos /xpos /xpos) for xpos in XPrimCent], c = 'red', label = r'$\Omega_K(r)$')
+            plt.plot(XPrimCent, [np.sqrt(np.sign(xpos) / xpos /xpos /xpos) for xpos in XPrimCent], c = 'red', linestyle='dashed', label = r'$-\Omega_K(r)$')
+            plt.xlim([-0.5, 0.5])
+            plt.ylim([-200,200])
+            plt.axvline(x = primary.softening_length, c ='grey', linestyle = 'dashed')
+            plt.axvline(x = -primary.softening_length, c ='grey', linestyle = 'dashed')
+            plt.legend()
+            plt.xlabel(r'$r~[a_0]$', fontsize = 12)
+            plt.title(r'Angular Speed of Minidisk', fontsize = 12)
+            plt.ylabel(r'$\Omega(r)$', fontsize = 12, rotation = 0)
+            plt.savefig('/home/do2364/sailfish/NEW.png', dpi = 300)
+
+            return f
+
+        def Pressure(self):
+            x, y = self.Mesh()
 
             primary, secondary = chkpt['point_masses']
             xprim,yprim        = primary.position_x, primary.position_y
             xsec,ysec          = secondary.position_x, secondary.position_y
 
-            XSecCent  = np.array(x)[:,0] + xsec
-            YSecCent  = np.array(y)[0,:] + ysec
-            XPrimCent = np.array(x)[:,0] + xsec
-            YPrimCent = np.array(y)[0,:] + ysec
+            XSecCent  = np.array(x) + xsec
+            YSecCent  = np.array(y) + ysec
+            XPrimCent = np.array(x) + xprim
+            YPrimCent = np.array(y) + yprim
 
-            XCent, YCent = np.meshgrid(XPrimCent,YPrimCent)
-            #XCent, YCent = np.meshgrid(XSecCent,YSecCent)
+            XPrim, YPrim = np.meshgrid(XPrimCent,YPrimCent)
+            XSec, YSec   = np.meshgrid(XSecCent,YSecCent)
 
-            Vx_Relative = self.Vx 
-            Vy_Relative = self.Vy 
+            rs1       = primary.softening_length
+            rs2       = secondary.softening_length
 
-            f = (XCent * Vy_Relative - YCent * Vx_Relative)/(XCent**2 + YCent**2) # w = (r x v) / r^2
+            rprim2    = XPrim**2 + YPrim**2
+            rsec2     = XSec**2  + YSec**2
+            Potential =  - 0.5 / (rprim2 + rs1**2) - 0.5 / (rsec2 + rs2**2)
+            #cs2       = - Potential / (MACH**2)
+
+            f =  - Potential / 100
             
             return f
 
@@ -368,6 +442,33 @@ def main_cbdiso_2d():
 
             return f #Ignoring 1/Sigma here
 
+        def Pressure(self):
+            x, y = self.Mesh()
+
+            primary, secondary = chkpt['point_masses']
+            xprim,yprim        = primary.position_x, primary.position_y
+            xsec,ysec          = secondary.position_x, secondary.position_y
+
+            XSecCent  = np.array(x) + xsec
+            YSecCent  = np.array(y) + ysec
+            XPrimCent = np.array(x) + xprim
+            YPrimCent = np.array(y) + yprim
+
+            XPrim, YPrim = np.meshgrid(XPrimCent,YPrimCent)
+            XSec, YSec   = np.meshgrid(XSecCent,YSecCent)
+
+            rs1       = primary.softening_length
+            rs2       = secondary.softening_length
+
+            rprim2    = XPrim**2 + YPrim**2
+            rsec2     = XSec**2  + YSec**2
+            Potential =  - 0.5 / (rprim2 + rs1**2) - 0.5 / (rsec2 + rs2**2)
+            #cs2       = - Potential / (MACH**2)
+
+            f =  - Potential / 100
+            
+            return f
+
 
     class DensityAverages():
         def __init__(self, mesh):
@@ -380,8 +481,8 @@ def main_cbdiso_2d():
             y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
             return x,y
 
-        def MeshBins(self,Sigma):
-            x,y  = self.Mesh()
+        def MeshBins(self,Sigma,chkpt): #pass chkpt for saving
+            x, y = self.Mesh()
             X, Y = np.meshgrid(x, y)
 
             Radial_Bins = np.linspace(0,10,1000)
@@ -392,10 +493,20 @@ def main_cbdiso_2d():
             xvals = x[:,0]
             yvals = y[0,:]
 
+            FitEccentricity = 0 
+            FitOrientation  = 0
             for i in range(0,len(xvals)-1):
                 for j in range(0,len(yvals)-1):
-                    radius        = np.sqrt(xvals[i]**2 + yvals[j]**2)
-                    closest_index = np.abs(Radial_Bins - radius).argmin()
+                    Radius = np.sqrt(xvals[i]**2 + yvals[j]**2)
+                    Angle  = np.arctan2(yvals[j],xvals[i])
+                    xrotate, yrotate = Radius * np.cos(Angle - FitOrientation), Radius * np.sin(Angle - FitOrientation) 
+
+                    Gridded_SemimajorAxis = np.sqrt(xrotate**2 +yrotate**2 / (1-FitEccentricity**2))
+                    #Rotate (x,y) with orientation.Mesh
+                    #Find Gridded Gridded_SemimajorAxis
+
+                    #radius        = np.sqrt(xvals[i]**2 + yvals[j]**2)
+                    closest_index = np.abs(Radial_Bins - Gridded_SemimajorAxis).argmin()
                 
                     Mesh_Bins[Radial_Bins[closest_index]].append(Sigma[i,j])
                 
@@ -403,13 +514,18 @@ def main_cbdiso_2d():
             for r in Radial_Bins:
                 f.append(np.mean(Mesh_Bins[r]))
 
-            plt.figure(figsize=(12,6))
-            plt.plot(Radial_Bins,f, linewidth = 2, label = 'Azimuthally Averaged Surface Density')
-            plt.xlabel(r'Radius $[a_0]$', fontsize = 16)
-            plt.legend()
-            plt.show()
+            #plt.figure(figsize=(12,6))
+            #plt.plot(Radial_Bins,f, linewidth = 2, label = 'Azimuthally Averaged Surface Density')
+            #plt.xlabel(r'Radius $[a_0]$', fontsize = 16)
+            #plt.legend()
+            #plt.show()
 
-            print('density',f)
+            #print('density',f)
+            if chkpt["model_parameters"]["retrograde"]:
+                np.save('/Users/davidoneill/Desktop/Averages/AveragedDensity_Retrograde%g_time%g'%(chkpt['model_parameters']['nu'],chkpt["time"]/ 2 / np.pi), f)
+            else:
+                np.save('/Users/davidoneill/Desktop/Averages/AveragedDensity_Prograde%g_time%g'%(chkpt['model_parameters']['nu'],chkpt["time"]/ 2 / np.pi), f)
+
 
         def Axisymmetry(self,Sigma):
             x,y  = self.Mesh()
@@ -446,7 +562,7 @@ def main_cbdiso_2d():
     for filename in args.checkpoints:
         fig, ax     = plt.subplots(figsize=[12, 9])
         chkpt       = load_checkpoint(filename)
-        CurrentTime = load_checkpoint(filename)["time"]/ 2 / np.pi
+        CurrentTime = chkpt["time"]/ 2 / np.pi
         
         mesh             = chkpt["mesh"]
         fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
@@ -469,7 +585,16 @@ def main_cbdiso_2d():
 
         if args.field == 'speed':
             f    = Velocities.AngularSpeed()
+
+        elif args.field == 'pressure':
+            sigma = fields['sigma'](prim).T
+            f     = sigma * Velocities.Pressure()
+            #f     = Velocities.Pressure()
             
+        elif args.field == 'pressure':
+            sigma = fields['sigma'](prim).T
+            f     = sigma * Velocities.Pressure()
+            #f     = Velocities.Pressure()
         elif args.field == 'vortensity':
             sigma = fields['sigma'](prim).T
             f     = Velocities.Vortensity()/sigma
@@ -477,7 +602,7 @@ def main_cbdiso_2d():
         elif args.field == 'AverageDensity':
             AD = DensityAverages(mesh)
             Sigma = fields['sigma'](prim).T
-            AD.MeshBins(Sigma)
+            AD.MeshBins(Sigma, chkpt)
             sys.exit()
 
         elif args.field == 'Axisymmetry':
@@ -540,6 +665,7 @@ def main_cbdiso_2d():
             colorbar2      = fig.colorbar(cm2, cax=fig.add_axes([0.85, 0.07, 0.03, 0.42]))
             colorbar2.set_label(r'$\log_{10}(-\zeta)$', rotation=0, labelpad =30)
             colorbar2.ax.invert_yaxis()
+            colorbar1.ax.tick_params(labelsize=16)
 
         else:
             if args.scale_by_power is not None:
@@ -558,21 +684,31 @@ def main_cbdiso_2d():
             
             fig.colorbar(cm)
                 
-
+        ax.tick_params(axis='x', labelsize=16)
+        ax.tick_params(axis='y', labelsize=16)
         primary, secondary = chkpt['point_masses']
 
         ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 40, c = 'white', label = 'Point Mass')
         #ax.axhline(y=0, linestyle='dashed', c = 'gray', label = 'x cut')
         ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 40, c = 'white')
         #ax.legend()
-        ax.text(
-                0.8, 0.95,  # Relative coordinates (x=5% from left, y=95% from bottom)
-                r'$t = %g$'%(int(chkpt["time"]/ 2 / np.pi)),
-                fontsize=24,
-                transform=ax.transAxes,  
-                verticalalignment='top',  
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.75)
-            )
+        #ax.text(
+        #        0.8, 0.95,  # Relative coordinates (x=5% from left, y=95% from bottom)
+        #        r'$t = %g$'%(int(chkpt["time"]/ 2 / np.pi)),
+        #        fontsize=24,
+
+        from matplotlib.patches import Circle
+        primarycenter   = (primary.position_x, primary.position_y)
+        secondarycenter = (secondary.position_x, secondary.position_y)
+        radius          = primary.sink_radius         # Radius of the circle
+
+        # Create a circle
+        primarysink   = Circle(primarycenter, radius, color='white', fill=True, alpha=0.7)
+        secondarysink = Circle(secondarycenter, radius, color='white', fill=True, alpha=0.7)
+
+        # Add the circle to the axes
+        ax.add_patch(primarysink)
+        ax.add_patch(secondarysink)
 
         if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
@@ -590,6 +726,8 @@ def main_cbdiso_2d():
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
             ax.set_ylim(-args.radius, args.radius)
+            #ax.set_xlim(0.3, 0.6)
+            #ax.set_ylim(-0.15, 0.15)
         fig.suptitle(chkpt["time"]/2/np.pi)
         #fig.suptitle(r'Angular Speed of a Retrograde Minidisk $\log_{10}{\Omega(r)}$')
         fig.subplots_adjust(
