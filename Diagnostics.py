@@ -166,6 +166,7 @@ if __name__ == '__main__':
         OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
         Normalised_Torque_g = ts.torque_g[-len(Final_Orbits):] / M_dot_0
         Normalised_Torque_a = ts.torque_a[-len(Final_Orbits):] / M_dot_0
+        binary_sma          = ts.semimajor_axis[-len(Final_Orbits):]
 
 
         plt.figure()
@@ -178,10 +179,12 @@ if __name__ == '__main__':
         MeanTorque_g = [np.mean(Normalised_Torque_g[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         MeanTorque_a = [np.mean(Normalised_Torque_a[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
 
-        
-        #plt.plot(Final_Orbits,Normalised_Torque_g, c = 'blue', linewidth = 0.1)
-        #plt.plot(TimeBins[1:],MeanTorque_g,linewidth = 1.5, label = 'Binned Torque Mean Gravitational', c = 'black')
-        plt.plot(TimeBins[1:],MeanTorque_a,linewidth = 1.5, label = 'Binned Torque Mean Accretion',linestyle = 'dashed', c = 'black')
+        Azimuthal_F  = (Normalised_Torque_g + Normalised_Torque_a) / binary_sma
+
+        plt.plot(Final_Orbits,Azimuthal_F, c = 'red', linewidth = 0.1)
+        plt.plot(Final_Orbits,Normalised_Torque_g, c = 'blue', linewidth = 0.1)
+        plt.plot(TimeBins[1:],MeanTorque_g,linewidth = 1.5, label = 'Binned Torque Mean Gravitational', c = 'black')
+        #plt.plot(TimeBins[1:],MeanTorque_a,linewidth = 1.5, label = 'Binned Torque Mean Accretion',linestyle = 'dashed', c = 'black')
         
         #plt.plot(ts.time, ts.jdisk)
         #plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
