@@ -10,7 +10,7 @@ Author: Jonathan Zrake (2022)
 
 
 # Python standard library imports
-from ctypes import CDLL, POINTER, c_int, c_double
+from ctypes import CDLL, POINTER, c_int, c_double, Structure
 from functools import wraps
 from hashlib import sha256
 from os import listdir
@@ -21,7 +21,7 @@ from logging import getLogger
 
 # Numpy imports
 from numpy.typing import NDArray
-from numpy import ndarray
+from numpy import ndarray, array
 
 logger = getLogger("sailfish")
 
@@ -163,13 +163,18 @@ def configure_kernel_module(
     logger.debug(f"KERNEL_DEFAULT_EXEC_MODE={KERNEL_DEFAULT_EXEC_MODE}")
 
 
+def argtype(t):
+    if issubclass(t, Structure):
+        return t
+    else:
+        return PY_CTYPE_DICT[t]
+
+
 def argtypes(f):
     """
     Return a tuple of ctypes objects derived from a function's type hints.
     """
-    return tuple(
-        PY_CTYPE_DICT[t] for k, t in f.__annotations__.items() if k != "return"
-    )
+    return tuple(argtype(t) for k, t in f.__annotations__.items() if k != "return")
 
 
 def restype(f):
@@ -182,15 +187,32 @@ def restype(f):
         return None
 
 
-def to_ctypes(args, signature):
+def to_cpu_args(args, signature):
     """
-    Return a generator that yields pointers from any ndarray arguments.
+    Return a generator that yields arguments suitable for args to a CPU kernel
     """
-    for arg, t in zip(args, signature):
-        if isinstance(arg, ndarray):
-            yield arg.ctypes.data_as(t)
+    for a, t in zip(args, signature):
+        if isinstance(a, ndarray):
+            yield a.ctypes.data_as(t)
+        elif isinstance(a, Structure):
+            yield a
         else:
-            yield arg
+            yield a
+
+
+def to_gpu_args(args):
+    """
+    Return a generator that yields arguments suitable for args to a GPU kernel
+    """
+    for a in args:
+        if isinstance(a, Structure):
+            # Note: array(a) should work in principle here, but it generates a
+            # warning due to a Python bug. See URL below:
+            #
+            # https://github.com/python/cpython/issues/54953
+            yield array(memoryview(a).tobytes())
+        else:
+            yield a
 
 
 class MissingFunction:
@@ -227,6 +249,10 @@ class MissingModule:
         return MissingFunction(self._error)
 
 
+def define_macros_string(define_macros):
+    return ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
+
+
 def cpu_extension(code, name, define_macros=list()):
     """
     Either build or load a CPU extension module with the given code and name.
@@ -257,7 +283,7 @@ def cpu_extension(code, name, define_macros=list()):
     sha.update(code.encode("utf-8"))
     sha.update(str(define_macros).encode("utf-8"))
     cache_dir = join(dirname(__file__), "__pycache__", sha.hexdigest())
-    define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
+    define_str = define_macros_string(define_macros)
 
     try:
         from cffi import FFI, VerificationError
@@ -316,7 +342,7 @@ def gpu_extension(code, name, define_macros=list()):
 
         code = KERNEL_DEFINE_MACROS_GPU + code
         options = tuple(f"-D {k}={v}" for k, v in define_macros)
-        define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
+        define_str = define_macros_string(define_macros)
         module = RawModule(code=code, options=options)
         module.compile()
         logger.info(f"compile GPU module {name}[{define_str}]")
@@ -350,7 +376,7 @@ def cpu_extension_function(module, stub):
     @wraps(stub)
     def wrapper(*args):
         shape, pyargs = stub(*args)
-        cargs = to_ctypes(pyargs, c_func.argtypes)
+        cargs = to_cpu_args(pyargs, c_func.argtypes)
         return c_func(*cargs)
 
     wrapper.__cpu_func__ = c_func
@@ -385,7 +411,7 @@ def gpu_extension_function(module, stub):
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
 
-        gpu_func(nb, bs, pyargs)
+        gpu_func(nb, bs, tuple(to_gpu_args(pyargs)))
 
     wrapper.__gpu_func__ = gpu_func
     return wrapper
@@ -559,7 +585,7 @@ def kernel_function(code: str = None, device_funcs=list(), define_macros=list())
             k.require_compiled()
             return k._func(*args, exec_mode=exec_mode)
 
-        wrapper.__kernel_data = k
+        wrapper.__kernel_data__ = k
         return wrapper
 
     return decorator
@@ -610,8 +636,8 @@ def kernel_class(cls):
         define_macros = list()
 
         for k in dir(self):
-            if hasattr(getattr(self, k), "__kernel_data"):
-                kernel_data = getattr(self, k).__kernel_data
+            if hasattr(getattr(self, k), "__kernel_data__"):
+                kernel_data = getattr(self, k).__kernel_data__
                 kernel_code += kernel_data.kernel_code()
                 device_funcs += kernel_data.device_funcs()
                 define_macros += kernel_data.define_macros()
@@ -623,8 +649,9 @@ def kernel_class(cls):
         if m := getattr(self, "define_macros", None):
             define_macros += m if type(m) is list else list(m.items())
 
-        code = static + collate_source_code(device_funcs) + kernel_code
         name = cls.__name__
+        comment = f"// {name}({define_macros_string(define_macros)})"
+        code = comment + static + collate_source_code(device_funcs) + kernel_code
         cpu_module = cpu_extension(code, name, define_macros)
         gpu_module = gpu_extension(code, name, define_macros)
 
@@ -632,6 +659,8 @@ def kernel_class(cls):
             k = kernel_data.copy()
             k.inject_modules(cpu_module, gpu_module)
             setattr(self, key, wrap_method(self, k))
+
+        self.__native_code__ = code
 
     cls.__init__ = __init__
     return cls
@@ -686,6 +715,7 @@ def main():
     )
     args = parser.parse_args()
 
+    configure_kernel_module(default_exec_mode=args.exec_mode)
     basicConfig(
         level=args.log_level.upper(),
         format="%(message)s",
@@ -935,10 +965,49 @@ def main():
             """
             return None, tuple()
 
-    m1 = ConfigurableModule(1)
-    m2 = ConfigurableModule(2)
-    assert m1.run() == 1
-    assert m2.run() == 2
+    if args.exec_mode != "gpu":
+        m1 = ConfigurableModule(1)
+        m2 = ConfigurableModule(2)
+        assert m1.run() == 1
+        assert m2.run() == 2
+
+    # ==============================================================================
+    # 6.
+    #
+    # Demonstrates how to pass data structure to a kernel function.
+    # ==============================================================================
+
+    class MyStruct(Structure):
+        _fields_ = [
+            ("x", c_int),
+            ("y", c_int),
+            ("a", c_double),
+            ("b", c_double),
+            ("c", c_int),
+            ("d", c_double),
+        ]
+
+    @kernel
+    def takes_struct_arg(arg: MyStruct):
+        R"""
+        struct MyStruct {
+            int x;
+            int y;
+            double a;
+            double b;
+            int c;
+            double d;
+        };
+
+        KERNEL void takes_struct_arg(struct MyStruct arg)
+        {
+            assert(arg.x + arg.y + arg.a + arg.b + arg.c + arg.d == 21.0);
+        }
+        """
+        return (1,), (arg,)
+
+    arg = MyStruct(x=1, y=2, a=3, b=4, c=5, d=6)
+    takes_struct_arg(arg)
 
 
 if __name__ == "__main__":

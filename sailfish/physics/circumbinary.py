@@ -31,6 +31,9 @@ class Diagnostic(NamedTuple):
     accretion: bool = False
     """ Whether to include the accretion term (if applicable) """
 
+    buffer: bool = False
+    """ If quantity being calculate is from the buffer source terms """
+
     which_mass: Union[int, str] = None
     """ 1, 2, or 'both' """
 
@@ -189,8 +192,15 @@ class Physics(NamedTuple):
     constant_softening: bool = True
     """ If local disk height is ignored in gravitational softening """
 
+    retrograde: bool = False
+    """ If disk is retrograde """
+
     diagnostics: List[Diagnostic] = []
     """ Physics diagnostics to be returned when reductions are computed """
+
+    cooling_coefficient: float = 0.0
+
+    base_coefficient: float = 0.0
 
     @property
     def num_particles(self):

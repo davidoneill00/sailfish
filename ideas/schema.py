@@ -1,7 +1,7 @@
 """
 Configurable models for the purose of app configuration
 
-This module exports a `configmodel` decorator which builds on a Python
+This module exports a `schema` decorator which builds on a Python
 dataclass with validation via `pydantic`, and pretty printing via the `rich`
 module.
 
@@ -9,7 +9,7 @@ Short and long descriptions of the model, and field decscriptions are read
 from the class doc string, which must have the following format:
 
 ```python
-@configmodel
+@schema
 class Bird:
     \"""
     A model to represent a bird
@@ -52,7 +52,7 @@ console.print(joe) # looks nice!
 
 def parse_docstring(cls):
     """
-    Parse a configmodel docstring.
+    Parse a schema docstring.
     """
     from textwrap import dedent
 
@@ -83,7 +83,7 @@ def parse_docstring(cls):
 
 def configmodel_rich_table(d, console, options):
     """
-    Returns a rich-renderable table generated from a configmodel.
+    Returns a rich-renderable table generated from a schema.
     """
     from rich.table import Table
     from rich.pretty import Pretty
@@ -114,6 +114,7 @@ def configmodel_rich_table(d, console, options):
         show_edge=True,
         show_lines=False,
         show_header=False,
+        expand=True,
         # min_width=80,
         # box=box.SQUARE,
     )
@@ -133,7 +134,7 @@ def configmodel_rich_table(d, console, options):
     yield table
 
 
-def configmodel(cls):
+def schema(cls):
     from pydantic.dataclasses import dataclass
     from pydantic import Extra
 
@@ -142,12 +143,15 @@ def configmodel(cls):
 
     class ModelConfig:
         extra = Extra.forbid
+        frozen = True
 
     dataclass(config=ModelConfig)(cls)
 
     short_descr, long_descr, field_descriptions = parse_docstring(cls)
     prop_descriptions = {
-        k: v.__doc__.strip() for k, v in vars(cls).items() if type(v) is property
+        k: v.__doc__.strip()
+        for k, v in vars(cls).items()
+        if type(v) is property and v.__doc__
     }
     fields = cls.__dataclass_fields__
 
@@ -183,7 +187,7 @@ def main():
     from rich.markdown import Markdown
     from rich.syntax import Syntax
 
-    @configmodel
+    @schema
     class Physics:
         """
         Fields
@@ -196,7 +200,7 @@ def main():
         cooling_rate: float = 1.0
         optical_depth: float = 2.0
 
-    @configmodel
+    @schema
     class CylindricalShocktube:
         """
         A circular explosion setup

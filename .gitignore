@@ -1,5 +1,15 @@
 *.pk
+*.txt
+*.mp4
+*.slurm
+*.png
+cupy*
 __pycache__
 /data
 /doc/source/_autosummary
 /doc/build
+Outputs/
+sfish-test/
+myenv/
+test_venv/
+sailfish/__init__.pyc

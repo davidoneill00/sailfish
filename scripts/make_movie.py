@@ -1,55 +1,98 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import msgpack
-import os
 from pathlib import Path
 import argparse
+import pickle as pk
+import sys
+sys.path.insert(1,"/groups/astro/davidon/sailfish/")
+import sailfish
+import subprocess
+sys.path.insert(1, ".")
 
 
-plt.switch_backend('agg')
+class FixNumpyCoreUnpickler(pk.Unpickler):
+    def find_class(self, module, name):
+        if module.startswith("numpy._core"):
+            module = module.replace("numpy._core", "numpy.core")
+        return super().find_class(module, name)
+
+def load_checkpoint(filename, require_solver=None):
+    with open(filename, "rb") as f:
+        chkpt = FixNumpyCoreUnpickler(f).load()
+    return chkpt
 
 
-def file_load(indir, outdir, savefigbool, filename):
-    file_count = 0
+def file_load(indir, movie_outdir, savefigbool, filename):
+    file_count        = 0
     current_path_name = Path().resolve()
-    Path('{}/output-figures'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
-    max_file_count = 5  # Number of digits in the filename.
 
+    if current_path_name.name != "sailfish":
+        raise RuntimeError(f"Script was designed to be run from 'sailfish', but you're in: {current_path_name}")
+
+    frame_list        = []
+    Path('{}/output-figures'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
+    
     for name in sorted(Path(indir).iterdir()):
         file_count += 1
-        chkpt = msgpack.load(open(name, 'rb'))
-        mesh = chkpt['mesh']
-        prim = np.zeros([mesh['ni'], mesh['nj'], 3])
-        for patch in chkpt['primitive_patches']:
-            i0 = patch['rect'][0]['start']
-            j0 = patch['rect'][1]['start']
-            i1 = patch['rect'][0]['end']
-            j1 = patch['rect'][1]['end']
-            local_prim = np.array(np.frombuffer(patch['data'])).reshape([i1 - i0, j1 - j0, 3])
-            prim[i0:i1, j0:j1] = local_prim
-        plt.imshow(prim[:,:,0].T, origin='lower')
-        plt.title(r"{} $\Sigma^{{1/4}}$".format(name))
 
-        file_count_str = str(file_count)
+        chkpt       = load_checkpoint(name)
+        CurrentTime = chkpt["time"]/ 2 / np.pi
+        
+        plot_script = str(current_path_name / "plot.py")
+        plot_args = [
+            "python", plot_script,
+            name,
+            #"-f", str('t'),
+            "-l",           
+            "--radius", str(0.8),
+            "--vmap",
+            "--vmin", str(-3.5),
+            "--vmax", str(-9.5),
+            "-o", "output-figures"
+        ]
 
-        if len(file_count_str) < max_file_count:
-            file_count_str = ('0' * (max_file_count - len(file_count_str))) + file_count_str
+        subprocess.run(plot_args, check=True)
+        
+        SavedFileName  = f"DensityMap-{int(CurrentTime * 100):05d}.png"
+        frame_list.append(SavedFileName)
+        
 
-        fname = '{}/output-figures/movie-{}.png'.format(current_path_name, file_count_str)
-        print(fname)
-        plt.savefig(fname, dpi=600)
-
-    make_movie(current_path_name, outdir, filename, max_file_count)
-
-    if savefigbool is False:
-        os.system("rm -rf {}/{}".format(current_path_name, 'output-figures'))
+    with open("output-figures/frames.txt", "w") as f:
+        for fname in frame_list:
+            f.write(f"file '{fname}'\n")
 
 
-def make_movie(current_path, outdir, filename, max_count):
-    Path('{}/{}'.format(current_path, outdir)).mkdir(parents=True, exist_ok=True)
-    command = "ffmpeg -start_number 1 -i {}/output-figures/movie-%0{}d.png -c:v libx264 -vb 20M -r 30 -pix_fmt yuv420p -filter:v 'setpts=2*PTS' -y {}/movie-{}.mp4".format(current_path, max_count, outdir, filename)
+    from shutil import move
 
-    os.system(command)
+    # After all images are saved, rename them sequentially
+    for i, fname in enumerate(sorted(Path("output-figures").glob("DensityMap-*.png"))):
+        new_name = Path("output-figures") / f"DensityMap-{i:05d}.png"
+        move(fname, new_name)
+    
+
+    make_movie(current_path_name, movie_outdir, filename, frame_list)
+    #if savefigbool is False:
+    #    os.system("rm -rf {}/{}".format(current_path_name, 'output-figures'))
+
+
+
+def make_movie(current_path, movie_outdir, filename, frame_list):
+    output_dir = Path(current_path) / movie_outdir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    output_file = output_dir / f"{filename}.mp4"
+    input_pattern = str(Path(current_path) / "output-figures" / "DensityMap-%05d.png")
+
+    command = f"""
+    ffmpeg -framerate 10 -start_number 0 -i '{input_pattern}' \
+    -c:v libx264 -pix_fmt yuv420p \
+    -filter:v "setpts=2*PTS" -y '{output_file}'
+    """
+
+    subprocess.run(command, shell=True, check=True)
+
+
+
+
 
 
 if __name__ == "__main__":
