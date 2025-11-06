@@ -561,9 +561,6 @@ def simulate(driver):
                 main_logger.info(
                     f"[orbit] a={ab:0.2f}a0  e={eb:.2f}  nrg={nrg:.2f}"
                 )
-                main_logger.info(
-                    f"CHECKING NOW a={driver.model_parameters["inspiral_start_time"]:0.2f}"
-                )
             else:
                 t_since_merge = (siml_time - driver.model_parameters['gw_inspiral_time'] - 2* 3.14159265359 * driver.model_parameters["inspiral_start_time"])/2/3.14159265359
                 main_logger.info(
@@ -901,6 +898,7 @@ def main():
 
                 Inspiral_Model_Parameters = driver.model_parameters
                 speed_of_light            = Inspiral_Model_Parameters["init_separation_rg"]**0.5
+                end_time                  = first_not_none(driver.end_time)
 
                 from numpy import pi, sqrt, cumsum, round, linspace
                 from scipy.optimize import newton
@@ -913,6 +911,7 @@ def main():
                         init_eccentricity  = Inspiral_Model_Parameters["init_eccentricity"],
                         init_semimajoraxis = a0,
                         timestep           = Inspiral_Model_Parameters["integration_timestep"],
+                        end_time           = end_time,
                         plot_inspiral      = False
                         )
                     
