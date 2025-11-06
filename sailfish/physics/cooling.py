@@ -299,13 +299,16 @@ if __name__ == '__main__':
 
 	r  = np.linspace(0.5, 10., 250)
 	ss = ShakuraSunyaevDisk(
-        	central_mass_msun = 8e6, 
+        	central_mass_msun = 1e6, 
         	length_scale_pc   = 9.7e-4,
         	mach_number_a     = 10,
         	alpha             = 0.1,
 			gamma             = 5./3.
         )
 	print("fedd : ", ss._eddington_fraction)
+	mp_code = cgs['mp'] /  ss._mass
+	kb_code = cgs['kb'] / (ss._mass * ss._length**2 / ss._time**2)
+	print('Ratio in code units is', mp_code / kb_code)
 
 
 	fcavity = 0.0001 + 0.9999 * np.exp(-((1.0 / r) ** 30))

@@ -41,12 +41,12 @@ def file_load(indir, movie_outdir, savefigbool, filename):
         plot_args = [
             "python", plot_script,
             name,
-            #"-f", str('t'),
+            "-f", str('t4'),
             "-l",           
-            "--radius", str(0.8),
-            "--vmap",
-            "--vmin", str(-3.5),
-            "--vmax", str(-9.5),
+            "--radius", str(4.0),
+            #"--vmap",
+            "--vmin", str(23.5),
+            "--vmax", str(25),
             "-o", "output-figures"
         ]
 
@@ -69,26 +69,51 @@ def file_load(indir, movie_outdir, savefigbool, filename):
         move(fname, new_name)
     
 
-    make_movie(current_path_name, movie_outdir, filename, frame_list)
+    make_movie(current_path_name, movie_outdir, filename)
     #if savefigbool is False:
     #    os.system("rm -rf {}/{}".format(current_path_name, 'output-figures'))
 
 
 
-def make_movie(current_path, movie_outdir, filename, frame_list):
+
+def make_movie(current_path, movie_outdir, filename, frame_list=None, use_glob=False):
     output_dir = Path(current_path) / movie_outdir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = output_dir / f"{filename}.mp4"
-    input_pattern = str(Path(current_path) / "output-figures" / "DensityMap-%05d.png")
 
-    command = f"""
-    ffmpeg -framerate 10 -start_number 0 -i '{input_pattern}' \
-    -c:v libx264 -pix_fmt yuv420p \
-    -filter:v "setpts=2*PTS" -y '{output_file}'
-    """
+    # Choose input: contiguous sequence (%05d) or glob for gaps
+    if use_glob:
+        # Works even if some frames are missing (zero-padded names keep correct order)
+        input_args = ["-pattern_type", "glob",
+                      "-i", str(Path(current_path) / "output-figures" / "DensityMap-*.png")]
+    elif frame_list:
+        # Explicit file list for arbitrary ordering / mixed padding
+        list_file = output_dir / "frames.txt"
+        with list_file.open("w") as f:
+            for p in frame_list:
+                f.write(f"file '{p}'\n")
+                f.write("duration 0.1\n")  # 10 fps; adjust as needed
+            if frame_list:
+                f.write(f"file '{frame_list[-1]}'\n")  # repeat last file per concat spec
+        input_args = ["-f", "concat", "-safe", "0", "-i", str(list_file)]
+    else:
+        # Contiguous %05d sequence starting at 0 (change start_number if needed)
+        input_args = ["-start_number", "0",
+                      "-i", str(Path(current_path) / "output-figures" / "DensityMap-%05d.png")]
 
-    subprocess.run(command, shell=True, check=True)
+    cmd = [
+        "ffmpeg", "-y",
+        "-framerate", "30",
+        *input_args,
+        # Single filter chain: make dimensions even + slow to 0.5x
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,setpts=2*PTS",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        str(output_file),
+    ]
+    subprocess.run(cmd, check=True)
 
 
 

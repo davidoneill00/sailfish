@@ -1,5 +1,6 @@
+import numpy as np  
 from scipy.optimize import newton
-import numpy as np
+import time
 
 class Orbital_Inspiral():
     r"""
@@ -14,6 +15,7 @@ class Orbital_Inspiral():
         init_eccentricity,
         init_semimajoraxis,
         timestep,
+        end_time,
         plot_inspiral = False
         ): 
         
@@ -21,15 +23,17 @@ class Orbital_Inspiral():
             a_dot_prefactor     = 64. / 5. * GM**3 * mass_ratio / (1 + mass_ratio)**2 / speed_of_light**5
             eccentricity_factor = 1 + 73/24 * e**2 + 37/96 * e**4
             return -a_dot_prefactor * eccentricity_factor / (a **3) / ((1-e**2) ** (7./2.)) #* 10
-    	
+
         def Eccentricity_Decay_Rate(a,e):
-       	    e_dot_prefactor     = 304. /15. * GM**3 * mass_ratio / (1 + mass_ratio)**2 / speed_of_light**5
+            e_dot_prefactor     = 304. /15. * GM**3 * mass_ratio / (1 + mass_ratio)**2 / speed_of_light**5
             eccentricity_factor = e * (1 + 121/304 * e**2) / ((1-e**2) ** (5./2.))
             return -e_dot_prefactor * eccentricity_factor / a**4  #* 1
 
+        start           = time.time()
         self.a_array    = [init_semimajoraxis]
         self.e_array    = [init_eccentricity]
         self.TimeDomain = [0.]
+        self.end_time   = end_time
 
         # Initialise
         current_time = 0.
@@ -37,7 +41,7 @@ class Orbital_Inspiral():
         e_old        = init_eccentricity
 
 
-        while a_old > 0.03:
+        while (a_old > 0.03) and (current_time < self.end_time):
             # RK4 integration
             k1_a = SemiMajorAxis_Decay_Rate(a_old , e_old)
             k1_e = Eccentricity_Decay_Rate( a_old , e_old)
@@ -79,6 +83,7 @@ class Orbital_Inspiral():
             e_old = e_new
             current_time += timestep
             self.TimeDomain.append(current_time)
+        print('[Orbital Elements] Binary integrated in', np.round((time.time()-start),2), ' seconds')
 
 
 
@@ -100,7 +105,7 @@ class Orbital_Inspiral():
             #print(self.TimeDomain[-1])
 
 
-    
+  
 
     def f(self,phi, MeanAnomaly, ecc):
         return phi-ecc*np.sin(phi)-MeanAnomaly
@@ -110,7 +115,6 @@ class Orbital_Inspiral():
         return E
     
     
-
 
 
 
