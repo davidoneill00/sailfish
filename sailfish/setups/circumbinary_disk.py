@@ -963,7 +963,7 @@ class CoolInspiral(SetupBase):
     semi_major_axis_list  = param([]," List of all semi-major axes over the inspiral")
     eccentricity_list     = param([]," List of all eccentricities axes over the inspiral")
     inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
-    gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ")
+    gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ", mutable=True)
     Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
     OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
 
