@@ -38,7 +38,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 	central_mass_msun : float
 	length_scale_pc   : float
-	mach_number_a    : float
+	mach_number_a     : float
 	alpha             : float
 	gamma             : float
 
@@ -299,9 +299,9 @@ if __name__ == '__main__':
 
 	r  = np.linspace(0.5, 10., 250)
 	ss = ShakuraSunyaevDisk(
-        	central_mass_msun = 1e6, 
+        	central_mass_msun = 8e6, 
         	length_scale_pc   = 9.7e-4,
-        	mach_number_a     = 10,
+        	mach_number_a     = 21,
         	alpha             = 0.1,
 			gamma             = 5./3.
         )

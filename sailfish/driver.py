@@ -479,7 +479,7 @@ def simulate(driver):
     for name, event in driver.events.items():
         logger.info(f"recurrence for {name} event is {event}")
 
-    logger.info(f"Inspiral timescale is {driver.model_parameters['gw_inspiral_time']/2/3.14159265359:0.2f} orbits")
+    logger.info(f"Binary Orbits expected over this run {driver.model_parameters['gw_inspiral_time']/2/3.14159265359:0.2f} orbits")
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"simulation time / user time is {reference_time:0.4f}")
