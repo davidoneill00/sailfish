@@ -12,8 +12,7 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
 )
 from sailfish.physics.kepler import OrbitalElements, OrbitalState
-import cooling
-from sailfish.physics.Peters_Inspiral import Orbital_Inspiral
+from sailfish.physics.cooling import gamma_law_index, ShakuraSunyaevDisk, cgs
 from sailfish.setup_base import SetupBase, SetupError, param
 import os
 
@@ -966,30 +965,18 @@ class CoolInspiral(SetupBase):
     inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
     gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ")
     Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
-    OpticalDepthFloor     = param(0., "Minimum optical depth to measure lightcurves", mutable=True) 
+    OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
 
     central_mass_msun    = param(8e6, "Mass of the central object in solar masses")
     semimajoraxis_pc     = param(None, "Length scale in parsecs") # Correct this for inspirals 
-    mach_number_3a       = param(21, "Disk Mach number just outside cavity") 
     # Radiation Pressure Contribution (Optional)
     beta                 = param(1., "Gas pressure fraction P_gas/P_tot where P_tot = P_gas+P_rad") 
-    # Inspiral specific parameters
-    init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
-    init_eccentricity     = param(0.0, "orbital eccentricity of the binary")
-    inspiral_start_time   = param(1000., "how many orbits before inspiral starts")
-    integration_timestep  = param(0.001, "timestep for integrating the inspiral")
-    semi_major_axis_list  = param([]," List of all semi-major axes over the inspiral")
-    eccentricity_list     = param([]," List of all eccentricities axes over the inspiral")
-    inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
-    gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ")
-    Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
 
     a0 = 1.0
     GM = 1.0
 
     @property
     def Gravitational_Radius_pc(self):
-        from cooling import cgs
         return cgs['G'] * self.central_mass_msun * cgs['msun'] / cgs['c'] / cgs['c'] / cgs['pc']
 
     @property
@@ -1011,11 +998,11 @@ class CoolInspiral(SetupBase):
     @property
     def gamma_law_index(self):
         #return self.beta + (4-3*self.beta)**2 * (self.gamma_law_index_gas-1) / ( self.beta + 12 * (self.gamma_law_index_gas-1) * (1-self.beta) )
-        return cooling.gamma_law_index(self.beta, self.gamma_law_index_gas)
+        return gamma_law_index(self.beta, self.gamma_law_index_gas)
 
     @property
     def SS73(self):
-        SS73_Setup = cooling.ShakuraSunyaevDisk(
+        SS73_Setup = ShakuraSunyaevDisk(
             central_mass_msun = self.central_mass_msun, 
             length_scale_pc   = self.length_scale_pc,
             mach_number_a     = self.mach_number_a,
@@ -1058,20 +1045,8 @@ class CoolInspiral(SetupBase):
             primitive[1] = sign  * sqrt(self.GM / r_softened) * phi_hat_x
             primitive[2] = sign  * sqrt(self.GM / r_softened) * phi_hat_y
             primitive[3] = pressure * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
-<<<<<<< HEAD
-<<<<<<< HEAD
 
-            # See eq. (A2) from Goodman (2003)
-            primitive[0] = (
-                sigma
-                * r_softened ** (-3.0 / 5.0)
-                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
-            )
-            primitive[3] = (
-                pressure
-                * r_softened ** (-3.0 / 2.0)
-                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
-            )
+        return primitive
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -1085,7 +1060,7 @@ class CoolInspiral(SetupBase):
         if self.is_isothermal:
             return dict(
                 eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
-                mach_number=self.mach_number_3a,
+                mach_number=self.mach_number_a,
                 point_mass_function=self.point_masses,
                 buffer_is_enabled=self.buffer_is_enabled,
                 buffer_driving_rate=100.0,
@@ -1143,7 +1118,6 @@ class CoolInspiral(SetupBase):
                 dict(quantity="uv"),
                 dict(quantity="xray"),
                 dict(quantity="max_temperature"),
-                dict(quantity="floor"),
                 #dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
                 #dict(quantity="torque",which_mass='both',gravity=True, radial_cut=(0.0, 1.0)),
                 #dict(quantity="torque",which_mass='both',gravity=True, radial_cut=(1.0, 10.0)),
@@ -1183,7 +1157,7 @@ class CoolInspiral(SetupBase):
     
     @property
     def Phase_at_Start(self):
-        return 0. # correct this later.... 
+        return 0. # correct this later -- only if inspiral begins at t=0, then Phase_at_Start = 0
 
     @property
     def code_start_inspiral_time(self):
@@ -1227,9 +1201,9 @@ class CoolInspiral(SetupBase):
             Eccentricity_N1  = self.eccentricity_list[Nstep+1]
             EcctricPhase_N1  = self.Eccentric_Anomalies[Nstep+1]
 
-            Interpolated_SMA   = SemiMajorAxis_N0 + Position_in_Bracket_N0_N1 * (SemiMajorAxis_N1 - SemiMajorAxis_N0)
-            Interpolated_ECC   = Eccentricity_N0  + Position_in_Bracket_N0_N1 * (Eccentricity_N1  - Eccentricity_N0)
-            Interpolated_Anom  = EcctricPhase_N0  + Position_in_Bracket_N0_N1 * (EcctricPhase_N1  - EcctricPhase_N0)
+            Interpolated_SMA  = SemiMajorAxis_N0 + Position_in_Bracket_N0_N1 * (SemiMajorAxis_N1 - SemiMajorAxis_N0)
+            Interpolated_ECC  = Eccentricity_N0  + Position_in_Bracket_N0_N1 * (Eccentricity_N1  - Eccentricity_N0)
+            Interpolated_Anom = EcctricPhase_N0  + Position_in_Bracket_N0_N1 * (EcctricPhase_N1  - EcctricPhase_N0)
 
             #Phase_at_Start     = self.Omega_0 * self.code_start_inspiral_time
             return [Interpolated_SMA , Interpolated_ECC , Interpolated_Anom+self.Phase_at_Start]
