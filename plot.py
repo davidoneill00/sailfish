@@ -7,6 +7,16 @@ import matplotlib.pyplot as plt
 sys.path.insert(1,"/groups/astro/davidon/sailfish/")
 import sailfish
 
+text_width   = 7.1
+column_width = text_width / 2.
+def configure_matplotlib():
+    plt.rc('xtick' , labelsize=8)
+    plt.rc('ytick' , labelsize=8)
+    plt.rc('axes'  , labelsize=8)
+    plt.rc('legend', fontsize=8)
+    plt.rc('font', family='DejaVu Sans', size=8)
+    plt.rc('text', usetex=True)
+configure_matplotlib()
 
 sys.path.insert(1, ".")
 
@@ -349,10 +359,10 @@ def main_cbdiso_2d():
             TotalSpeed = np.sqrt( Vx_Relative**2 + Vy_Relative**2 )
 
 
-            fig, ax = plt.subplots(figsize=[12, 9])
-            #ni, nj = mesh.shape
-            #xspace = np.linspace(mesh.x0,mesh.x1,ni)
-            #yspace = np.linspace(mesh.y0,mesh.y1,nj)
+            fig, ax = plt.subplots(figsize=[text_width, 0.75*text_width])
+            ni, nj = mesh.shape
+            xspace = np.linspace(mesh.x0,mesh.x1,ni)
+            yspace = np.linspace(mesh.y0,mesh.y1,nj)
             ax.plot(xspace,f[nj//2,:], label = 'horizontal cut')
             ax.plot(yspace,f[:,ni//2], label = 'vertical cut')
             plt.legend()
@@ -368,12 +378,6 @@ def main_cbdiso_2d():
             #TotalSpeed = np.sqrt( self.Vx**2 + self.Vy**2 )
             TotalSpeed = self.Vy
 
-
-            print('Keys', chkpt.keys())
-
-
-            print('Keys', chkpt.keys())
-
             primary, secondary = chkpt['point_masses']
             xprim,yprim        = primary.position_x , primary.position_y
             xsec,ysec          = secondary.position_x, secondary.position_y
@@ -388,7 +392,7 @@ def main_cbdiso_2d():
 
             f = (XCent * self.Vy - YCent * self.Vx)/(XCent**2 + YCent**2) # w = (r x v) / r^2
             
-            plt.figure(figsize = (6,6))
+            plt.figure(figsize = (text_width, text_width))
             plt.plot(XPrimCent, TotalSpeed[nj//2,:]/XPrimCent, c = 'black', linewidth = 2, label = r'$\Omega(r)$')
             plt.plot(XPrimCent, [- np.sqrt(np.sign(xpos) / xpos /xpos /xpos) for xpos in XPrimCent], c = 'red', label = r'$\Omega_K(r)$')
             plt.plot(XPrimCent, [np.sqrt(np.sign(xpos) / xpos /xpos /xpos) for xpos in XPrimCent], c = 'red', linestyle='dashed', label = r'$-\Omega_K(r)$')
@@ -397,9 +401,9 @@ def main_cbdiso_2d():
             plt.axvline(x = primary.softening_length, c ='grey', linestyle = 'dashed')
             plt.axvline(x = -primary.softening_length, c ='grey', linestyle = 'dashed')
             plt.legend()
-            plt.xlabel(r'$r~[a_0]$', fontsize = 12)
-            plt.title(r'Angular Speed of Minidisk', fontsize = 12)
-            plt.ylabel(r'$\Omega(r)$', fontsize = 12, rotation = 0)
+            plt.xlabel(r'$r~[a_0]$')
+            plt.title(r'Angular Speed of Minidisk')
+            plt.ylabel(r'$\Omega(r)$', rotation = 0)
             plt.savefig('/home/do2364/sailfish/NEW.png', dpi = 300)
 
             return f
@@ -551,9 +555,9 @@ def main_cbdiso_2d():
             for r in Radial_Bins:
                 f.append(np.std(Mesh_Bins[r]))
 
-            plt.figure(figsize=(12,6))
+            plt.figure(figsize=(text_width,0.5*text_width))
             plt.plot(Radial_Bins,f, linewidth = 2, label = 'Surface Density Standard Deviation')
-            plt.xlabel(r'Radius $[a_0]$', fontsize = 16)
+            plt.xlabel(r'Radius $[a_0]$')
             plt.legend()
             plt.show()
 
@@ -561,7 +565,7 @@ def main_cbdiso_2d():
 
 
     for filename in args.checkpoints:
-        fig, ax     = plt.subplots(figsize=[12, 9])
+        fig, ax     = plt.subplots(figsize=[text_width, 0.75*text_width])
         chkpt       = load_checkpoint(filename)
         CurrentTime = chkpt["time"]/ 2 / np.pi
         
@@ -657,7 +661,7 @@ def main_cbdiso_2d():
             colorbar2      = fig.colorbar(cm2, cax=fig.add_axes([0.85, 0.07, 0.03, 0.42]))
             colorbar2.set_label(r'$\log_{10}(-\zeta)$', rotation=0, labelpad =30)
             colorbar2.ax.invert_yaxis()
-            colorbar1.ax.tick_params(labelsize=16)
+            colorbar1.ax.tick_params()
 
         else:
             if args.scale_by_power is not None:
@@ -676,8 +680,8 @@ def main_cbdiso_2d():
             
             fig.colorbar(cm)
                 
-        ax.tick_params(axis='x', labelsize=16)
-        ax.tick_params(axis='y', labelsize=16)
+        ax.tick_params(axis='x')
+        ax.tick_params(axis='y')
         primary, secondary = chkpt['point_masses']
 
         ax.scatter(primary.position_x, primary.position_y, marker = '+', s = 40, c = 'white', label = 'Point Mass')
@@ -783,8 +787,6 @@ def main_cbdgam_2d():
         "pre": lambda p: p[:, :, 3],
     }
 
-
-
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoints", type=str, nargs="+")
     parser.add_argument(
@@ -855,21 +857,16 @@ def main_cbdgam_2d():
         default="magma",
         help="colormap name",
     )
-
+    from sailfish.physics.cooling import gamma_law_index, EffectiveTemperature, cgs, ShakuraSunyaevDisk, PlanckSpectrum 
 
     args = parser.parse_args()
-
     for filename in args.checkpoints:
-        fig, ax     = plt.subplots(figsize=[10, 10])
+        fig, ax     = plt.subplots(figsize=[text_width, text_width])
         chkpt       = load_checkpoint(filename, require_solver="cbdgam_2d")
         CurrentTime = chkpt["time"]/ 2 / np.pi
         mesh        = chkpt["mesh"]
         prim        = chkpt["solution"]
-
-        
-        import cooling
-        from cooling import gamma_law_index, EffectiveTemperature, cgs
-        gamma = gamma_law_index(chkpt['model_parameters']['beta'], chkpt['model_parameters']['gamma_law_index_gas'])
+        gamma       = gamma_law_index(chkpt['model_parameters']['beta'], chkpt['model_parameters']['gamma_law_index_gas'])
 
         try:
             length_scale_pc = chkpt['model_parameters']['length_scale_pc']
@@ -877,13 +874,17 @@ def main_cbdgam_2d():
             r_g             = cgs['G'] * chkpt['model_parameters']['central_mass_msun'] * cgs['msun'] / cgs['c'] / cgs['c']
             length_scale_pc = r_g * chkpt['model_parameters']['init_separation_rg'] / cgs['pc']
 
-        SS73 = cooling.ShakuraSunyaevDisk(
+        SS73 = ShakuraSunyaevDisk(
             central_mass_msun = chkpt['model_parameters']['central_mass_msun'], 
             length_scale_pc   = length_scale_pc,
             mach_number_a     = chkpt['model_parameters']['mach_number_a'],
             alpha             = chkpt['model_parameters']['alpha'],
             gamma             = gamma
             )
+        
+        Mdrop = chkpt['model_parameters']['target_accretion_rate'] / SS73._eddington_fraction
+        
+        IGNORE = False
 
         if args.field == 't':
             Sigma    = fields["sigma"](prim)
@@ -895,12 +896,33 @@ def main_cbdgam_2d():
 
             Midplane_T    = ((Pressure / Sigma) * (mp_code / kb_code))
             optical_depth = Sigma * kappa_code
-            mask_values   = optical_depth >= 1.0 * SS73._eddington_fraction / chkpt['model_parameters']['target_accretion_rate'] ####FIX THIS MASK
-
+            #mask_values   = optical_depth * Mdrop >= 1.0
+            mask_values = 1
+            
             Teff          = EffectiveTemperature(optical_depth, Midplane_T)
             EddingtonFrac = SS73._eddington_fraction
-            RescaledTemp  = Teff * (10/EddingtonFrac) ** 0.25
+            RescaledTemp  = Teff * Mdrop ** 0.25
             f             = (RescaledTemp * mask_values).T
+
+        elif args.field == 't4':
+            Sigma    = fields["sigma"](prim)
+            Pressure = fields["pre"](prim)
+
+            kb_code    = cgs['kb'] / (SS73._mass * SS73._length**2 / SS73._time**2)
+            mp_code    = cgs['mp'] / (SS73._mass)
+            kappa_code = cgs['kappa'] / (SS73._length**2 / SS73._mass)
+
+            Midplane_T    = ((Pressure / Sigma) * (mp_code / kb_code))
+            optical_depth = Sigma * kappa_code
+            mask_values   = np.where(optical_depth > 1.0, 1.0, 1e-20)
+
+
+            
+            Teff          = EffectiveTemperature(optical_depth, Midplane_T)
+            EddingtonFrac = SS73._eddington_fraction
+            RescaledTemp  = Teff**4 * Mdrop 
+            f             = (RescaledTemp * mask_values).T
+
 
         elif args.field == 'mach':
             Sigma    = fields["sigma"](prim)
@@ -922,127 +944,27 @@ def main_cbdgam_2d():
             Mach    = romega / cs
             f       = Mach.T
 
-            plt.figure(figsize = (4,4))
+            plt.figure(figsize = (text_width,text_width))
             plt.title('Mach Number Profile')
             plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), f[mesh.shape[1]//2,:], label = 'horizontal cut', c = 'tab:red', linewidth = 2)
             plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), f[:,mesh.shape[0]//2], label = 'vertical cut'  , c = 'tab:blue', linewidth = 2)
+            plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), [SS73.mach_profile(np.abs(r)) for r in np.linspace(mesh.x0, mesh.x1, mesh.shape[0])], label = 'SS73 Mach Profile', linestyle = 'dashed', c = 'black')
             plt.legend()
             plt.ylim([5,20])
 
-            #plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), [SS73.mach_profile(r/3) for r in np.linspace(mesh.x0, mesh.x1, mesh.shape[0])], label = 'SS73 Mach Profile', linestyle = 'dashed')
             plt.savefig(args.Outputs + "/MidplaneMach.png", dpi = 300)
 
 
         elif args.field == 'tau':
-            Sigma    = fields["sigma"](prim) 
-            #Pressure = fields["pre"](prim)
-
+            Sigma      = fields["sigma"](prim) 
             kb_code    = cgs['kb'] / (SS73._mass * SS73._length**2 / SS73._time**2)
             mp_code    = cgs['mp'] / (SS73._mass)
             kappa_code = cgs['kappa'] / (SS73._length**2 / SS73._mass)
 
-            #Midplane_T    = ((Pressure / Sigma) * (mp_code / kb_code)).T
-            #optical_depth = Sigma * kappa_code
-            #Teff          = EffectiveTemperature(optical_depth, Midplane_T)
-            #EddingtonFrac = SS73._eddington_fraction
-            #RescaledTemp  = Teff * (10/EddingtonFrac) ** 0.25
-
-            f         = Sigma * kappa_code * 1.0 / (10 / SS73._eddington_fraction)
-
-            print('Minimum Density', 10 / kappa_code)
-            #Tmid = 10 **-2 * mp_code/kb_code
-            #kappa_code = cgs['kappa'] / (SS73._length**2 / SS73._mass)
-            #Teff = cooling.EffectiveTemperature(1e-10, kappa_code, Tmid)
-            #EmittingTemp = Teff * (10/SS73._eddington_fraction)** 0.25
-            #print('Emitting Temp',EmittingTemp)
-            #print('Optical depth', kappa_code * 1e-10)
+            optical_depth = (Sigma * kappa_code * Mdrop).T
+            f             = optical_depth > 1
+            IGNORE        = True
             
-
- 
-        import cooling
-
-        gamma = gamma_law_index(chkpt['model_parameters']['beta'], chkpt['model_parameters']['gamma_law_index_gas'])
-        try:
-            length_scale_pc = chkpt['model_parameters']['length_scale_pc']
-        except KeyError as e:
-            r_g             = cgs['G'] * chkpt['model_parameters']['central_mass_msun'] * cgs['msun'] / cgs['c'] / cgs['c']
-            length_scale_pc = r_g * chkpt['model_parameters']['init_separation_rg'] / cgs['pc']
-
-        SS73 = cooling.ShakuraSunyaevDisk(
-            central_mass_msun = chkpt['model_parameters']['central_mass_msun'], 
-            length_scale_pc   = length_scale_pc,
-            mach_number_a     = chkpt['model_parameters']['mach_number_a'],
-            alpha             = chkpt['model_parameters']['alpha'],
-            gamma             = gamma
-            )
-
-        if args.field == 't':
-            Sigma    = fields["sigma"](prim)
-            Pressure = fields["pre"](prim)
-
-            kb_code    = cgs['kb'] / (SS73._mass * SS73._length**2 / SS73._time**2)
-            mp_code    = cgs['mp'] / (SS73._mass)
-            kappa_code = cgs['kappa'] / (SS73._length**2 / SS73._mass)
-
-            Midplane_T    = ((Pressure / Sigma) * (mp_code / kb_code))
-            optical_depth = Sigma * kappa_code
-            mask_values   = optical_depth >= 1.0 * SS73._eddington_fraction / chkpt['model_parameters']['target_accretion_rate'] ####FIX THIS MASK
-
-            Teff          = EffectiveTemperature(optical_depth, Midplane_T)
-            EddingtonFrac = SS73._eddington_fraction
-            RescaledTemp  = Teff * (10/EddingtonFrac) ** 0.25
-            print('Remapping factor', 1/SS73._eddington_fraction)
-            f             = (RescaledTemp * mask_values).T
-
-        elif args.field == 'mach':
-             Sigma    = fields["sigma"](prim)
-             Pressure = fields["pre"](prim)
- 
-             cs     = (gamma * Pressure / Sigma)**0.5
-             ni, nj = mesh.shape
-             xspace = np.linspace(mesh.x0, mesh.x1,ni)
-             yspace = np.linspace(mesh.y0, mesh.y1,nj)
-             X, Y   = np.meshgrid(xspace, yspace)
-             primary, secondary = chkpt['point_masses']
-             xprim, yprim = primary.position_x, primary.position_y
-             xsec, ysec   = secondary.position_x, secondary.position_y
-
-             R_1     = np.sqrt((X-xprim)**2 + (Y-yprim)**2)
-             R_2     = np.sqrt((X-xsec)**2  + (Y-ysec)**2)
-             Omega_1 = np.sqrt(0.5 / (R_1**3 + 1e-12)) #Assuming a Keplerian disk
-             Omega_2 = np.sqrt(0.5 / (R_2**3 + 1e-12))  #Assuming a Keplerian disk
-             
-             ROmega  = np.sqrt((R_1 * Omega_1)**2 + (R_2 * Omega_2)**2) #Assuming a Keplerian disk
- 
-             Mach    = ROmega / cs
-             f       = Mach.T
-
-
-        elif args.field == 'tau':
-            Sigma    = fields["sigma"](prim) 
-            #Pressure = fields["pre"](prim)
-
-            kb_code    = cgs['kb'] / (SS73._mass * SS73._length**2 / SS73._time**2)
-            mp_code    = cgs['mp'] / (SS73._mass)
-            kappa_code = cgs['kappa'] / (SS73._length**2 / SS73._mass)
-
-            #Midplane_T    = ((Pressure / Sigma) * (mp_code / kb_code)).T
-            #optical_depth = Sigma * kappa_code
-            #Teff          = EffectiveTemperature(optical_depth, Midplane_T)
-            #EddingtonFrac = SS73._eddington_fraction
-            #RescaledTemp  = Teff * (10/EddingtonFrac) ** 0.25
-
-            f         = Sigma * kappa_code * 1.0 / (10 / SS73._eddington_fraction)
-
-            print('Minimum Density', 10 / kappa_code)
-            #Tmid = 10 **-2 * mp_code/kb_code
-            #kappa_code = cgs['kappa'] / (SS73._length**2 / SS73._mass)
-            #Teff = cooling.EffectiveTemperature(1e-10, kappa_code, Tmid)
-            #EmittingTemp = Teff * (10/SS73._eddington_fraction)** 0.25
-            #print('Emitting Temp',EmittingTemp)
-            #print('Optical depth', kappa_code * 1e-10)
-            
-
         else:
             f = fields[args.field](prim).T
 
@@ -1051,34 +973,30 @@ def main_cbdgam_2d():
 
         extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
 
-        if np.percentile(f, 0)> -9: 
-            if np.percentile(f, 0) < -7:
-                new_vmin = np.percentile(f, 0)  
-            else:
-                new_vmin = -7
-        else:
-            new_vmin = -9
-
         cm = ax.imshow(
             f,
             origin="lower",
-            vmin=new_vmin,
-            vmax=-4,
+            vmin=args.vmin,
+            vmax=args.vmax,
             cmap=args.cmap,
             extent=extent,
         )
-        fig.colorbar(cm)
-        ax.tick_params(axis='x', labelsize=16)
-        ax.tick_params(axis='y', labelsize=16)
-
+        #cm.cmap.set_over('aqua')
+        cbar = fig.colorbar(cm, ax=ax, shrink=0.805, aspect=20, pad=0.05)
+        ax.tick_params(axis='x')
+        ax.tick_params(axis='y')
         ax.set_aspect("equal")
-        fig.suptitle(chkpt["time"]/2/np.pi)
 
+        # ---------------------------------------------------------------------
+        if not IGNORE:
+            sigma = np.log10(fields["sigma"](prim)).T
+            ax.imshow(sigma, origin="lower", vmin=-15.653, vmax=-15.653, cmap='Reds_r', extent=extent, alpha=0.2)
+
+        ax.set_title(r'$t = $ %g $\mathrm{[2\pi\Omega_0^{-1}]}$'%(np.round(chkpt["time"]/2/np.pi,3)))
         fig.subplots_adjust(
         left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
         )
 
-<<<<<<< HEAD
     if args.SED:
         kb_code    = cgs['kb'] / (SS73._mass * SS73._length**2 / SS73._time**2)
         mp_code    = cgs['mp'] / (SS73._mass)
@@ -1086,14 +1004,12 @@ def main_cbdgam_2d():
 
         Sigma           = fields["sigma"](prim) 
         Pressure        = fields["pre"](prim)
-        optical_depth   = Sigma * kappa_code
-        Remapping_Value = chkpt['model_parameters']['target_accretion_rate'] / SS73._eddington_fraction
-        mask_values     = optical_depth >= (10.0 / Remapping_Value)
+        optical_depth   = Sigma * kappa_code * Mdrop ** (7./10.) 
+        mask_values     = optical_depth >= 1
         T               = np.maximum((Pressure / Sigma) * (mp_code / kb_code), 1) * mask_values
 
-        Teff                  = EffectiveTemperature(optical_depth, T)
-        RescaledTemp          = Teff * Remapping_Value ** 0.25
-        mask_values           = optical_depth >= (10.0 / Remapping_Value)
+        Teff            = EffectiveTemperature(optical_depth, T)
+        RescaledTemp    = Teff * Mdrop ** 0.25
         
         ev            = 1.6e-12
         E_low         = 1e-1 * ev
@@ -1109,11 +1025,11 @@ def main_cbdgam_2d():
         ni, nj        = np.shape(RescaledTemp)
         dx            = mesh.dx
 
-        Cell_Spectra  = np.array([cooling.PlanckSpectrum(freq, RescaledTemp, length_scale_pc * cgs['pc'] * dx) for freq in freq_space])
+        Cell_Spectra  = np.array([PlanckSpectrum(freq, RescaledTemp, length_scale_pc * cgs['pc'] * dx) for freq in freq_space])
         Spectrum      = np.sum(np.sum(Cell_Spectra, axis=1), axis=1) 
         integral      = np.trapz(Spectrum, np.log(freq_space)) 
 
-        plt.figure(figsize=(4, 3))
+        plt.figure(figsize=(text_width, 0.75*text_width))
         plt.plot(Ev_array, Spectrum, label = 'SED')
         plt.xscale('log')
         plt.yscale('log') 
@@ -1128,14 +1044,7 @@ def main_cbdgam_2d():
         plt.savefig(args.Outputs + "/SED_%g.png"%(chkpt["time"]/ 2 / np.pi), dpi=300, bbox_inches='tight')
 
     if args.vmap:
-            Number_of_Vectors = 15
-<<<<<<< HEAD
-=======
-    if args.vmap:
             Number_of_Vectors = 20
->>>>>>> f3c6636 (Clean diagnostic plotting. Include vmap for plot.py)
-=======
->>>>>>> dac8f5d (Plot mach number in disk)
             ni, nj            = mesh.shape
             x                 = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
             y                 = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
@@ -1158,7 +1067,7 @@ def main_cbdgam_2d():
             plt.quiver(
                 X, Y,
                 Vx_sampled, Vy_sampled,
-                width=0.0025, angles='xy', scale_units='xy', scale=20, color = 'darkgrey', headwidth=4
+                width=0.002, angles='xy', scale_units='xy', scale=3, color = 'darkgrey', headwidth=4
             )
 
 
@@ -1220,20 +1129,10 @@ def main_cbdgam_2d():
         plt.show()
     else:
         pngname     = args.Outputs + f"/DensityMap-{int(CurrentTime * 100):05d}.png"
-        
-        fig.savefig(pngname, dpi=400)
+        fig.savefig(pngname, dpi=400, bbox_inches='tight')
 
 
-text_width   = 7.1
-column_width = text_width / 2.
-def configure_matplotlib():
-    plt.rc('xtick' , labelsize=8)
-    plt.rc('ytick' , labelsize=8)
-    plt.rc('axes'  , labelsize=8)
-    plt.rc('legend', fontsize=8)
-    plt.rc('font', family='DejaVu Sans', size=8)
-    plt.rc('text', usetex=True)
-configure_matplotlib()
+
 
 if __name__ == "__main__":
     for arg in sys.argv:
