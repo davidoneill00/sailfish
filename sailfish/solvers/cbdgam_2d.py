@@ -15,7 +15,7 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
-from cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, EffectiveTemperature
+from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, EffectiveTemperature
 import numpy as np
 import warnings
 
@@ -28,7 +28,7 @@ class Options(NamedTuple):
     density_floor: float = 1e-10
     velocity_ceiling: float = 1e16
     mach_ceiling: float = 1e5
-    sink_emission: bool = True
+    sink_emission: bool = False
 
 
 def initial_condition(setup, mesh, time):
@@ -86,9 +86,8 @@ class Patch:
         self.retrograde = physics.retrograde
 
         def dynamic_cooling(_self):
-            return (2e-9 * xp.exp(self.time / 10)) * self.physics.base_coefficient
-            #return _self._base_cooling_coefficient * (2e-9 * self.xp.exp(self.time / 10))
-
+            return self.physics.base_coefficient #(2e-9 * xp.exp(self.time / 10)) * self.physics.base_coefficient
+            
         # Inject it as a property into the *physics instance only*
         self.physics.__class__.cooling_coefficient = property(dynamic_cooling)
 
@@ -428,18 +427,7 @@ class Solver(SolverBase):
         return mask.sum() ## Return and check this sum over patches. Is it multiplied by da? If not is it a bottleneck?
     
     def detect_pressure_floor(self, patch):
-        pressure = patch.primitive1[:, :, 0]
-        mask     = pressure <= patch.options.pressure_floor * 1.01
-        return mask.sum() ## Return and check this sum over patches. Is it multiplied by da? If not is it a bottleneck?
-
-
-    def detect_density_floor(self, patch):
-        rho  = patch.primitive1[:, :, 0]
-        mask = rho <= patch.options.density_floor * 1.01
-        return mask.sum() ## Return and check this sum over patches. Is it multiplied by da? If not is it a bottleneck?
-    
-    def detect_pressure_floor(self, patch):
-        pressure = patch.primitive1[:, :, 0]
+        pressure = patch.primitive1[:, :, 3]
         mask     = pressure <= patch.options.pressure_floor * 1.01
         return mask.sum() ## Return and check this sum over patches. Is it multiplied by da? If not is it a bottleneck?
 
@@ -453,15 +441,6 @@ class Solver(SolverBase):
         Precomputed_low  = self.xp.log10(Precomputed[0][0])
         Precomputed_high = self.xp.log10(Precomputed[0][-1])
 
-
-        Sigma            = patch.primitive[:, :, 0]
-        T                = self.xp.maximum((patch.primitive[:, :, 3] / Sigma) * (self.mp_code / self.kb_code), 10**Precomputed_low)
-        optical_depth    = Sigma * self.kappa_code
-
-
-        T                = np.maximum((patch.primitive[:, :, 3] / Sigma) * (self.mp_code / self.kb_code), Precomputed_low)
-
-
         Sigma            = patch.primitive[:, :, 0]
         T                = self.xp.maximum((patch.primitive[:, :, 3] / Sigma) * (self.mp_code / self.kb_code), 10**Precomputed_low)
         optical_depth    = Sigma * self.kappa_code
@@ -470,7 +449,7 @@ class Solver(SolverBase):
         # the code unit optical depth is used to compute the surface temperature before the mapping is applied
         Teff                  = EffectiveTemperature(optical_depth, T)
         RescaledTemp          = Teff * self.setup.Mdrop ** 0.25
-        RescaledDepth         = optical_depth * self.setup.Mdrop ** (7./10.)
+        RescaledDepth         = optical_depth * self.setup.Mdrop
         Bolometric_Luminosity = 2 * cgs['sigmab'] * RescaledTemp ** 4 * self.Length_Scale_CGS**2
 
 
@@ -493,39 +472,19 @@ class Solver(SolverBase):
         transparent_mask = (RescaledDepth >= self.setup.OpticalDepthFloor)
         mask_interp_min  = (RescaledTemp * transparent_mask >= 1.01 * 10**Precomputed_low) # Rescaled Temperatures should not be below interpolation minimum
         mask             = r1_mask * r2_mask * mask_interp_min 
-
-        N0               = self.xp.floor(Progress).astype(int)
-        Progress      = (np.log10(RescaledTemp) - Precomputed_low)/ Precomputed[1]
-
-        
-        if np.min(Progress) < 0:
-            raise IndexError("Interpolated temperature range limit needs to be lower in cbdgam_2d.py. Current value is logT_min = %g"%(np.log10(self.Precompute_Band_Luminosities[0][0])), 
-                "while the temperature dropped down to a value of logT = %g"%(np.log10(np.min(RescaledTemp))))
-
-        Teff                  = EffectiveTemperature(optical_depth, T)
-        RescaledTemp          = Teff * self.setup.AccretionRateRescaling ** 0.25
-        Bolometric_Luminosity = 2 * cgs['sigmab'] * RescaledTemp ** 4 * self.Length_Scale_CGS**2
-
-        transparent_mask = (optical_depth >= 1.0)#.astype(self.xp.float64)
-        mask_all_vals_if = (RescaledTemp * transparent_mask >= 1.01)#.astype(self.xp.float64)
-        # High temp cutoff??
-
-
-
-        if self.xp.min(Progress) < 0:
-            raise IndexError(
-            f"Interpolated temperature range limit needs to be lower in cbdgam_2d.py. "
-            f"Current value is logT_min = {self.xp.log10(self.Precompute_Band_Luminosities[0][0])}, "
-            f"while the temperature dropped down to a value of logT = {self.xp.log10(self.xp.min(RescaledTemp))}"
-        )
-
-        N0            = self.xp.floor(Progress).astype(int)
-        Bracket_N0_N1 = Progress - N0
-
-        Progress         = (self.xp.log10(RescaledTemp) - Precomputed_low)/ Precomputed[1]
+        Progress         = (np.log10(RescaledTemp) - Precomputed_low)/ Precomputed[1]
         N0               = self.xp.floor(Progress).astype(int)
         Bracket_N0_N1    = Progress - N0
 
+
+        #if self.xp.min(Progress) < 0:
+        #    raise IndexError(
+        #    f"Interpolated temperature range limit needs to be lower in cbdgam_2d.py. "
+        #    f"Current value is logT_min = {self.xp.log10(self.Precompute_Band_Luminosities[0][0])}, "
+        #    f"while the temperature dropped down to a value of logT = {self.xp.log10(self.xp.min(RescaledTemp))}"
+        #)
+
+        
 
         try:
             Optical_N0 = self.xp.take(Precomputed[2],N0, axis=0)
@@ -536,11 +495,6 @@ class Solver(SolverBase):
             UV_N1      = self.xp.take(Precomputed[4],N0+1,axis=0)
             Xray_N0    = self.xp.take(Precomputed[5],N0  ,axis=0)
             Xray_N1    = self.xp.take(Precomputed[5],N0+1,axis=0)
-
-            Optical_N0 = self.xp.take(Precomputed[2], N0, axis=0)
-            Optical_N1 = self.xp.take(Precomputed[2],N0+1,axis=0)
-            Infared_N0 = self.xp.take(Precomputed[3],N0  ,axis=0)
-            Infared_N1 = self.xp.take(Precomputed[3],N0+1,axis=0)
 
             Interpolated_Optical = Optical_N0 + Bracket_N0_N1 * (Optical_N1-Optical_N0)
             Interpolated_Infared = Infared_N0 + Bracket_N0_N1 * (Infared_N1-Infared_N0)
@@ -556,15 +510,8 @@ class Solver(SolverBase):
             #return Interpolated_Optical, Interpolated_Infared, Bolometric_Luminosity, sum(~mask_all_vals_if)
             return Interpolated_Infared, Interpolated_Optical, Interpolated_UV, Interpolated_Xray, Bolometric_Luminosity, sum(~mask_interp_min), self.xp.max(RescaledTemp)
 
-            Interpolated_Optical  *= mask_all_vals_if
-            Interpolated_Infared  *= mask_all_vals_if
-            Bolometric_Luminosity *= mask_all_vals_if
-
-            return Interpolated_Optical, Interpolated_Infared, Bolometric_Luminosity, sum(~mask_all_vals_if)
-
         
         except IndexError as e:
-
 
             if self.xp.max(RescaledTemp) > self.Precompute_Band_Luminosities[0][-2]:
                 raise IndexError("Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_max = %g"%(self.xp.log10(self.Precompute_Band_Luminosities[0][-1])),
@@ -574,48 +521,8 @@ class Solver(SolverBase):
                 warnings.warn(f"Lightcurve reductions failed at time={self.time:0.4f} due to zero surface density")
                 return self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), sum(~mask_interp_min), 0
             else:
-                print('SOMETHING ELSE WENT WRONG, FIGURE IT OUT.')
-            
+                warnings.warn(f"Something went wrong. Figure it out. Error: {e} in Interpolate_band_luminosity")
 
-            warnings.warn("Interpolated temperature range needs to be higher in cbdgam_2d.py. Current value is logT = %g"%(np.log10(self.Precompute_Band_Luminosities[0][-1])), UserWarning)
-            return 0., 0.
-        except TypeError as e:
-            warnings.warn("The rescaled, effective temperature inside a cell was %g"%(RescaledTemp), UserWarning)
-            return 0., 0.
-            if RescaledTemp.any() > self.Precompute_Band_Luminosities[0][-1]:
-
-            if np.max(RescaledTemp) > self.Precompute_Band_Luminosities[0][-2]:
-
-                raise IndexError("Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_min = %g"%(np.log10(self.Precompute_Band_Luminosities[0][-1])),
-                    "while the temperature reached a value of logT = %g"%(np.log10(np.min(RescaledTemp))))
-
-                raise IndexError("Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_max = %g"%(np.log10(self.Precompute_Band_Luminosities[0][-1])),
-                    "while the temperature reached a value of logT = %g"%(np.log10(np.max(RescaledTemp))))
-
-            elif np.min(Sigma) == 0.0:
-                logger.info(f"Lightcurve reductions failed at time={self.time:0.4f} due to zero surface density")
-                warnings.warn(f"Lightcurve reductions failed at time={self.time:0.4f} due to zero surface density")
-                return np.zeros_like(Sigma), np.zeros_like(Sigma)
-
-
-            elif RescaledTemp.any() < self.Precompute_Band_Luminosities[0][0]:
-                raise IndexError("Interpolated temperature range limit needs to be lower in cbdgam_2d.py. Current value is logT = %g"%(np.log10(self.Precompute_Band_Luminosities[0][0])))
-
-
-            if self.xp.max(RescaledTemp) > self.Precompute_Band_Luminosities[0][-2]:
-                raise IndexError("Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_max = %g"%(self.xp.log10(self.Precompute_Band_Luminosities[0][-1])),
-                    "while the temperature reached a value of logT = %g"%(self.xp.log10(self.xp.max(RescaledTemp))))
-            elif np.min(Sigma) == 0.0:
-                logger.info(f"Lightcurve reductions failed at time={self.time:0.4f} due to zero surface density")
-                warnings.warn(f"Lightcurve reductions failed at time={self.time:0.4f} due to zero surface density")
-                return self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), self.xp.zeros_like(Sigma), sum(~mask_all_vals_if), 0
-            else:
-                print('SOMETHING ELSE WENT WRONG, FIGURE IT OUT.')
-
-            
-
-    def optical_luminosity(self,patch):
-        return self.Interpolate_Band_Luminosity(patch)[0]
 
     def infared_luminosity(self,patch):
         return 2 * self.Interpolate_Band_Luminosity(patch)[0]
@@ -630,28 +537,16 @@ class Solver(SolverBase):
         return 2 * self.Interpolate_Band_Luminosity(patch)[3]
     
     def bolometric_luminosity(self,patch):
-        return self.Interpolate_Band_Luminosity(patch)[4]
+        return self.Interpolate_Band_Luminosity(patch)[4] # factor of 2 is already included in the Interpolate_Band_Luminosity function
+    
     def Uncounted_Cells(self,patch):
         return self.Interpolate_Band_Luminosity(patch)[5].sum()
     
     def MaxTemperature(self,patch):
         return self.Interpolate_Band_Luminosity(patch)[6] 
 
-    
-    def bolometric_luminosity(self,patch):
-        return self.Interpolate_Band_Luminosity(patch)[2]
-    
-    def Uncounted_Cells(self,patch):
-        return self.Interpolate_Band_Luminosity(patch)[3].sum()
 
-
-    
-        return self.Interpolate_Band_Luminosity(patch)[2]
-    
-    def Uncounted_Cells(self,patch):
-        return self.Interpolate_Band_Luminosity(patch)[3].sum()
-
-    def runtime_reductions(self):
+    def reductions(self):
         """
         Generate runtime reductions on the solution data for time series.
         """
@@ -661,6 +556,7 @@ class Solver(SolverBase):
         udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
         udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
         da = self.mesh.dx * self.mesh.dy
+        ng = self.num_guard
 
         def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False):
             """
@@ -669,6 +565,9 @@ class Solver(SolverBase):
             1, 2, or 'both'), term (either 'acc' or 'grv').
             """
             x, y = patch.cell_center_coordinate_arrays
+            r = (x**2 + y**2) ** 0.5
+
+            def apply_radial_cut(f):
                 if cut is not None:
                     r0, r1 = cut
                     return f * (r0 < r) * (r < r1)
@@ -728,38 +627,8 @@ class Solver(SolverBase):
                 else:
                     raise ValueError("Mass option for 'power' must be 1 or 2.")
 
-
             if quantity == "Accreted_energy":
                 return get_field(patch, 3, cut, mass="both", gravity=False, accretion=True, buffer=False)
-
-            if quantity == "optical":
-                return self.optical_luminosity(patch)
-
-            if quantity == "infared":
-                return self.infared_luminosity(patch)
-     
-            if quantity == "floor":
-                return self.detect_density_floor(patch)
-
-
-
-            if quantity == "energy":
-                Energy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 3])
-                return Energy
-
-
-            if quantity == "Accreted_energy":
-                return get_field(patch, 3, cut, mass="both", gravity=False, accretion=True, buffer=False)
-
-            if quantity == "optical":
-                return self.optical_luminosity(patch)
-
-            if quantity == "infared":
-                return self.infared_luminosity(patch)
-     
-            if quantity == "floor":
-                return self.detect_density_floor(patch)
-
 
             q = quantity
             i = self.patches.index(patch)
@@ -793,7 +662,6 @@ class Solver(SolverBase):
                         f = self.infared_luminosity(p)
                         result.append(f.sum())
 
-
                     elif d.quantity == "uv":
                         f = self.uv_luminosity(p)
                         result.append(f.sum())
@@ -801,7 +669,6 @@ class Solver(SolverBase):
                     elif d.quantity == "xray":
                         f = self.xray_luminosity(p)
                         result.append(f.sum())
-
 
                     elif d.quantity == "bolometric":
                         f = self.bolometric_luminosity(p)
@@ -840,24 +707,14 @@ class Solver(SolverBase):
                 pass1.append(orbital_state.semimajor_axis)
             elif d.quantity == "eccentricity":
                 pass1.append(orbital_state.eccentricity)
-
             elif d.quantity == 'density_floor':
                 pass1.append(float(sum(self.detect_density_floor(p) for p in self.patches))) # double check again
             elif d.quantity == 'pressure_floor':
                 pass1.append(float(sum(self.detect_pressure_floor(p) for p in self.patches))) # double check again
             elif d.quantity == 'uncounted_cells_in_lc':
                 pass1.append(float(sum(self.Uncounted_Cells(p) for p in self.patches))) # double check again
-
             elif d.quantity == 'max_temperature':
                 pass1.append(float(max(self.MaxTemperature(p) for p in self.patches)))
-
-
-            elif d.quantity == 'floor':
-                return int(sum(self.detect_density_floor(p) for p in self.patches))
-            elif d.quantity == "optical":
-                return sum(self.optical_luminosity(p) for p in self.patches)
-            elif d.quantity == "infared":
-                return sum(self.infared_luminosity(p) for p in self.patches)
 
             
 
