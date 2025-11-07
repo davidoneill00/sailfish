@@ -171,7 +171,7 @@ if __name__ == '__main__':
     CurrentTime         = ts.currenttime
     Model_Parameters    = ts.modelparams
 
-    Number_of_Orbits    = 1.
+    Number_of_Orbits    = 20.
     Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
 
@@ -235,9 +235,9 @@ if __name__ == '__main__':
         plt.figure(figsize = (10,3))
         plt.plot(Final_Orbits, ts.infared[-len(Final_Orbits):], c = 'red', label = 'infared luminosity')
         plt.plot(Final_Orbits, ts.optical[-len(Final_Orbits):], c = 'blue', label = 'optical luminosity')
-        plt.plot(Final_Orbits, ts.uv[-len(Final_Orbits):],   c = 'purple', label = 'uv')
-        plt.plot(Final_Orbits, ts.xray[-len(Final_Orbits):], c = 'green', label = 'xray', linewidth = 0.6) 
-        plt.plot(Final_Orbits, ts.bolometric[-len(Final_Orbits):], c = 'black', label = 'bolometric luminosity', linewidth = 0.6)
+        #plt.plot(Final_Orbits, ts.uv[-len(Final_Orbits):],   c = 'purple', label = 'uv')
+        #plt.plot(Final_Orbits, ts.xray[-len(Final_Orbits):], c = 'green', label = 'xray', linewidth = 0.6) 
+        #plt.plot(Final_Orbits, ts.bolometric[-len(Final_Orbits):], c = 'black', label = 'bolometric luminosity', linewidth = 0.6)
         plt.xlabel('time')
         plt.title('Multiband Lightcurves')
         plt.yscale('log')
@@ -245,7 +245,7 @@ if __name__ == '__main__':
         print(chkpt['solver_options'])
 
         plt.title('Multiband Lightcurves e = %g'%(np.round(OrbitalEccentricity,3)))
-        plt.ylim([1e40, 6e48])
+        plt.ylim([1e43, 1e44])
         plt.legend(loc='lower left')
         try:
             savename = os.getcwd() + "/Lightcurves.%04d.png"%(CurrentTime)
