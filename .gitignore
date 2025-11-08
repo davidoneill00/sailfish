@@ -1,5 +1,10 @@
 *.pk
 __pycache__
-/data
 /doc/source/_autosummary
 /doc/build
+*.txt
+*.slurm
+/Movies
+/output-figures
+/Outputs
+/cupy*
