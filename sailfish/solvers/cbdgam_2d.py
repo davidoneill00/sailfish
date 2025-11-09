@@ -127,7 +127,14 @@ class Patch:
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
-        m1, m2 = self.physics.point_masses(self.time) 
+        m1, m2 = self.physics.point_masses(self.time)
+        #m1, m2 = self.physics.point_masses(
+        #    self.time_new, 
+        #    self.time_old, 
+        #    (xold, yold, zold), 
+        #    (pxold, pyold, pzold)
+        #    ) 
+        
 
         with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
