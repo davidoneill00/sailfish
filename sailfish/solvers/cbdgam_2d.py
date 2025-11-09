@@ -15,16 +15,24 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
+from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, EffectiveTemperature
+import numpy as np
+from cupy import fuse
+
+@fuse()
+def interpolate_band(N0, N1, frac):
+    return N0 + frac * (N1 - N0)
 
 
 logger = getLogger(__name__)
 
 
 class Options(NamedTuple):
-    pressure_floor: float = 1e-12
-    density_floor: float = 1e-10
-    velocity_ceiling: float = 1e16
-    mach_ceiling: float = 1e5
+    pressure_floor   : float = 1e-12
+    density_floor    : float = 1e-10
+    velocity_ceiling : float = 1e16
+    mach_ceiling     : float = 1e5
+    sink_emission    : bool  = False
 
 
 def initial_condition(setup, mesh, time):
@@ -79,6 +87,17 @@ class Patch:
         self.buffer_outer_radius = buffer_outer_radius
         self.buffer_surface_density = buffer_surface_density
         self.buffer_surface_pressure = buffer_surface_pressure
+        self.retrograde = physics.retrograde
+
+        # option to vary the cooling coefficient dynamically
+        def dynamic_cooling(_self):
+            #return (2e-9 * xp.exp(self.time / 10)) * self.physics.dynamic_cooling_base
+            return self.physics.dynamic_cooling_base 
+            
+        # Inject it back into physics as a property
+        self.physics.__class__.cooling_coefficient = property(dynamic_cooling)
+        self.physics.__class__.dynamic_cooling     = (self.physics.cooling_coefficient==self.physics.dynamic_cooling_base )
+
 
         with self.execution_context:
             x0 = self.xl + 0.5 * mesh.dx
@@ -87,6 +106,7 @@ class Patch:
             y1 = self.yr - 0.5 * mesh.dy
             self.coordinate_array_x = xp.linspace(x0, x1, ni)[:, None]
             self.coordinate_array_y = xp.linspace(y0, y1, nj)[None, :]
+            self.r                  = xp.sqrt(self.coordinate_array_x**2 + self.coordinate_array_y**2)
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
             self.primitive1 = self.xp.array(primitive)
             self.primitive2 = self.xp.array(primitive)
@@ -101,12 +121,13 @@ class Patch:
         """
         return self.coordinate_array_x, self.coordinate_array_y
 
+
     def point_mass_source_term(self, which_mass, gravity=False, accretion=False):
         ng = 2  # number of guard cells
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
-        m1, m2 = self.physics.point_masses(self.time)
+        m1, m2 = self.physics.point_masses(self.time) 
 
         with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
@@ -182,6 +203,7 @@ class Patch:
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 int(self.physics.buffer_is_enabled),
+                int(self.retrograde),
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
@@ -325,6 +347,7 @@ class Solver(SolverBase):
             )
             self.patches.append(patch)
 
+
     @property
     def solution(self):
         return concat_on_host(
@@ -338,40 +361,164 @@ class Solver(SolverBase):
         """
         return None
 
+    def detect_density_floor(self, patch):
+        with patch.execution_context:
+            rho  = patch.primitive1[:, :, 0]
+            mask = rho <= patch.options.density_floor * 1.01
+            return float(self.xp.sum(mask).get()) 
+    
+    def detect_pressure_floor(self, patch):
+        with patch.execution_context:
+            pressure = patch.primitive1[:, :, 3]
+            mask     = pressure <= patch.options.pressure_floor * 1.01
+            return float(self.xp.sum(mask).get())  
+
+    def Band_Luminosity(self, patch):
+        with patch.execution_context:
+            dev_id = int(patch.execution_context.id)
+
+            if not hasattr(self, "_EmissionTable_cache"):
+                self._EmissionTable_cache = {}
+
+            if dev_id not in self._EmissionTable_cache:
+                self._EmissionTable_cache[dev_id] = [ self.xp.array(band) for band in self.setup.EmissionTable ]
+                logger.info(f"Precomputed emission tables for temperature range 10^{self.xp.round(self.xp.log10(self.setup.Temperature[0]))} K to 10^{self.xp.round(self.xp.log10(self.setup.Temperature[-1]))} K")
+            EmissionTable = self._EmissionTable_cache[dev_id]
+
+            
+
+            Precomputed_T = self.setup.Temperature
+            Sigma         = patch.primitive[:, :, 0]
+            T             = self.xp.maximum((patch.primitive[:, :, 3] / Sigma) * (self.setup.mp_code / self.setup.kb_code), Precomputed_T[0])
+            optical_depth = Sigma * self.setup.kappa_code
+
+            # Note that the temperature mapping only occurs on the effective temperature, not the actual temperature. Hence
+            # the code unit optical depth is used to compute the surface temperature before the mapping is applied
+            Teff                 = EffectiveTemperature(optical_depth, T)
+            RescaledTemp         = Teff * self.setup.Mdrop ** 0.25
+            RescaledOpticalDepth = optical_depth * self.setup.Mdrop
+            BolometricLuminosity = 2 * cgs['sigmab'] * RescaledTemp ** 4 * self.setup.Length_Scale_CGS**2
+
+            if not patch.options.sink_emission:
+                x_, y_  = patch.cell_center_coordinate_arrays
+                x       = self.xp.pad(x_[:, 0], pad_width=2, mode="edge")
+                y       = self.xp.pad(y_[0, :], pad_width=2, mode="edge")
+                X, Y    = self.xp.meshgrid(x, y, indexing='ij')
+                m1, m2  = patch.physics.point_masses(patch.time)
+                r1_mask = ((X-m1.position_x)**2 + (Y-m1.position_y)**2) > m1.sink_radius**2
+                r2_mask = ((X-m2.position_x)**2 + (Y-m2.position_y)**2) > m2.sink_radius**2
+            else:
+                r1_mask = 1
+                r2_mask = 1
+
+            transparent_mask = (RescaledOpticalDepth >= self.setup.OpticalDepthFloor)
+            mask             = r1_mask * r2_mask * transparent_mask
+            
+            # numpy arrays arrays, keep them on the CPU
+            dlogT            = np.diff(np.log10(Precomputed_T))[0]
+            interpolate_cpu  = np.log10(to_host(RescaledTemp) / Precomputed_T[0]) / dlogT
+            
+            interpolate      = self.xp.array(interpolate_cpu)
+            N0               = self.xp.floor(interpolate).astype(int)
+            Bracket_N0_N1    = interpolate - N0
+
+            if float(self.xp.min(Sigma)) < 1e-30:
+                logger.error(
+                    f"Lightcurve reduction failed at time={self.time:0.4f} — "
+                    f"zero surface density detected in patch {self.patches.index(patch)}"
+                )
+                return (
+                    self.xp.zeros_like(Sigma), 
+                    self.xp.zeros_like(Sigma), 
+                    self.xp.zeros_like(Sigma), 
+                    self.xp.zeros_like(Sigma), 
+                    self.xp.zeros_like(Sigma), 
+                    self.xp.zeros_like(Sigma), 
+                    0.0
+                )
+
+
+            if self.xp.max(RescaledTemp) > self.setup.Temperature[-1]:
+                raise IndexError(f"Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_max ={self.xp.max(RescaledTemp):0.4f} due to zero surface density")
+
+            Optical_N0 = self.xp.take(EmissionTable[0],N0, axis=0)
+            Optical_N1 = self.xp.take(EmissionTable[0],N0+1,axis=0)
+            Infared_N0 = self.xp.take(EmissionTable[1],N0  ,axis=0)
+            Infared_N1 = self.xp.take(EmissionTable[1],N0+1,axis=0)
+            UV_N0      = self.xp.take(EmissionTable[2],N0  ,axis=0)
+            UV_N1      = self.xp.take(EmissionTable[2],N0+1,axis=0)
+            Xray_N0    = self.xp.take(EmissionTable[3],N0  ,axis=0)
+            Xray_N1    = self.xp.take(EmissionTable[3],N0+1,axis=0)
+
+            Interpolated_Optical = interpolate_band(Optical_N0, Optical_N1, Bracket_N0_N1)
+            Interpolated_Infared = interpolate_band(Infared_N0, Infared_N1, Bracket_N0_N1)
+            Interpolated_UV      = interpolate_band(UV_N0     , UV_N1     , Bracket_N0_N1)
+            Interpolated_Xray    = interpolate_band(Xray_N0   , Xray_N1   , Bracket_N0_N1)
+
+            Interpolated_Optical *= mask
+            Interpolated_Infared *= mask
+            Interpolated_UV      *= mask
+            Interpolated_Xray    *= mask
+            BolometricLuminosity *= mask
+            
+            return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(RescaledTemp)
+
     def reductions(self):
         """
         Generate runtime reductions on the solution data for time series.
+        Fully GPU-parallelized version with all diagnostics preserved.
         """
-        diagnostics = self._physics.diagnostics
-        udots1_acc = [p.point_mass_source_term(1, accretion=True) for p in self.patches]
-        udots2_acc = [p.point_mass_source_term(2, accretion=True) for p in self.patches]
-        udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
-        udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
+        xp = self.xp
         da = self.mesh.dx * self.mesh.dy
         ng = self.num_guard
+        diagnostics = self._physics.diagnostics
 
-        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False):
-            """
-            Return one of the udot fields: for a particular patch, conserved
-            variable quantity, radial cut (optional), and point mass (either
-            1, 2, or 'both'), term (either 'acc' or 'grv').
-            """
-            x, y = patch.cell_center_coordinate_arrays
-            r = (x**2 + y**2) ** 0.5
+        gpu_results = []
+
+        # Helper to make sure we can always stack safely
+        def to_gpu_array(x):
+            if isinstance(x, (float, int)):
+                return xp.array(x)
+            return xp.asarray(x)
+        
+
+        udots_cache = {}
+        def get_udots(which_mass, term):
+            key = (which_mass, term)
+            if key not in udots_cache:
+                if term == "acc":
+                    udots_cache[key] = [p.point_mass_source_term(which_mass, accretion=True) for p in self.patches]
+                elif term == "grv":
+                    udots_cache[key] = [p.point_mass_source_term(which_mass, gravity=True) for p in self.patches]
+                else:
+                    raise ValueError("Invalid source term")
+            return udots_cache[key]
+
+        # Precompute emission results once per patch
+        band_cache = {p: self.Band_Luminosity(p) for p in self.patches}
+
+        import sailfish.physics.kepler as kepler
+        m1, m2 = self._physics.point_masses(self.time)
+        m1 = kepler.PointMass(m1.mass, m1.position_x, m1.position_y, m1.velocity_x, m1.velocity_y)
+        m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y)
+        orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
+
+        # Utility for hydrodynamic quantities (reusing your original get_field logic)
+        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False):
+            x, y, r = patch.coordinate_array_x, patch.coordinate_array_y, patch.r
 
             def apply_radial_cut(f):
                 if cut is not None:
                     r0, r1 = cut
                     return f * (r0 < r) * (r < r1)
-                else:
-                    return f
+                return f
 
             if quantity == "mdot":
-                return get_field(patch, 0, cut, mass, gravity, accretion)
+                return get_field(patch, 0, cut, mass, gravity, accretion, buffer)
 
             if quantity == "torque":
-                fx = get_field(patch, 1, cut, mass, gravity, accretion)
-                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion, buffer)
                 return x * fy - y * fx
 
             if quantity == "sigma_m1":
@@ -391,15 +538,45 @@ class Solver(SolverBase):
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
 
+            if quantity == "angular_momentum":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                return sigma * (x * vy - y * vx)
+
+            if quantity == "buffer_torque":
+                fx = get_field(patch, 1, cut, mass, False, False, buffer=True)
+                fy = get_field(patch, 2, cut, mass, False, False, buffer=True)
+                return x * fy - y * fx
+
+            if quantity == "buffer_mass_rate":
+                return get_field(patch, 0, cut, mass, False, False, buffer=True)
+
+            if quantity == "power":
+                fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion, buffer)
+                m1, m2 = self._physics.point_masses(self.time)
+                if mass == 1:
+                    vx1, vy1 = m1.velocity_x, m1.velocity_y
+                    return vx1 * fx + vy1 * fy
+                elif mass == 2:
+                    vx2, vy2 = m2.velocity_x, m2.velocity_y
+                    return vx2 * fx + vy2 * fy
+                else:
+                    raise ValueError("Mass option for 'power' must be 1 or 2.")
+
+            if quantity == "Accreted_energy":
+                return get_field(patch, 3, cut, mass="both", gravity=False, accretion=True, buffer=False)
+
             q = quantity
             i = self.patches.index(patch)
 
             if accretion:
-                udots1 = udots1_acc
-                udots2 = udots2_acc
+                udots1 = get_udots(1, "acc")
+                udots2 = get_udots(2, "acc")
             elif gravity:
-                udots1 = udots1_grv
-                udots2 = udots2_grv
+                udots1 = get_udots(1, "grv")
+                udots2 = get_udots(2, "grv")
 
             if mass == "both":
                 f = udots1[i][..., q] + udots2[i][..., q]
@@ -407,11 +584,58 @@ class Solver(SolverBase):
                 f = udots1[i][..., q]
             elif mass == 2:
                 f = udots2[i][..., q]
+            else:
+                raise ValueError("Invalid mass specifier")
 
             return apply_radial_cut(f)
 
-        def get_sum_fields(d):
-            result = []
+        for d in diagnostics:
+            q = d.quantity
+
+            # --- Orbital quantities ---
+            if q == "time":
+                gpu_results.append(xp.array(self.time / self.setup.reference_time_scale))
+                continue
+            elif q == "semimajor-axis":
+                gpu_results.append(xp.array(orbital_state.semimajor_axis))
+                continue
+            elif q == "eccentricity":
+                gpu_results.append(xp.array(orbital_state.eccentricity))
+                continue
+
+            # --- Floor diagnostics ---
+            elif q == "density_floor":
+                vals = [to_gpu_array(self.detect_density_floor(p)) for p in self.patches]
+                gpu_sum = xp.sum(xp.stack(vals))
+                gpu_results.append(gpu_sum)
+                continue
+            elif q == "pressure_floor":
+                vals = [to_gpu_array(self.detect_pressure_floor(p)) for p in self.patches]
+                gpu_sum = xp.sum(xp.stack(vals))
+                gpu_results.append(gpu_sum)
+                continue
+
+            # --- Radiative luminosities ---
+            if q in ("infared", "optical", "uv", "xray", "bolometric"):
+                idx = dict(infared=0, optical=1, uv=2, xray=3, bolometric=4)[q]
+                gpu_sum = xp.sum(xp.stack([band_cache[p][idx] for p in self.patches]))
+                gpu_results.append(gpu_sum * da)
+                continue
+
+            elif q == "uncounted_cells_in_lc":
+                vals = [to_gpu_array(band_cache[p][5]) for p in self.patches]
+                gpu_sum = xp.sum(xp.stack(vals))
+                gpu_results.append(gpu_sum)
+                continue
+
+            elif q == "max_temperature":
+                vals = [to_gpu_array(band_cache[p][6]) for p in self.patches]
+                gpu_max = xp.max(xp.stack(vals))
+                gpu_results.append(gpu_max)
+                continue
+
+            # --- Hydrodynamic quantities ---
+            field_sums = []
             for p in self.patches:
                 with p.execution_context:
                     f = get_field(
@@ -422,25 +646,13 @@ class Solver(SolverBase):
                         gravity=d.gravity,
                         accretion=d.accretion,
                     )
-                    result.append(f.sum())
-            return result
+                    field_sums.append(xp.sum(f))
+            gpu_sum = xp.sum(xp.stack([to_gpu_array(f) for f in field_sums]))
+            gpu_results.append(gpu_sum * da)
 
-        pass1 = []
-        pass2 = []
+        gpu_results = xp.stack([xp.asarray(r) for r in gpu_results])
+        return gpu_results.get().tolist()
 
-        for d in diagnostics:
-            if d.quantity == "time":
-                pass1.append(self.time / self.setup.reference_time_scale)
-            else:
-                pass1.append(get_sum_fields(d))
-
-        for item in pass1:
-            if type(item) is not float:
-                pass2.append(sum(to_host(x) for x in item) * da)
-            else:
-                pass2.append(item)
-
-        return pass2
 
     @property
     def time(self):
@@ -479,6 +691,8 @@ class Solver(SolverBase):
         self.set_bc("primitive1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
+
+
 
     def set_bc(self, array):
         ng = self.num_guard

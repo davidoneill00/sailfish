@@ -183,6 +183,12 @@ class Physics(NamedTuple):
     point_mass_function: Callable[[float], List[PointMass]] = None
     """ Callback function to supply point masses as a function of time """
 
+    dynamic_cooling_base: float = 0.0
+    """ Base value for the dynamic cooling coefficient """
+
+    dynamic_cooling: bool = False
+    """ Whether dynamic cooling is enabled """
+
     cooling_coefficient: float = 0.0
     """ Strength of the cooling term """
 
@@ -191,6 +197,10 @@ class Physics(NamedTuple):
 
     diagnostics: List[Diagnostic] = []
     """ Physics diagnostics to be returned when reductions are computed """
+
+    retrograde: bool = False
+    """ If disk is retrograde """
+
 
     @property
     def num_particles(self):
