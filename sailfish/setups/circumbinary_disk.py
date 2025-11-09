@@ -12,7 +12,8 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup_base import SetupBase, SetupError, param
-
+from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, gamma_law_index, cgs, ShakuraSunyaevDisk
+import numpy as np
 
 class CircumbinaryDisk(SetupBase):
     r"""
@@ -602,3 +603,414 @@ class EccentricSingleDisk(SetupBase):
             sink_radius=self.sink_radius,
             mass=1.0,
         )
+
+
+
+
+
+
+class CoolBinary(SetupBase):
+    r"""
+    A circumbinary disk setup for GW-inspiralling binaries.
+    """
+
+    eos                   = param("gamma-law", "EOS type: either isothermal or gamma-law")
+    domain_radius         = param(10.0, "half side length of the square computational domain")
+    mass_ratio            = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
+    sink_rate             = param(1.0, "component sink rate", mutable=True)
+    sink_radius           = param(0.03, "component sink radius", mutable=True)
+    softening_length      = param(0.03, "gravitational softening length", mutable=True)
+    buffer_is_enabled     = param(True, "whether the buffer zone is enabled", mutable=True)
+    sink_model            = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
+    alpha                 = param(0.1, "alpha-viscosity parameter (gamma-law)")
+    nu                    = param(0.001, "kinematic viscosity parameter (isothermal)")
+    gamma_law_index_gas   = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    constant_softening    = param(True, "whether to use constant softening (gamma-law)")
+    retrograde            = param(False, "is disk retrograde?")
+    which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
+
+    # Cooling specific parameters
+    central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
+    mach_number_a         = param(10, "Disk Mach number") 
+    target_accretion_rate = param(1., "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
+    beta                  = param(1., "Gas pressure fraction P_gas/P_tot where P_tot = P_gas+P_rad") 
+    # Inspiral specific parameters
+    init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
+    init_eccentricity     = param(0.0, "orbital eccentricity of the binary")
+    #inspiral_start_time   = param(1000., "how many orbits before inspiral starts")
+    #integration_timestep  = param(0.001, "timestep for integrating the inspiral")
+    #semi_major_axis_list  = param([]," List of all semi-major axes over the inspiral")
+    #eccentricity_list     = param([]," List of all eccentricities axes over the inspiral")
+    #inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
+    #gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ", mutable=True)
+    #Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
+    OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
+    central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
+    
+    a0 = 1.0
+    GM = 1.0
+
+    @property
+    def Gravitational_Radius_pc(self):
+        return cgs['G'] * self.central_mass_msun * cgs['msun'] / cgs['c'] / cgs['c'] / cgs['pc']
+
+    @property
+    def length_scale_pc(self):
+        r_g = self.Gravitational_Radius_pc
+        return r_g * self.init_separation_rg  
+
+    @property
+    def is_isothermal(self):
+        return self.eos == "isothermal"
+
+    @property
+    def is_gamma_law(self):
+        return self.eos == "gamma-law"
+
+    @property
+    def gamma_law_index(self):
+        #return self.beta + (4-3*self.beta)**2 * (self.gamma_law_index_gas-1) / ( self.beta + 12 * (self.gamma_law_index_gas-1) * (1-self.beta) )
+        return gamma_law_index(self.beta, self.gamma_law_index_gas)
+
+    @property
+    def SS73(self):
+        SS73_Setup = ShakuraSunyaevDisk(
+            central_mass_msun = self.central_mass_msun, 
+            length_scale_pc   = self.length_scale_pc,
+            mach_number_a     = self.mach_number_a,
+            alpha             = self.alpha,
+            gamma             = self.gamma_law_index
+            )
+        return SS73_Setup
+    
+    @property   
+    def Length_Scale_CGS(self):
+        return self.length_scale_pc * cgs['pc']
+
+    @property
+    def kb_code(self):
+        return cgs['kb'] / (self.SS73._mass * self.SS73._length**2 / self.SS73._time**2)
+
+    @property
+    def mp_code(self):
+        return cgs['mp'] / (self.SS73._mass)
+
+    @property
+    def kappa_code(self):
+        return cgs['kappa'] / (self.SS73._length**2 / self.SS73._mass)
+
+    @property
+    def Mdrop(self):
+        return self.target_accretion_rate / self.SS73._eddington_fraction
+
+    @property
+    def dynamic_cooling_base(self):
+        return self.SS73.cooling_coefficient
+    
+    @property
+    def Temperature(self):
+        return np.logspace(0,10,int(1e6))
+    
+    @property   
+    def EmissionTable(self):
+        optical_emission   = OpticalEmission(self.Temperature, self.Length_Scale_CGS)
+        infared_emission   = InfaredEmission(self.Temperature, self.Length_Scale_CGS)
+        uv_emission        = UVEmission(self.Temperature     , self.Length_Scale_CGS)
+        xray_emission      = XrayEmission(self.Temperature   , self.Length_Scale_CGS)
+        
+        return np.asarray([np.asarray(optical_emission), np.asarray(infared_emission), np.asarray(uv_emission), np.asarray(xray_emission)])
+    
+    
+
+    def primitive(self, t, coords, primitive):
+        x, y       = coords
+        r          = sqrt(x * x + y * y)
+        r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
+        phi_hat_x  = -y / max(r, 1e-12)
+        phi_hat_y  = +x / max(r, 1e-12)
+
+        sign = 1.0
+        if self.retrograde == True:
+                sign = -1.
+        if self.is_isothermal:
+            primitive[0] = 1.0
+            primitive[1] = sqrt(self.GM / r_softened) * phi_hat_x * sign
+            primitive[2] = sqrt(self.GM / r_softened) * phi_hat_y * sign
+        elif self.is_gamma_law:
+            sigma    = self.SS73.surface_density_profile(r_softened)
+            pressure = self.SS73.surface_pressure_profile(r_softened)
+            primitive[0] = sigma * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+            primitive[1] = sign  * sqrt(self.GM / r_softened) * phi_hat_x
+            primitive[2] = sign  * sqrt(self.GM / r_softened) * phi_hat_y
+            primitive[3] = pressure * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+
+        return primitive
+
+    def mesh(self, resolution):
+        return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
+
+    @property
+    def default_resolution(self):
+        return 3000
+
+    @property
+    def physics(self):
+        if self.is_isothermal:
+            return dict(
+                eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
+                mach_number=self.mach_number_a,
+                point_mass_function=self.point_masses,
+                buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=100.0,
+                buffer_onset_width=1.0,
+                cooling_coefficient=0.0,
+                constant_softening=self.constant_softening,
+                viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+                viscosity_coefficient=self.nu,
+                alpha=0.0,
+                diagnostics=self.diagnostics,
+                retrograde=self.retrograde,
+            )
+
+        elif self.is_gamma_law:
+            return dict(
+                eos_type=EquationOfState.GAMMA_LAW,
+                gamma_law_index=self.gamma_law_index,
+                point_mass_function=self.point_masses,
+                buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=1000.0,  # default value in circumbinary.py
+                buffer_onset_width=0.1,  # default value in circumbinary.py
+                dynamic_cooling_base=self.dynamic_cooling_base,
+                constant_softening=self.constant_softening,
+                viscosity_model=ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
+                viscosity_coefficient=0.0,
+                alpha=self.alpha,
+                diagnostics=self.diagnostics,
+                retrograde=self.retrograde,
+            )
+
+
+    @property
+    def diagnostics(self):
+        if self.which_diagnostics == "david":
+            return [
+                dict(quantity="time"),
+                dict(quantity="semimajor-axis"),
+                dict(quantity="eccentricity"),
+                dict(quantity="density_floor"),
+                dict(quantity="pressure_floor"),
+                dict(quantity="Accreted_energy"),
+                dict(quantity="infared"),
+                dict(quantity="optical"),
+                dict(quantity="bolometric"),
+                dict(quantity="uv"),
+                dict(quantity="xray"),
+                dict(quantity="uncounted_cells_in_lc"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass='both', gravity=True),
+                dict(quantity="torque", which_mass='both', accretion=True),
+                dict(quantity="power" ,which_mass=1,gravity=True),
+                dict(quantity="power" ,which_mass=2,gravity=True),
+                dict(quantity="power" ,which_mass=1,accretion=True),
+                dict(quantity="power" ,which_mass=2,accretion=True),
+                dict(quantity="angular_momentum"),
+                dict(quantity="max_temperature"),
+            ]
+        else:
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+            ]
+
+    from math import sqrt
+    @property
+    def solver(self):
+        if self.is_isothermal:
+            return "cbdiso_2d"
+        elif self.is_gamma_law:
+            return "cbdgam_2d"
+
+    @property
+    def boundary_condition(self):
+        return "outflow"
+
+    @property
+    def reference_time_scale(self):
+        return 2.0 * pi
+    
+
+    @property
+    def orbital_elements(self):
+        return OrbitalElements(
+            semimajor_axis=1.0,
+            total_mass=1.0,
+            mass_ratio=self.mass_ratio,
+            eccentricity=self.init_eccentricity,
+        )
+
+    def point_masses(self, time):
+        m1, m2 = self.orbital_elements.orbital_state(time)
+
+        return (
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m1._asdict(),
+            ),
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m2._asdict(),
+            ),
+        )
+    
+    #@property
+    #def Omega_0(self):
+    #    return sqrt(self.GM/self.a0/self.a0/self.a0)
+    
+    #@property
+    #def Phase_at_Start(self):
+    #    return 0. # correct this later -- only if inspiral begins at t=0, then Phase_at_Start = 0
+
+    # @property
+    # def code_start_inspiral_time(self):
+    #     return self.inspiral_start_time * self.reference_time_scale
+    
+    # @property
+    # def kick_speed(self):
+    #     c_code         = (self.init_separation_rg)**0.5
+    #     Ratio_v_over_c = (530e5) / 2.99792458e10
+    #     return Ratio_v_over_c * c_code
+
+    
+    # def check_if_inspiral(self, time):
+    #     if (time <= self.code_start_inspiral_time):
+    #         return 'Burn-in'
+    #     elif (self.code_start_inspiral_time <= time <= self.code_start_inspiral_time + self.inspiral_time_list[-1]):
+    #         return 'Inspiralling'
+    #     elif (self.inspiral_time_list[-1] + self.code_start_inspiral_time <= time):
+    #         return 'Merged'
+        
+
+    # def Orbital_Elements_During_Inspiral(self, time):
+    #     if time < self.code_start_inspiral_time:
+    #         raise ValueError("Orbital_Elements_During_Inspiral has been called before inspiral is set to occur")
+
+    #     Inspiral_t                = time - self.code_start_inspiral_time
+    #     Inspiral_Progress         = Inspiral_t/self.integration_timestep
+    #     Nstep                     = floor(Inspiral_Progress)
+    #     Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
+
+    #     self.semi_major_axis_list.append(1e-5)
+    #     self.eccentricity_list.append(1e-5)
+    #     self.Eccentric_Anomalies.append(1e-5)
+        
+    #     try:
+    #         SemiMajorAxis_N0 = self.semi_major_axis_list[Nstep]
+    #         Eccentricity_N0  = self.eccentricity_list[Nstep]
+    #         EcctricPhase_N0  = self.Eccentric_Anomalies[Nstep]
+
+    #         SemiMajorAxis_N1 = self.semi_major_axis_list[Nstep+1]
+    #         Eccentricity_N1  = self.eccentricity_list[Nstep+1]
+    #         EcctricPhase_N1  = self.Eccentric_Anomalies[Nstep+1]
+
+    #         Interpolated_SMA  = SemiMajorAxis_N0 + Position_in_Bracket_N0_N1 * (SemiMajorAxis_N1 - SemiMajorAxis_N0)
+    #         Interpolated_ECC  = Eccentricity_N0  + Position_in_Bracket_N0_N1 * (Eccentricity_N1  - Eccentricity_N0)
+    #         Interpolated_Anom = EcctricPhase_N0  + Position_in_Bracket_N0_N1 * (EcctricPhase_N1  - EcctricPhase_N0)
+
+    #         #Phase_at_Start     = self.Omega_0 * self.code_start_inspiral_time
+    #         return [Interpolated_SMA , Interpolated_ECC , Interpolated_Anom+self.Phase_at_Start]
+        
+    #     except IndexError as e:
+    #         return 'Merged'
+
+
+
+    # def orbital_elements(self, time):
+    #     flag = self.check_if_inspiral(time)
+
+    #     if flag == 'Burn-in':
+    #         return OrbitalElements(
+    #             semimajor_axis=self.a0,
+    #             total_mass=1.0,
+    #             mass_ratio=self.mass_ratio,
+    #             eccentricity=self.init_eccentricity)
+
+    #     elif flag =='Inspiralling':
+    #         Inspiralling_Orbital_Elements = self.Orbital_Elements_During_Inspiral(time)
+    #         return OrbitalElements(
+    #                 semimajor_axis=Inspiralling_Orbital_Elements[0],
+    #                 total_mass=1.0,
+    #                 mass_ratio=self.mass_ratio,
+    #                 eccentricity=Inspiralling_Orbital_Elements[1])
+        
+    #     elif flag == 'Merged':
+    #         return 'Merged'
+
+
+
+    # def point_masses(self, time):
+    #     from math import cos, sin, sqrt
+    #     m1   = 1 / (1+self.mass_ratio)
+    #     m2   = self.mass_ratio/ (1+self.mass_ratio)
+    #     a1   = m2
+    #     a2   = m1
+    #     flag = self.check_if_inspiral(time)
+
+    #     # Case 1: Still at the burn-in stage
+    #     if flag == 'Burn-in':
+    #         primary, secondary = self.orbital_elements(time).orbital_state(time)
+
+    #         return (
+    #             PointMass(
+    #                 softening_length=self.softening_length,
+    #                 sink_model=SinkModel[self.sink_model.upper()],
+    #                 sink_rate=self.sink_rate,
+    #                 sink_radius=self.sink_radius,
+    #                 **primary._asdict(),),
+    #             PointMass(
+    #                 softening_length=self.softening_length,
+    #                 sink_model=SinkModel[self.sink_model.upper()],
+    #                 sink_rate=self.sink_rate,
+    #                 sink_radius=self.sink_radius,
+    #                 **secondary._asdict(),),
+    #                 )
+
+    #     # Case 2: Inspiral has begun
+    #     elif flag == 'Inspiralling':
+    #         semi_major, eccen, phase = self.Orbital_Elements_During_Inspiral(time)
+    #         Current_Omega            = sqrt(self.GM/semi_major/semi_major/semi_major)
+    #         dphase_dt                = Current_Omega / (1-eccen * cos(phase))
+            
+    #         x1  = a1 * semi_major * cos (phase) - a1 * semi_major * eccen
+    #         y1  = a2 * semi_major * (1 - eccen**2)**0.5 * sin (phase)
+    #         x2  = -x1 * self.mass_ratio
+    #         y2  = -y1 * self.mass_ratio
+    #         vx1 = - dphase_dt * (a1 * semi_major * sin (phase))
+    #         vy1 =   dphase_dt * (a2 * semi_major * (1 - eccen**2)**0.5 * cos (phase))
+    #         vx2 = -vx1 * self.mass_ratio
+    #         vy2 = -vy1 * self.mass_ratio
+
+    #         c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length= self.softening_length,sink_model=SinkModel['TORQUE_FREE'],sink_rate=self.sink_rate,sink_radius= self.sink_radius,)
+    #         c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length= self.softening_length,sink_model=SinkModel['TORQUE_FREE'],sink_rate=self.sink_rate,sink_radius= self.sink_radius,)
+    #         return (c1,c2)
+        
+    #     # Case 3: Merger has occurred
+    #     elif flag =='Merged':
+    #         tmerge = self.inspiral_time_list[-1] + self.code_start_inspiral_time
+    #         x  = 0.0
+    #         y  = - self.kick_speed * (time - tmerge)
+    #         vx = 0.0
+    #         vy = - self.kick_speed
+
+    #         c1 = PointMass(0.97, x, y, vx, vy, softening_length=2 * self.softening_length, sink_model=SinkModel['ACCELERATION_FREE'], sink_rate=self.sink_rate, sink_radius=2 * self.sink_radius,)
+    #         return c1
+
+    # def checkpoint_diagnostics(self, time):
+    #     return dict(point_masses=self.point_masses(time))
