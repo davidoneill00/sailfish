@@ -1,4 +1,6 @@
 *.pk
+*.png
+*.pdf
 __pycache__
 /doc/source/_autosummary
 /doc/build
