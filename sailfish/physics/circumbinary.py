@@ -201,6 +201,11 @@ class Physics(NamedTuple):
     retrograde: bool = False
     """ If disk is retrograde """
 
+    disk_structure: object = None
+    """ Optional disk structure class for non-isotermal setups """
+
+    optical_depth_floor: float = None
+    """ Optional floor value for optical depth in cooling calculations """
 
     @property
     def num_particles(self):

@@ -283,4 +283,7 @@ class SetupBase(ABC):
         An example use case is to record the positions of point masses (with
         prescribed trajectory) in a gravitating hydrodynmics problem.
         """
-        return dict()
+        return dict(
+            SS73         = self.SS73,
+            point_masses = self.point_masses(time)
+            )
