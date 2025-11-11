@@ -112,6 +112,17 @@ class Patch:
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.xp.zeros(primitive.shape)
 
+            import numpy as np
+            if not np.isfinite(self.primitive1).all():
+                raise RuntimeError(
+                    f"[Patch.__init__] Non-finite primitive1 immediately after GPU upload "
+                    f"on device {self.execution_context.id}.\n"
+                    f"  CPU Sigma range: {primitive[..., 0].min()} – {primitive[..., 0].max()}\n"
+                    f"  CPU Pressure range: {primitive[..., 3].min()} – {primitive[..., 3].max()}\n"
+                    f"  GPU Sigma range: {self.primitive1[..., 0].min()} – {self.primitive1[..., 0].max()}\n"
+                    f"  GPU Pressure range: {self.primitive1[..., 3].min()} – {self.primitive1[..., 3].max()}"
+                )
+
     @property
     def cell_center_coordinate_arrays(self):
         """
@@ -172,12 +183,44 @@ class Patch:
 
     def maximum_wavespeed(self):
         with self.execution_context:
+            import numpy as np
+
+            # 1. Check primitive BEFORE calling the kernel
+            prim = self.primitive1
+            if not np.isfinite(prim).all():
+                raise RuntimeError(
+                    f"[Patch.maximum_wavespeed PRE] Non-finite values in primitive1 "
+                    f"on device {self.execution_context.id}.\n"
+                    f"  Sigma range: {prim[..., 0].min()} – {prim[..., 0].max()}\n"
+                    f"  Pressure range: {prim[..., 3].min()} – {prim[..., 3].max()}"
+                )
+
+            # 2. Call the wavespeed kernel
             self.lib.cbdgam_2d_wavespeed[self.shape](
                 self.primitive1,
                 self.wavespeeds,
                 self.physics.gamma_law_index,
             )
+
+            # 3. Check the wavespeeds themselves
+            if not np.isfinite(self.wavespeeds).all():
+                raise RuntimeError(
+                    f"[Patch.maximum_wavespeed POST] Non-finite values in wavespeeds "
+                    f"on device {self.execution_context.id}."
+                )
+
             return self.wavespeeds.max()
+
+
+
+    # def maximum_wavespeed(self):
+    #     with self.execution_context:
+    #         self.lib.cbdgam_2d_wavespeed[self.shape](
+    #             self.primitive1,
+    #             self.wavespeeds,
+    #             self.physics.gamma_law_index,
+    #         )
+    #         return self.wavespeeds.max()
 
     def recompute_conserved(self):
         with self.execution_context:
@@ -239,6 +282,17 @@ class Patch:
                 self.options.pressure_floor,
                 int(self.physics.constant_softening),
             )
+
+            import numpy as np
+            rho = self.primitive2[..., 0]
+            pre = self.primitive2[..., 3]
+            if not np.isfinite(rho).all() or not np.isfinite(pre).all():
+                raise RuntimeError(
+                    f"[Patch.advance_rk] Non-finite values in primitive2 after advance_rk "
+                    f"on device {self.execution_context.id}, time={self.time}, rk_param={rk_param}, dt={dt}.\n"
+                    f"  Sigma range: {rho.min()} – {rho.max()}\n"
+                    f"  Pressure range: {pre.min()} – {pre.max()}"
+                )
 
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
@@ -707,14 +761,24 @@ class Solver(SolverBase):
             pr = getattr(self.patches[ir], array)
             self.set_bc_patch(pl, pc, pr, i0)
 
+
     def set_bc_patch(self, pl, pc, pr, patch_index):
         ni, nj = self.mesh.shape
         ng = self.num_guard
 
         with self.patches[patch_index].execution_context:
-            # 1. write to the guard zones of pc, the internal BC
-            pc[:+ng] = pl[-2 * ng : -ng]
-            pc[-ng:] = pr[+ng : +2 * ng]
+            xp = self.xp
+
+            # --- copy left boundary from left neighbor via host ---
+            left_host  = to_host(pl[-2 * ng : -ng])    # numpy array
+            right_host = to_host(pr[+ng : +2 * ng])    # numpy array
+
+            left  = xp.asarray(left_host)   # now on this patch's device
+            right = xp.asarray(right_host)
+
+            # 1. internal BC in i-direction using the re-uploaded slices
+            pc[:+ng] = left
+            pc[-ng:] = right
 
             # 2. Set outflow BC on the left/right patch edges
             if patch_index == 0:
@@ -730,6 +794,7 @@ class Solver(SolverBase):
 
             for i in range(pc.shape[1] - ng, pc.shape[1]):
                 pc[:, i] = pc[:, -ng - 1]
+
 
     def new_iteration(self):
         for patch in self.patches:
