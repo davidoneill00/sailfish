@@ -23,24 +23,28 @@ cgs = dict(
 		blackbodyconst2 = 4.79921e-11,
 		c2h3 = 2.61463e-58,
 		h_over_kb = 4.79921e-11,
-		year=31556952
+		year=31556952,
+		ev = 1.60218e-12
 	)
 
 logger = getLogger(__name__)
 
 class ShakuraSunyaevDisk(NamedTuple):
-	"""The central mass, length scale (e.g. binary separation), alpha, and mach number (at r=3a)
+	"""The central mass, length scale (e.g. binary separation), alpha, and mach number (at r=a)
 	   for a Shakura-Sunyaev alpha-disk (Frank, King, & Raine 2002) 
-		- for numerical reasons the disk Mach number at r=3a is supplied (as oppoed to the
+		- for numerical reasons the disk Mach number at r=a is supplied (as oppoed to the
 		  accretion rate), and mdot as a fraction of the eddington rate is determined 
-		  accordingly
+		  accordingly.
+		- the target_accretion_rate is supplied to package the accretion rate remapping together
+		  with the disk structure as a single container and for clarity in checkpoints.
 	"""
 
-	central_mass_msun : float
-	length_scale_pc   : float
-	mach_number_a     : float
-	alpha             : float
-	gamma             : float
+	central_mass_msun     : float
+	length_scale_pc       : float
+	mach_number_a         : float
+	alpha                 : float
+	gamma                 : float
+	target_accretion_rate : float
 
 	# -------------------------------------------------------------------------
 	@property
@@ -101,6 +105,10 @@ class ShakuraSunyaevDisk(NamedTuple):
 		The actual accretion rate, parameterised by the Eddington rate
 		"""
 		return self._eddington_fraction * self._eddington_rate
+	
+	@property
+	def Mdrop(self):
+		return self.target_accretion_rate / self._eddington_fraction
 
 	@property
 	def _surface_density(self) -> float:
@@ -195,6 +203,27 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 	def surface_pressure_goodman(self):
 		return cgs['kb'] / cgs['mp'] * self.midplane_temperature_goodman() * self.surface_density_goodman()
+	
+	# =============================================================================
+	# ========================== Code unit conversions ============================
+	# =============================================================================
+
+	@property
+	def kb_code(self):
+		return cgs['kb'] / (self._mass * self._length**2 / self._time**2)
+
+	@property
+	def mp_code(self):
+		return cgs['mp'] / (self._mass)
+
+	@property
+	def kappa_code(self):
+		return cgs['kappa'] / (self._length**2 / self._mass)
+
+	@property   
+	def Length_Scale_CGS(self): # physical units (not code units)
+		return self.length_scale_pc * cgs['pc']
+
 
 
 def gamma_law_index(beta, gamma_law_index_gas):
@@ -225,6 +254,11 @@ nu_UV_high      = cgs['c'] / (1e-6)
 
 nu_Xray_low     = cgs['c'] / (1e-6)
 nu_Xray_high    = cgs['c'] / (1e-9)
+
+E_Xray_low   , E_Xray_high    = cgs['h'] * nu_Xray_low   , cgs['h'] * nu_Xray_high
+E_UV_low     , E_UV_high      = cgs['h'] * nu_UV_low     , cgs['h'] * nu_UV_high
+E_optical_low, E_optical_high = cgs['h'] * nu_optical_low, cgs['h'] * nu_optical_high
+E_infared_low, E_infared_high = cgs['h'] * nu_infared_low, cgs['h'] * nu_infared_high
 
 def Energy_to_wavelength(E):
 	return (cgs['h'] * cgs['c']) / E 
@@ -261,11 +295,13 @@ def UVEmission(temperature, dx):
 def XrayEmission(temperature, dx):
     return BandEmission(temperature, dx, nu_Xray_low, nu_Xray_high)
 
-
+# def PlanckSpectrum(nu, T, dx):
+#     B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2) / np.expm1(cgs['h'] * nu / (cgs['kb'] * T))
+#     return np.pi * B_nu * dx**2
 
 def PlanckSpectrum(nu, T, dx):
-	B_nu = ( 2 * cgs['h'] * nu ** 3 / cgs['c']**2 ) * 1 / (np.expm1(cgs['h'] * nu / (cgs['kb'] * T) ))
-	return np.pi * nu * B_nu * dx**2
+	B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2 ) / np.expm1(cgs['h'] * nu / (cgs['kb'] * T) )
+	return np.pi * B_nu * dx**2
 
 if __name__ == '__main__':
 	import numpy as np
