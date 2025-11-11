@@ -383,28 +383,23 @@ class Solver(SolverBase):
     def Band_Luminosity(self, patch):
         with patch.execution_context:
             dev_id = int(patch.execution_context.id)
-
             if not hasattr(self, "_EmissionTable_cache"):
                 self._EmissionTable_cache = {}
-
             if dev_id not in self._EmissionTable_cache:
                 self._EmissionTable_cache[dev_id] = [ self.xp.array(band) for band in self.setup.EmissionTable ]
                 logger.info(f"Precomputed emission tables for temperature range 10^{self.xp.round(self.xp.log10(self.setup.Temperature[0]))} K to 10^{self.xp.round(self.xp.log10(self.setup.Temperature[-1]))} K")
-            EmissionTable = self._EmissionTable_cache[dev_id]
-
             
 
-            Precomputed_T = self.setup.Temperature
-            Sigma         = patch.primitive[:, :, 0]
-            T             = self.xp.maximum((patch.primitive[:, :, 3] / Sigma) * (self.setup.mp_code / self.setup.kb_code), Precomputed_T[0])
-            optical_depth = Sigma * self.setup.kappa_code
-
-            # Note that the temperature mapping only occurs on the effective temperature, not the actual temperature. Hence
-            # the code unit optical depth is used to compute the surface temperature before the mapping is applied
+            # ============ We need to do remapping for diagnostics ============
+            Mdrop         = self.setup.SS73.Mdrop
+            Sigma         = patch.primitive[:, :, 0] * Mdrop**(3./5.)
+            Pressure      = patch.primitive[:, :, 3] * Mdrop
+            
+            Precomputed_T        = self.setup.Temperature
+            T                    = self.xp.maximum((Pressure / Sigma) * (self.setup.SS73.mp_code / self.setup.SS73.kb_code), Precomputed_T[0])
+            optical_depth        = Sigma * self.setup.SS73.kappa_code
             Teff                 = EffectiveTemperature(optical_depth, T)
-            RescaledTemp         = Teff * self.setup.Mdrop ** 0.25
-            RescaledOpticalDepth = optical_depth * self.setup.Mdrop
-            BolometricLuminosity = 2 * cgs['sigmab'] * RescaledTemp ** 4 * self.setup.Length_Scale_CGS**2
+            BolometricLuminosity = 2 * cgs['sigmab'] * Teff ** 4 * self.setup.SS73.Length_Scale_CGS**2
 
             if not patch.options.sink_emission:
                 x_, y_  = patch.cell_center_coordinate_arrays
@@ -418,13 +413,12 @@ class Solver(SolverBase):
                 r1_mask = 1
                 r2_mask = 1
 
-            transparent_mask = (RescaledOpticalDepth >= self.setup.OpticalDepthFloor)
+            transparent_mask = (optical_depth >= self.setup.OpticalDepthFloor)
             mask             = r1_mask * r2_mask * transparent_mask
             
             # numpy arrays arrays, keep them on the CPU
             dlogT            = np.diff(np.log10(Precomputed_T))[0]
-            interpolate_cpu  = np.log10(to_host(RescaledTemp) / Precomputed_T[0]) / dlogT
-            
+            interpolate_cpu  = np.log10(to_host(Teff) / Precomputed_T[0]) / dlogT
             interpolate      = self.xp.array(interpolate_cpu)
             N0               = self.xp.floor(interpolate).astype(int)
             Bracket_N0_N1    = interpolate - N0
@@ -445,17 +439,18 @@ class Solver(SolverBase):
                 )
 
 
-            if self.xp.max(RescaledTemp) > self.setup.Temperature[-1]:
-                raise IndexError(f"Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_max ={self.xp.max(RescaledTemp):0.4f} due to zero surface density")
+            if self.xp.max(Teff) > self.setup.Temperature[-1]:
+                raise IndexError(f"Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_max ={self.xp.max(Teff):0.4f} due to zero surface density")
 
-            Optical_N0 = self.xp.take(EmissionTable[0],N0, axis=0)
-            Optical_N1 = self.xp.take(EmissionTable[0],N0+1,axis=0)
-            Infared_N0 = self.xp.take(EmissionTable[1],N0  ,axis=0)
-            Infared_N1 = self.xp.take(EmissionTable[1],N0+1,axis=0)
-            UV_N0      = self.xp.take(EmissionTable[2],N0  ,axis=0)
-            UV_N1      = self.xp.take(EmissionTable[2],N0+1,axis=0)
-            Xray_N0    = self.xp.take(EmissionTable[3],N0  ,axis=0)
-            Xray_N1    = self.xp.take(EmissionTable[3],N0+1,axis=0)
+            EmissionTable = self._EmissionTable_cache[dev_id]
+            Optical_N0    = self.xp.take(EmissionTable[0],N0, axis=0)
+            Optical_N1    = self.xp.take(EmissionTable[0],N0+1,axis=0)
+            Infared_N0    = self.xp.take(EmissionTable[1],N0  ,axis=0)
+            Infared_N1    = self.xp.take(EmissionTable[1],N0+1,axis=0)
+            UV_N0         = self.xp.take(EmissionTable[2],N0  ,axis=0)
+            UV_N1         = self.xp.take(EmissionTable[2],N0+1,axis=0)
+            Xray_N0       = self.xp.take(EmissionTable[3],N0  ,axis=0)
+            Xray_N1       = self.xp.take(EmissionTable[3],N0+1,axis=0)
 
             Interpolated_Optical = interpolate_band(Optical_N0, Optical_N1, Bracket_N0_N1)
             Interpolated_Infared = interpolate_band(Infared_N0, Infared_N1, Bracket_N0_N1)
@@ -468,7 +463,7 @@ class Solver(SolverBase):
             Interpolated_Xray    *= mask
             BolometricLuminosity *= mask
             
-            return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(RescaledTemp)
+            return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(Teff)
 
     def reductions(self):
         """
