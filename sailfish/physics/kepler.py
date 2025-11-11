@@ -60,12 +60,12 @@ class PointMass(NamedTuple):
         """
         Return the gravitational acceleration due to a point mass.
         """
-        dx = x - p.position_x
-        dy = y - p.position_y
+        dx = x - self.position_x
+        dy = y - self.position_y
         r2 = dx * dx + dy * dy
         s2 = softening_length ** 2.0
-        ax = -NEWTON_G * p.mass / (r2 + s2) ** 1.5 * dx
-        ay = -NEWTON_G * p.mass / (r2 + s2) ** 1.5 * dy
+        ax = -NEWTON_G * self.mass / (r2 + s2) ** 1.5 * dx
+        ay = -NEWTON_G * self.mass / (r2 + s2) ** 1.5 * dy
         return (ax, ay)
 
     def perturb(
@@ -79,10 +79,10 @@ class PointMass(NamedTuple):
 
         dv = (dp - v dm) / m
         """
-        return p._replace(
-            mass=p.mass + dm,
-            velocity_x=velocity_x + (dpx - p.velocity_x * dm) / p.mass,
-            velocity_y=velocity_y + (dpy - p.velocity_y * dm) / p.mass,
+        return self._replace(
+            mass=self.mass + dm,
+            velocity_x=velocity_x + (dpx - self.velocity_x * dm) / self.mass,
+            velocity_y=velocity_y + (dpy - self.velocity_y * dm) / self.mass,
         )
 
 
@@ -123,14 +123,14 @@ class OrbitalState(NamedTuple):
         x2 = self[1].position_x
         y2 = self[1].position_y
         return sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-    
+
     @property
     def semimajor_axis(self) -> float:
         try:
             return  -0.5 * NEWTON_G * self[0].mass * self[1].mass / self.total_energy
         except:
-            return 0.0
-        
+            return 0.
+
     @property
     def eccentricity(self):
         """
@@ -145,13 +145,13 @@ class OrbitalState(NamedTuple):
             return ecc
         except:
             return 0.
-
+    
     @property
     def total_energy(self) -> float:
         """
         The system total energy
         """
-        return self.kinetic_energy - G * self[0].mass * self[1].mass / self.separation
+        return self.kinetic_energy - NEWTON_G * self[0].mass * self[1].mass / self.separation
 
     @property
     def kinetic_energy(self) -> float:
@@ -207,6 +207,35 @@ class OrbitalState(NamedTuple):
             self[1].perturb_mass_and_momentum(dm2, dpx2, dpy2),
         )
 
+    def true_anomaly(self, t: float) -> float:
+        from numpy import arctan2
+        """
+        This function determines the true anomaly from the
+        orbital state vector and an absolute time.
+        """
+        c1 = self[0]
+        c2 = self[1]
+
+        # component masses, total mass, and mass ratio
+        m1 = c1.mass
+        m2 = c2.mass
+        m = m1 + m2
+        q = m2 / m1
+
+        # position and velocity of the CM frame
+        x_cm = (c1.position_x * c1.mass + c2.position_x * c2.mass) / m
+        y_cm = (c1.position_y * c1.mass + c2.position_y * c2.mass) / m
+        vx_cm = (c1.velocity_x * c1.mass + c2.velocity_x * c2.mass) / m
+        vy_cm = (c1.velocity_y * c1.mass + c2.velocity_y * c2.mass) / m
+
+        # positions and velocities of the components in the CM frame
+        x1 = c1.position_x - x_cm
+        y1 = c1.position_y - y_cm
+        x2 = c2.position_x - x_cm
+        y2 = c2.position_y - y_cm
+
+        return arctan2(y1,x1)
+
     def orbital_parameters(self, t: float) -> ("OrbitalElements", "OrbitalOrientation"):
         """
         Compute the inverse Kepler two-body problem.
@@ -252,7 +281,7 @@ class OrbitalState(NamedTuple):
         l2 = m2 * r2 * vf2
         r = r1 + r2
         l = l1 + l2
-        h = t1 + t2 - G * m1 * m2 / r
+        h = t1 + t2 - NEWTON_G * m1 * m2 / r
 
         if h >= 0.0:
             raise ValueError("the orbit is unbound")
@@ -261,7 +290,7 @@ class OrbitalState(NamedTuple):
         a = -0.5 * NEWTON_G * m1 * m2 / h
         b = sqrt(-0.5 * l * l / h * (m1 + m2) / (m1 * m2))
         e = sqrt(clamp_between_zero_and_one(1.0 - b * b / a / a))
-        omega = sqrt(G * m / a / a / a)
+        omega = sqrt(NEWTON_G * m / a / a / a)
 
         # semi-major and semi-minor axes of the primary
         a1 = a * q / (1.0 + q)
@@ -294,14 +323,16 @@ class OrbitalState(NamedTuple):
         # cartesian components of semi-major axis, and the argument of periapse
         ax = (cn - e) * x1 + sn * sqrt(1.0 - e * e) * y1
         ay = (cn - e) * y1 - sn * sqrt(1.0 - e * e) * x1
-        pomega = atan2(ay, ax)
+        if e>1e-4:
+            pomega = atan2(ay, ax)
+        else:
+            pomega = 0
 
         # final result
         elements = OrbitalElements(a, m, q, e)
         orientation = OrbitalOrientation(x_cm, y_cm, vx_cm, vy_cm, pomega, tau)
 
         return elements, orientation
-        
 
 
 class OrbitalOrientation(NamedTuple):
@@ -326,6 +357,7 @@ class OrbitalElements(NamedTuple):
     total_mass: float
     mass_ratio: float
     eccentricity: float
+
 
     @property
     def omega(self) -> float:
@@ -355,7 +387,7 @@ class OrbitalElements(NamedTuple):
         m1 = m / (1.0 + q)
         m2 = m - m1
         return m1 * m2 / m * sqrt(NEWTON_G * m * a * (1.0 - e * e))
-
+    
     def orbital_state_from_eccentric_anomaly(
         self, eccentric_anomaly: float
     ) -> OrbitalState:
@@ -439,7 +471,6 @@ class OrbitalElements(NamedTuple):
         c2 = PointMass(m2, x2p, y2p, vx2p, vy2p)
 
         return OrbitalState(c1, c2)
-
 
 def solve_newton_rapheson(f, g, x: float) -> float:
     n = 0
