@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from sailfish.solvers.scdg_1d import Physics
 
-#sys.path.insert(1, ".")
-
 text_width   = 7.1
 column_width = text_width / 2.
 def configure_matplotlib():
@@ -349,9 +347,6 @@ def main_cbdiso_2d():
 
             Vx_sampled = self.Vx[xmin:xmax:Sampling, xmin:xmax:Sampling] 
             Vy_sampled = self.Vy[xmin:xmax:Sampling, xmin:xmax:Sampling]# - 0.5
-
-            #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.001, scale=200)
-            #plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.003, angles='xy', scale_units='xy', scale=200, color = 'white')
             plt.quiver(X, Y, Vx_sampled, Vy_sampled,width=0.0025, angles='xy', scale_units='xy', scale=40, color = 'darkgrey')
 
             
@@ -381,8 +376,7 @@ def main_cbdiso_2d():
 
 
             x, y        = self.Mesh()
-            #TotalSpeed = np.sqrt( self.Vx**2 + self.Vy**2 )
-            TotalSpeed = self.Vy
+            TotalSpeed  = self.Vy
 
             primary, secondary = chkpt['point_masses']
             xprim,yprim        = primary.position_x , primary.position_y
@@ -865,6 +859,12 @@ def main_cbdgam_2d():
         help="plot the sink properties",
     )
     parser.add_argument(
+        "--remap",
+        type=bool,
+        default=False,
+        help="Whether or not to rescale disk properties to target accretion rate",
+    )
+    parser.add_argument(
         "--cmap",
         default="magma",
         help="colormap name",
@@ -884,36 +884,34 @@ def main_cbdgam_2d():
         gamma          = chkpt['model_parameters']['gamma_law_index']
         Floor_Depth    = chkpt['model_parameters']['OpticalDepthFloor']
         ni, nj         = mesh.shape
-        x              = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])#[:, None]
-        y              = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])#[None, :]
+        x              = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
+        y              = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
         
         # ======== Calculate desired field ========
-        Sigma           = fields["sigma"](prim)
-        Pressure        = fields["pre"](prim)
-        Mdrop           = SS73.Mdrop
-        optical_depth   = (Sigma * SS73.kappa_code * SS73.Mdrop)  # optical_depth   = Sigma * kappa_code * Mdrop ** (7./10.) 
+        Mdrop           = (SS73.Mdrop if args.remap else 1.0)
+        Sigma           = fields["sigma"](prim) * Mdrop**(3./5.)
+        Pressure        = fields["pre"](prim)   * Mdrop
+        optical_depth   = (Sigma * SS73.kappa_code)
         mask_values     = (optical_depth > Floor_Depth)
         Midplane_T      = ((Pressure / Sigma) * (SS73.mp_code / SS73.kb_code))
-        Teff            = EffectiveTemperature(optical_depth, Midplane_T)
-        RescaledTemp    = Teff * Mdrop ** 0.25
+        Teff            = EffectiveTemperature(optical_depth, Midplane_T) 
         r_g             = cgs['G'] * chkpt['model_parameters']['central_mass_msun'] * cgs['msun'] / cgs['c'] / cgs['c']
         length_scale_pc = r_g * chkpt['model_parameters']['init_separation_rg'] / cgs['pc']
         
-
         if args.field == 't':
-            f             = RescaledTemp.T
+            f             = Teff.T
             title         = 'Effective Temperature [K] '
             cmap          = 'inferno'
             savename      = 'TemperatureMap'
 
         elif args.field == 't4':
-            f             = (RescaledTemp.T)**4
+            f             = (Teff.T)**4
             title         = 'Emitted Flux [$\mathrm{K^4}$] '
             cmap          = 'inferno'
             savename      = 'FluxMap'
 
         elif args.field == 'tau':
-            f             = optical_depth
+            f             = optical_depth.T
             title         = 'Optical Depth'
             savename      = 'TauMap'
 
@@ -924,7 +922,7 @@ def main_cbdgam_2d():
             # ===== Calculate orbital velocity ========
             X, Y               = np.meshgrid(x, y)
             primary, secondary = chkpt['point_masses']
-            xprim, yprim       = primary.position_x, primary.position_y
+            xprim, yprim       = primary.position_x  , primary.position_y
             xsec, ysec         = secondary.position_x, secondary.position_y
             R_1, R_2           = np.sqrt((X-xprim)**2 + (Y-yprim)**2), np.sqrt((X-xsec)**2  + (Y-ysec)**2)
             romega             = np.sqrt(0.5 / (R_1 + 1e-12) + 0.5 / (R_2 + 1e-12))
@@ -932,6 +930,7 @@ def main_cbdgam_2d():
             f                  = Mach.T
             title              = 'Mach Number'
             savename           = 'MachMap'
+            MachNumber_a       = chkpt["model_parameters"]["mach_number_a"] * Mdrop**(-1./5.)
 
             # ===== Plot midplane cuts ========
             plt.figure(figsize = (column_width,3*column_width/4))
@@ -939,7 +938,7 @@ def main_cbdgam_2d():
             plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), f[mesh.shape[1]//2,:], label = 'horizontal cut', c = 'tab:red', linewidth = 2)
             plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), f[:,mesh.shape[0]//2], label = 'vertical cut'  , c = 'tab:blue', linewidth = 2)
             plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), [SS73.mach_profile(np.abs(r)) for r in np.linspace(mesh.x0, mesh.x1, mesh.shape[0])], label = 'SS73 Mach Profile', linestyle = 'dashed', c = 'black')
-            plt.ylim([5,30])
+            plt.ylim([0 ,2*MachNumber_a])
             plt.legend()
             plt.savefig(args.Outputs + "/MidplaneMach.png", dpi = 300)
             
@@ -1048,7 +1047,7 @@ def main_cbdgam_2d():
         E_array                  = np.logspace(np.log10(E_low/(1000*cgs['ev'])), np.log10(E_high/(1000*cgs['ev'])), 100)
         freq_low, freq_high      = E_low / cgs['h'], E_high / cgs['h']
         freq_space               = np.logspace(np.log10(freq_low), np.log10(freq_high), len(E_array))
-        Masked_Cell_Temperatures = RescaledTemp * (mask_values)
+        Masked_Cell_Temperatures = Teff * (mask_values)
         Cell_Spectra             = np.array([PlanckSpectrum(freq, Masked_Cell_Temperatures, length_scale_pc*cgs['pc']*mesh.dx) for freq in freq_space])
         Spectrum                 = np.sum(Cell_Spectra, axis=(1,2)) 
         integral                 = np.trapz(Spectrum, x=freq_space)
