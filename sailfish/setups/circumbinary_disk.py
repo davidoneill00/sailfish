@@ -624,7 +624,7 @@ class CoolBinary(SetupBase):
     sink_model            = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
     alpha                 = param(0.1, "alpha-viscosity parameter (gamma-law)")
     nu                    = param(0.001, "kinematic viscosity parameter (isothermal)")
-    gamma_law_index_gas   = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    gamma_law_index       = param(5.0 / 3.0, "adiabatic index (gamma-law)")
     constant_softening    = param(True, "whether to use constant softening (gamma-law)")
     retrograde            = param(False, "is disk retrograde?")
     which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
@@ -633,7 +633,7 @@ class CoolBinary(SetupBase):
     central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
     mach_number_a         = param(10, "Disk Mach number") 
     target_accretion_rate = param(1., "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
-    beta                  = param(1., "Gas pressure fraction P_gas/P_tot where P_tot = P_gas+P_rad") 
+    OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
     # Inspiral specific parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
     init_eccentricity     = param(0.0, "orbital eccentricity of the binary")
@@ -644,8 +644,7 @@ class CoolBinary(SetupBase):
     #inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
     #gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ", mutable=True)
     #Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
-    OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
-    central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
+    
     
     a0 = 1.0
     GM = 1.0
@@ -657,7 +656,7 @@ class CoolBinary(SetupBase):
     @property
     def length_scale_pc(self):
         r_g = self.Gravitational_Radius_pc
-        return r_g * self.init_separation_rg  
+        return r_g * self.init_separation_rg 
 
     @property
     def is_isothermal(self):
@@ -668,40 +667,16 @@ class CoolBinary(SetupBase):
         return self.eos == "gamma-law"
 
     @property
-    def gamma_law_index(self):
-        #return self.beta + (4-3*self.beta)**2 * (self.gamma_law_index_gas-1) / ( self.beta + 12 * (self.gamma_law_index_gas-1) * (1-self.beta) )
-        return gamma_law_index(self.beta, self.gamma_law_index_gas)
-
-    @property
     def SS73(self):
         SS73_Setup = ShakuraSunyaevDisk(
-            central_mass_msun = self.central_mass_msun, 
-            length_scale_pc   = self.length_scale_pc,
-            mach_number_a     = self.mach_number_a,
-            alpha             = self.alpha,
-            gamma             = self.gamma_law_index
+            central_mass_msun     = self.central_mass_msun, 
+            length_scale_pc       = self.length_scale_pc,
+            mach_number_a         = self.mach_number_a,
+            alpha                 = self.alpha,
+            gamma                 = self.gamma_law_index,
+            target_accretion_rate = self.target_accretion_rate
             )
         return SS73_Setup
-    
-    @property   
-    def Length_Scale_CGS(self):
-        return self.length_scale_pc * cgs['pc']
-
-    @property
-    def kb_code(self):
-        return cgs['kb'] / (self.SS73._mass * self.SS73._length**2 / self.SS73._time**2)
-
-    @property
-    def mp_code(self):
-        return cgs['mp'] / (self.SS73._mass)
-
-    @property
-    def kappa_code(self):
-        return cgs['kappa'] / (self.SS73._length**2 / self.SS73._mass)
-
-    @property
-    def Mdrop(self):
-        return self.target_accretion_rate / self.SS73._eddington_fraction
 
     @property
     def dynamic_cooling_base(self):
@@ -713,11 +688,11 @@ class CoolBinary(SetupBase):
     
     @property   
     def EmissionTable(self):
-        optical_emission   = OpticalEmission(self.Temperature, self.Length_Scale_CGS)
-        infared_emission   = InfaredEmission(self.Temperature, self.Length_Scale_CGS)
-        uv_emission        = UVEmission(self.Temperature     , self.Length_Scale_CGS)
-        xray_emission      = XrayEmission(self.Temperature   , self.Length_Scale_CGS)
-        
+        optical_emission   = OpticalEmission(self.Temperature, self.SS73.Length_Scale_CGS)
+        infared_emission   = InfaredEmission(self.Temperature, self.SS73.Length_Scale_CGS)
+        uv_emission        = UVEmission(self.Temperature     , self.SS73.Length_Scale_CGS)
+        xray_emission      = XrayEmission(self.Temperature   , self.SS73.Length_Scale_CGS)
+
         return np.asarray([np.asarray(optical_emission), np.asarray(infared_emission), np.asarray(uv_emission), np.asarray(xray_emission)])
     
     
@@ -757,36 +732,38 @@ class CoolBinary(SetupBase):
     def physics(self):
         if self.is_isothermal:
             return dict(
-                eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
-                mach_number=self.mach_number_a,
-                point_mass_function=self.point_masses,
-                buffer_is_enabled=self.buffer_is_enabled,
-                buffer_driving_rate=100.0,
-                buffer_onset_width=1.0,
-                cooling_coefficient=0.0,
-                constant_softening=self.constant_softening,
-                viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
-                viscosity_coefficient=self.nu,
-                alpha=0.0,
-                diagnostics=self.diagnostics,
-                retrograde=self.retrograde,
+                eos_type              = EquationOfState.LOCALLY_ISOTHERMAL,
+                mach_number           = self.mach_number_a,
+                point_mass_function   = self.point_masses,
+                buffer_is_enabled     = self.buffer_is_enabled,
+                buffer_driving_rate   = 100.0,
+                buffer_onset_width    = 1.0,
+                cooling_coefficient   = 0.0,
+                constant_softening    = self.constant_softening,
+                viscosity_model       = ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+                viscosity_coefficient = self.nu,
+                alpha                 = 0.0,
+                diagnostics           = self.diagnostics,
+                retrograde            = self.retrograde,
             )
 
         elif self.is_gamma_law:
             return dict(
-                eos_type=EquationOfState.GAMMA_LAW,
-                gamma_law_index=self.gamma_law_index,
-                point_mass_function=self.point_masses,
-                buffer_is_enabled=self.buffer_is_enabled,
-                buffer_driving_rate=1000.0,  # default value in circumbinary.py
-                buffer_onset_width=0.1,  # default value in circumbinary.py
-                dynamic_cooling_base=self.dynamic_cooling_base,
-                constant_softening=self.constant_softening,
-                viscosity_model=ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
-                viscosity_coefficient=0.0,
-                alpha=self.alpha,
-                diagnostics=self.diagnostics,
-                retrograde=self.retrograde,
+                eos_type               = EquationOfState.GAMMA_LAW,
+                gamma_law_index        = self.gamma_law_index,
+                point_mass_function    = self.point_masses,
+                buffer_is_enabled      = self.buffer_is_enabled,
+                buffer_driving_rate    = 1000.0,  # default value in circumbinary.py
+                buffer_onset_width     = 0.1,  # default value in circumbinary.py
+                dynamic_cooling_base   = self.dynamic_cooling_base,
+                constant_softening     = self.constant_softening,
+                viscosity_model        = ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
+                viscosity_coefficient  = 0.0,
+                alpha                  = self.alpha,
+                diagnostics            = self.diagnostics,
+                retrograde             = self.retrograde,
+                disk_structure         = self.SS73,
+                optical_depth_floor    = self.OpticalDepthFloor,
             )
 
 
@@ -799,21 +776,21 @@ class CoolBinary(SetupBase):
                 dict(quantity="eccentricity"),
                 dict(quantity="density_floor"),
                 dict(quantity="pressure_floor"),
-                dict(quantity="Accreted_energy"),
+                dict(quantity="Accreted_energy", which_mass='both', accretion=True),
                 dict(quantity="infared"),
                 dict(quantity="optical"),
                 dict(quantity="bolometric"),
                 dict(quantity="uv"),
                 dict(quantity="xray"),
                 dict(quantity="uncounted_cells_in_lc"),
-                dict(quantity="mdot", which_mass=1, accretion=True),
-                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="mdot"  , which_mass=1, accretion=True),
+                dict(quantity="mdot"  , which_mass=2, accretion=True),
                 dict(quantity="torque", which_mass='both', gravity=True),
                 dict(quantity="torque", which_mass='both', accretion=True),
-                dict(quantity="power" ,which_mass=1,gravity=True),
-                dict(quantity="power" ,which_mass=2,gravity=True),
-                dict(quantity="power" ,which_mass=1,accretion=True),
-                dict(quantity="power" ,which_mass=2,accretion=True),
+                dict(quantity="power" , which_mass=1,gravity=True),
+                dict(quantity="power" , which_mass=2,gravity=True),
+                dict(quantity="power" , which_mass=1,accretion=True),
+                dict(quantity="power" , which_mass=2,accretion=True),
                 dict(quantity="angular_momentum"),
                 dict(quantity="max_temperature"),
             ]
@@ -823,8 +800,7 @@ class CoolBinary(SetupBase):
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
             ]
-
-    from math import sqrt
+        
     @property
     def solver(self):
         if self.is_isothermal:
