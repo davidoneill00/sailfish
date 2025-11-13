@@ -175,7 +175,7 @@ def write_checkpoint(number, outdir, state):
 
     with open(filename, "wb") as chkpt:
         logger.info(f"write checkpoint {chkpt.name}")
-        pickle.dump(state_checkpoint_dict, chkpt)
+        pickle.dump(state_checkpoint_dict, chkpt, protocol=5)
 
 
 def load_checkpoint(chkpt_file):
