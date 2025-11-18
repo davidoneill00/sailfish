@@ -1,63 +1,98 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import msgpack
-import os
 from pathlib import Path
 import argparse
+import pickle as pk
+import sys
+import numpy as np
+
+repo_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(repo_root))
+import subprocess
+from shutil import move, rmtree
 
 
-plt.switch_backend('agg')
+def load_checkpoint(filename, require_solver=None):
+    with open(filename, "rb") as f:
+        chkpt = pk.load(file=f)
+    return chkpt
 
 
-def file_load(indir, outdir, savefigbool, filename):
-    file_count = 0
+def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
     current_path_name = Path().resolve()
-    Path('{}/output-figures'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
-    max_file_count = 5  # Number of digits in the filename.
-
+    Path('{}/output-figures/'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
+    
     for name in sorted(Path(indir).iterdir()):
-        file_count += 1
-        chkpt = msgpack.load(open(name, 'rb'))
-        mesh = chkpt['mesh']
-        prim = np.zeros([mesh['ni'], mesh['nj'], 3])
-        for patch in chkpt['primitive_patches']:
-            i0 = patch['rect'][0]['start']
-            j0 = patch['rect'][1]['start']
-            i1 = patch['rect'][0]['end']
-            j1 = patch['rect'][1]['end']
-            local_prim = np.array(np.frombuffer(patch['data'])).reshape([i1 - i0, j1 - j0, 3])
-            prim[i0:i1, j0:j1] = local_prim
-        plt.imshow(prim[:,:,0].T, origin='lower')
-        plt.title(r"{} $\Sigma^{{1/4}}$".format(name))
+        if not quick_plotting:
+            chkpt       = load_checkpoint(name)
+            CurrentTime = chkpt["time"]/ 2 / np.pi
+            
+            plot_script = str(current_path_name / "plot.py")
+            plot_args = [
+                "python", plot_script,
+                name,
+                #"-f", str('t4'),
+                "-l",           
+                "--radius", str(4.0),
+                "--vmap",
+                "--vmin", str(-8),
+                #"--vmax", str(25),
+                "-o", "output-figures/"
+            ]
 
-        file_count_str = str(file_count)
+            subprocess.run(plot_args, check=True)
 
-        if len(file_count_str) < max_file_count:
-            file_count_str = ('0' * (max_file_count - len(file_count_str))) + file_count_str
+    # After all images are saved, rename them sequentially
+    ordered_frames = sorted(Path("output-figures").glob("DensityMap-*.png"))
+    if not ordered_frames:
+        raise FileNotFoundError("No frames were generated. Did you run with --quick_plotting?")
 
-        fname = '{}/output-figures/movie-{}.png'.format(current_path_name, file_count_str)
-        print(fname)
-        plt.savefig(fname, dpi=600)
+    for i, fname in enumerate(ordered_frames):
+        new_name = Path("output-figures") / f"DensityMap-{i:05d}.png"
+        if fname != new_name:
+            move(fname, new_name)
+    
 
-    make_movie(current_path_name, outdir, filename, max_file_count)
-
+    make_movie(current_path_name, movie_outdir, filename)
     if savefigbool is False:
-        os.system("rm -rf {}/{}".format(current_path_name, 'output-figures'))
+        rmtree(Path(current_path_name) / "output-figures", ignore_errors=True)
 
 
-def make_movie(current_path, outdir, filename, max_count):
-    Path('{}/{}'.format(current_path, outdir)).mkdir(parents=True, exist_ok=True)
-    command = "ffmpeg -start_number 1 -i {}/output-figures/movie-%0{}d.png -c:v libx264 -vb 20M -r 30 -pix_fmt yuv420p -filter:v 'setpts=2*PTS' -y {}/movie-{}.mp4".format(current_path, max_count, outdir, filename)
 
-    os.system(command)
+
+def make_movie(current_path, movie_outdir, filename):
+    output_dir  = Path(current_path) / movie_outdir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / f"{filename}.mp4"
+
+    input_pattern = Path(current_path) / "output-figures" / "DensityMap-%05d.png"
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-framerate", "30",
+        "-start_number", "0",
+        "-i", str(input_pattern),
+        # Single filter chain: make dimensions even + slow to 0.5x
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,setpts=2*PTS",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        str(output_file),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+
+
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--indir', default='', help='Checkpoint file directory.', required=True)
-    parser.add_argument('--outdir', default='movie', help='Output movie directory.')
+    parser.add_argument("indir", help='Checkpoint file directory.')
+    parser.add_argument('--outdir', '-o', default='movie', help='Output movie directory.')
     parser.add_argument('--filename', default='movie', help='Output movie name.')
-    parser.add_argument('--savefigs', default=False, help='Whether the program saves the figures used to make the movie.')
+    parser.add_argument('--savefigs', default=True, help='Whether the program saves the figures used to make the movie.')
+    parser.add_argument('--quick_plotting', '-q', action='store_true', help='Whether to run the plotting script.')
     args = parser.parse_args()
 
-    file_load(args.indir, args.outdir, args.savefigs, args.filename)
+    print(args.indir)
+
+    file_load(args.indir, args.outdir, args.savefigs, args.filename, args.quick_plotting)
