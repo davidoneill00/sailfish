@@ -453,7 +453,7 @@ class Solver(SolverBase):
             T                    = self.xp.maximum((Pressure / Sigma) * (self.setup.SS73.mp_code / self.setup.SS73.kb_code), Precomputed_T[0])
             optical_depth        = Sigma * self.setup.SS73.kappa_code
             Teff                 = EffectiveTemperature(optical_depth, T)
-            BolometricLuminosity = 2 * cgs['sigmab'] * Teff ** 4 * self.setup.SS73.Length_Scale_CGS**2
+            BolometricLuminosity = 2 * cgs['sigmab'] * Teff ** 4
 
             if not patch.options.sink_emission:
                 x_, y_  = patch.cell_center_coordinate_arrays
@@ -472,11 +472,12 @@ class Solver(SolverBase):
             
             # numpy arrays arrays, keep them on the CPU
             dlogT            = np.diff(np.log10(Precomputed_T))[0]
-            interpolate_cpu  = np.log10(to_host(Teff) / Precomputed_T[0]) / dlogT
+            Teff_clamped     = self.xp.maximum(Teff, Precomputed_T[0])
+            interpolate_cpu  = np.log10(to_host(Teff_clamped) / Precomputed_T[0]) / dlogT
             interpolate      = self.xp.array(interpolate_cpu)
             N0               = self.xp.floor(interpolate).astype(int)
             Bracket_N0_N1    = interpolate - N0
-
+            
             if float(self.xp.min(Sigma)) < 1e-30:
                 logger.error(
                     f"Lightcurve reduction failed at time={self.time:0.4f} — "
@@ -511,12 +512,12 @@ class Solver(SolverBase):
             Interpolated_UV      = interpolate_band(UV_N0     , UV_N1     , Bracket_N0_N1)
             Interpolated_Xray    = interpolate_band(Xray_N0   , Xray_N1   , Bracket_N0_N1)
 
-            Interpolated_Optical *= mask
-            Interpolated_Infared *= mask
-            Interpolated_UV      *= mask
-            Interpolated_Xray    *= mask
-            BolometricLuminosity *= mask
-            
+            Interpolated_Optical *= (mask * self.setup.SS73.Length_Scale_CGS**2)
+            Interpolated_Infared *= (mask * self.setup.SS73.Length_Scale_CGS**2)
+            Interpolated_UV      *= (mask * self.setup.SS73.Length_Scale_CGS**2)
+            Interpolated_Xray    *= (mask * self.setup.SS73.Length_Scale_CGS**2)
+            BolometricLuminosity *= (mask * self.setup.SS73.Length_Scale_CGS**2)
+
             return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(Teff)
 
     def reductions(self):

@@ -1,6 +1,7 @@
 *.pk
 *.png
 *.pdf
+*.mp4
 __pycache__
 /doc/source/_autosummary
 /doc/build
