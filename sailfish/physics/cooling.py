@@ -93,11 +93,6 @@ class ShakuraSunyaevDisk(NamedTuple):
 		"""
 		f0 = 10.2604 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**0.5 * self.gamma**(-2.)
 		return f0 * self.alpha**0.5 * self._GM**(7./4.) * self._length**(-1./4.) * self.mach_number_a**-5 / self._eddington_rate
-
-		rm = 3 * self._length
-		return (f0 * self.alpha**0.5 * self._GM**(7./4.) * self._length**(-1./4.) * self.mach_number_3a**-5
-		           / self._eddington_rate)
-
 	
 	@property
 	def _accretion_rate(self) -> float:
@@ -226,12 +221,12 @@ class ShakuraSunyaevDisk(NamedTuple):
 
 
 
-def gamma_law_index(beta, gamma_law_index_gas):
-	"""
-	For a mixture of radiation and gas, we can define beta as the ratiom between gas pressure and
-	radiation pressure. When beta = 0, gamma=4/3, whereas when beta=0, gamma=gamma_gas. 
-	"""
-	return beta + (4-3*beta)**2 * (gamma_law_index_gas-1) / ( beta + 12 * (gamma_law_index_gas-1) * (1-beta) )
+# def gamma_law_index(beta, gamma_law_index_gas):
+# 	"""
+# 	For a mixture of radiation and gas, we can define beta as the ratiom between gas pressure and
+# 	radiation pressure. When beta = 0, gamma=4/3, whereas when beta=0, gamma=gamma_gas. 
+# 	"""
+# 	return beta + (4-3*beta)**2 * (gamma_law_index_gas-1) / ( beta + 12 * (gamma_law_index_gas-1) * (1-beta) )
 
 def EffectiveTemperature(optical_depth, T):
 	"""
@@ -266,10 +261,7 @@ def Energy_to_wavelength(E):
 def Wavelength_to_energy(L):
 	return (cgs['h'] * cgs['c']) / L 
 
-ev = 1/624150907446
-
-
-def BandEmission(temperature, dx, nu_low, nu_high):
+def BandEmission(temperature, nu_low, nu_high):
     x_low  = cgs['h_over_kb'] * nu_low  / temperature
     x_high = cgs['h_over_kb'] * nu_high / temperature
     x_grid = np.logspace(np.log10(x_low), np.log10(x_high), 400)
@@ -280,28 +272,23 @@ def BandEmission(temperature, dx, nu_low, nu_high):
 
     integral  = np.trapz(integrand, x_grid, axis=0)
     prefactor = (2 * (cgs['kb'] * temperature)**4) / cgs['c2h3']
-    return np.pi * dx**2 * prefactor * integral
+    return np.pi * prefactor * integral
 
+def InfaredEmission(temperature):  
+	return BandEmission(temperature, nu_infared_low, nu_infared_high)
 
-def InfaredEmission(temperature, dx):
-    return BandEmission(temperature, dx, nu_infared_low, nu_infared_high)
+def OpticalEmission(temperature):  
+	return BandEmission(temperature, nu_optical_low, nu_optical_high)
 
-def OpticalEmission(temperature, dx):
-    return BandEmission(temperature, dx, nu_optical_low, nu_optical_high)
+def UVEmission(temperature):       
+	return BandEmission(temperature, nu_UV_low, nu_UV_high)
 
-def UVEmission(temperature, dx):
-    return BandEmission(temperature, dx, nu_UV_low, nu_UV_high)
+def XrayEmission(temperature):     
+	return BandEmission(temperature, nu_Xray_low, nu_Xray_high)
 
-def XrayEmission(temperature, dx):
-    return BandEmission(temperature, dx, nu_Xray_low, nu_Xray_high)
-
-# def PlanckSpectrum(nu, T, dx):
-#     B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2) / np.expm1(cgs['h'] * nu / (cgs['kb'] * T))
-#     return np.pi * B_nu * dx**2
-
-def PlanckSpectrum(nu, T, dx):
-	B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2 ) / np.expm1(cgs['h'] * nu / (cgs['kb'] * T) )
-	return np.pi * B_nu * dx**2
+def PlanckSpectrum(nu, T):
+    B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2) / np.expm1(cgs['h'] * nu / (cgs['kb'] * T))
+    return np.pi * B_nu
 
 if __name__ == '__main__':
 	import numpy as np
@@ -313,7 +300,8 @@ if __name__ == '__main__':
         	length_scale_pc   = 9.7e-4,
         	mach_number_a     = 21,
         	alpha             = 0.1,
-			gamma             = 5./3.
+			gamma             = 5./3.,
+			target_accretion_rate=10.0,
         )
 	print("fedd : ", ss._eddington_fraction)
 	mp_code = cgs['mp'] /  ss._mass
