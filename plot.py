@@ -781,7 +781,7 @@ def main_cbdgam_2d():
     import numpy as np
     import os
     import sailfish.physics.cooling as cooling
-    from sailfish.physics.cooling import gamma_law_index, EffectiveTemperature, cgs, ShakuraSunyaevDisk, PlanckSpectrum 
+    from sailfish.physics.cooling import EffectiveTemperature, cgs, ShakuraSunyaevDisk, PlanckSpectrum 
     from sailfish.physics.kepler import OrbitalState, PointMass
     from matplotlib.patches import Circle
     transparent_black = mcolors.LinearSegmentedColormap.from_list("transparent_black", [(0, (1, 1, 1, 0)), (1, (0, 0, 0, 1))])
@@ -972,7 +972,7 @@ def main_cbdgam_2d():
            origin="lower", 
            cmap=transparent_black,      
            extent=extent, 
-           alpha=0.5,        
+           alpha=0.25,        
            vmin=0, vmax=1
         )
     
@@ -1048,8 +1048,8 @@ def main_cbdgam_2d():
         freq_low, freq_high      = E_low / cgs['h'], E_high / cgs['h']
         freq_space               = np.logspace(np.log10(freq_low), np.log10(freq_high), len(E_array))
         Masked_Cell_Temperatures = Teff * (mask_values)
-        Cell_Spectra             = np.array([PlanckSpectrum(freq, Masked_Cell_Temperatures, length_scale_pc*cgs['pc']*mesh.dx) for freq in freq_space])
-        Spectrum                 = np.sum(Cell_Spectra, axis=(1,2)) 
+        Cell_Spectra             = np.array([PlanckSpectrum(freq, Masked_Cell_Temperatures) for freq in freq_space]) # Note: This can be large if remap is False!
+        Spectrum                 = np.sum(Cell_Spectra, axis=(1,2)) * (length_scale_pc*cgs['pc']*mesh.dx)**2
         integral                 = np.trapz(Spectrum, x=freq_space)
 
         E_Xray_low   , E_Xray_high    = cooling.E_Xray_low/(1000*cgs['ev'])   , cooling.E_Xray_high/(1000*cgs['ev'])
@@ -1092,6 +1092,7 @@ def main_cbdgam_2d():
         plt.ylabel(r'$\nu L_\nu~[\mathrm{erg~s^{-1}}]$')
         plt.title('Spectral Energy Distribution at t = %g'%(chkpt["time"]/ 2 / np.pi))
         plt.ylim([1e40, 30 * integral])
+        plt.xlim([E_infared_low, E_Xray_high])
         Savename = os.path.join(args.Outputs, f"SED_{chkpt['time'] / 2 / np.pi:.2f}.png")
         plt.savefig(Savename, dpi=400, bbox_inches='tight')
 
