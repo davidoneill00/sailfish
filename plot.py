@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from sailfish.solvers.scdg_1d import Physics
 
-text_width   = 7.1
+text_width   = 5.0
 column_width = text_width / 2.
 def configure_matplotlib():
     plt.rc('xtick' , labelsize=8)
@@ -914,10 +914,12 @@ def main_cbdgam_2d():
             f             = optical_depth.T
             title         = 'Optical Depth'
             savename      = 'TauMap'
+            cmap          = 'cividis'
 
         elif args.field == 'mach':
             cs     = (gamma * Pressure / Sigma)**0.5
             ni, nj = mesh.shape
+            cmap   = 'magma'
             
             # ===== Calculate orbital velocity ========
             X, Y               = np.meshgrid(x, y)
@@ -946,6 +948,7 @@ def main_cbdgam_2d():
             f        = fields[args.field](prim).T
             title    = 'Density'
             savename = 'DensityMap'
+            cmap   = 'magma'
 
         if args.log:
             f = np.log10(f)
@@ -958,7 +961,7 @@ def main_cbdgam_2d():
             origin="lower",
             vmin=args.vmin,
             vmax=args.vmax,
-            cmap=args.cmap,
+            cmap=cmap,
             extent=extent,
         )
         cbar = fig.colorbar(cm, ax=ax, shrink=0.805, aspect=20, pad=0.05)

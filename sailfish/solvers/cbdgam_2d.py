@@ -518,7 +518,7 @@ class Solver(SolverBase):
             Interpolated_Xray    *= (mask * self.setup.SS73.Length_Scale_CGS**2)
             BolometricLuminosity *= (mask * self.setup.SS73.Length_Scale_CGS**2)
 
-            return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(Teff)
+            return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(Teff*mask)
 
     def reductions(self):
         """
