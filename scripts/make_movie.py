@@ -21,7 +21,7 @@ def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
     Path('{}/output-figures/'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
     
     for name in sorted(Path(indir).iterdir()):
-        if not quick_plotting:
+        if not quick_plotting and name.suffix == '.pk':
             chkpt       = load_checkpoint(name)
             CurrentTime = chkpt["time"]/ 2 / np.pi
             
@@ -31,10 +31,10 @@ def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
                 name,
                 #"-f", str('t4'),
                 "-l",           
-                "--radius", str(4.0),
+                "--radius", str(1.0),
                 "--vmap",
-                "--vmin", str(-8),
-                #"--vmax", str(25),
+                "--vmin", str(-3),
+                "--vmax", str(0.5),
                 "-o", "output-figures/"
             ]
 
@@ -91,8 +91,14 @@ if __name__ == "__main__":
     parser.add_argument('--filename', default='movie', help='Output movie name.')
     parser.add_argument('--savefigs', default=True, help='Whether the program saves the figures used to make the movie.')
     parser.add_argument('--quick_plotting', '-q', action='store_true', help='Whether to run the plotting script.')
+    parser.add_argument('--clean', '-c', action='store_true', help='Whether to clean the output directory first.')
     args = parser.parse_args()
 
+    print('=== Passed input directory ===')
     print(args.indir)
 
+    if args.clean:
+        for png in Path("output-figures/").glob("*.png"):
+            png.unlink()
+        print('=== Cleaned output directory ===')
     file_load(args.indir, args.outdir, args.savefigs, args.filename, args.quick_plotting)

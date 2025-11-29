@@ -916,6 +916,22 @@ def main_cbdgam_2d():
             savename      = 'TauMap'
             cmap          = 'cividis'
 
+        elif args.field == 'dt':
+            Vx, Vy = chkpt['solution'][:, :, 1], chkpt['solution'][:, :, 2]
+            cs     = np.sqrt(gamma * Pressure / Sigma)
+            speed_x = np.maximum(np.abs(Vx - cs), np.abs(Vx + cs))
+            speed_y = np.maximum(np.abs(Vy - cs), np.abs(Vy + cs))
+            max_sp  = np.maximum(speed_x, speed_y)
+            dx      = mesh.min_spacing(CurrentTime)
+            cfl     = chkpt['cfl_number']
+            f       = (dx * cfl / max_sp).T
+            cmap    = 'magma_r'
+
+            title     = 'Time Step Map'
+            savename  = 'Timestepping'
+            dt_global = dx * cfl / np.max(max_sp)
+            print(f"Global timestep from max speed: {dt_global:.5e}")
+
         elif args.field == 'mach':
             cs     = (gamma * Pressure / Sigma)**0.5
             ni, nj = mesh.shape
@@ -1000,7 +1016,7 @@ def main_cbdgam_2d():
             plt.quiver(
                 X, Y,
                 Vx_bound[::stride_y, ::stride_x], Vy_bound[::stride_y, ::stride_x],
-                width=0.002, angles='xy', scale_units='xy', scale=3,
+                width=0.002, angles='xy', scale_units='xy', scale=20,
                 color='darkgrey', headwidth=4
             )
 
@@ -1113,6 +1129,10 @@ def main_cbdgam_2d():
             print(chkpt["model_parameters"])
             print('-------------Solver Parameters-------------')
             print(chkpt["SS73"])
+            print('---------------Point Masses---------------')
+            print(chkpt["point_masses"])
+            print('-------------Timestep dt-------------------')
+            print(chkpt['timestep_dt'])
 
 
 
