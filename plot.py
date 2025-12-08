@@ -817,6 +817,13 @@ def main_cbdgam_2d():
         help="plot spectrum",
     )
     parser.add_argument(
+        "--axisymmetry",
+        "-asym",
+        default=False,
+        action="store_true",
+        help="plot Mean Absolute Deviation of surface density",
+    )
+    parser.add_argument(
         "--vmap",
         default=False,
         action="store_true",
@@ -916,9 +923,31 @@ def main_cbdgam_2d():
             savename      = 'TauMap'
             cmap          = 'cividis'
 
+        elif args.field == 'viscosity':
+            primary, secondary = chkpt['point_masses']
+            X, Y               = np.meshgrid(x, y)
+            xprim, yprim       = primary.position_x  , primary.position_y
+            xsec, ysec         = secondary.position_x, secondary.position_y
+            R_1, R_2           = np.sqrt((X-xprim)**2 + (Y-yprim)**2), np.sqrt((X-xsec)**2  + (Y-ysec)**2)
+            omega              = np.sqrt(primary.mass / (R_1**3 + 1e-12) + secondary.mass / (R_2**3 + 1e-12))
+            cs                 = (gamma * Pressure / Sigma)**0.5
+            H                  = cs / omega
+            nu                 = chkpt['model_parameters']['alpha'] * cs * H
+            f                  = nu.T
+            title              = 'Viscosity'
+            savename           = 'ViscosityMap'
+            cmap               = 'cividis'
+
+        elif args.field == 'speed':
+            Vx, Vy  = chkpt['solution'][:, :, 1], chkpt['solution'][:, :, 2]
+            f       = np.sqrt(Vx**2 + Vy**2).T
+            title   = 'Speed Map'
+            savename= 'SpeedMap'
+            cmap    = 'inferno'
+
         elif args.field == 'dt':
-            Vx, Vy = chkpt['solution'][:, :, 1], chkpt['solution'][:, :, 2]
-            cs     = np.sqrt(gamma * Pressure / Sigma)
+            Vx, Vy  = chkpt['solution'][:, :, 1], chkpt['solution'][:, :, 2]
+            cs      = np.sqrt(gamma * Pressure / Sigma)
             speed_x = np.maximum(np.abs(Vx - cs), np.abs(Vx + cs))
             speed_y = np.maximum(np.abs(Vy - cs), np.abs(Vy + cs))
             max_sp  = np.maximum(speed_x, speed_y)
@@ -943,7 +972,7 @@ def main_cbdgam_2d():
             xprim, yprim       = primary.position_x  , primary.position_y
             xsec, ysec         = secondary.position_x, secondary.position_y
             R_1, R_2           = np.sqrt((X-xprim)**2 + (Y-yprim)**2), np.sqrt((X-xsec)**2  + (Y-ysec)**2)
-            romega             = np.sqrt(0.5 / (R_1 + 1e-12) + 0.5 / (R_2 + 1e-12))
+            romega             = np.sqrt(primary.mass / (R_1**3 + 1e-12) + secondary.mass / (R_2**3 + 1e-12))
             Mach               = romega / cs
             f                  = Mach.T
             title              = 'Mach Number'
@@ -986,14 +1015,14 @@ def main_cbdgam_2d():
         ax.set_aspect("equal")
         ax.set_title(title + r' at time $t = $ %g $\mathrm{[2\pi\Omega_0^{-1}]}$'%(np.round(chkpt["time"]/2/np.pi,3)))
 
-        ax.imshow(
-           1-mask_values.T, 
-           origin="lower", 
-           cmap=transparent_black,      
-           extent=extent, 
-           alpha=0.25,        
-           vmin=0, vmax=1
-        )
+        # ax.imshow(
+        #    1-mask_values.T, 
+        #    origin="lower", 
+        #    cmap=transparent_black,      
+        #    extent=extent, 
+        #    alpha=0.25,        
+        #    vmin=0, vmax=1
+        # )
     
         if args.radius is not None:
             ax.set_xlim(-args.radius, args.radius)
@@ -1114,6 +1143,53 @@ def main_cbdgam_2d():
         plt.xlim([E_infared_low, E_Xray_high])
         Savename = os.path.join(args.Outputs, f"SED_{chkpt['time'] / 2 / np.pi:.2f}.png")
         plt.savefig(Savename, dpi=400, bbox_inches='tight')
+
+    if args.axisymmetry:
+        Nbins         = 1000
+        RadialBins    = np.linspace(0,mesh.x1,Nbins)
+        DiskStructure = {'MeanValues': [], 'Deviation': []}
+        for r in RadialBins:
+            DiskStructure[r] = []
+
+        for i in range(0,len(x)-1):
+            for j in range(0,len(y)-1):
+                Radius        = np.sqrt(x[i]**2 + y[j]**2) 
+                closest_index = np.abs(RadialBins - Radius).argmin()
+                DiskStructure[RadialBins[closest_index]].append(Sigma[i,j])
+            
+        for r in RadialBins:
+            Sigma_bin   = DiskStructure[r]
+            Sigma_mean  = np.mean(Sigma_bin)                 # mean disk density
+            Sigma_devt  = np.abs(Sigma_bin - Sigma_mean)**2
+            Sigma_sigma = np.sqrt(np.mean(Sigma_devt))       # standard deviation of disk density
+            DiskStructure['MeanValues'].append(Sigma_mean)
+            DiskStructure['Deviation'].append(Sigma_sigma)
+            
+
+
+        
+        fig, ax = plt.subplots(2, 1, figsize=(text_width, text_width))
+        plt.subplots_adjust(hspace=0.1, wspace=0.1)
+        
+        ax[0].plot(RadialBins, DiskStructure['MeanValues']             , linewidth = 2, linestyle='solid' , label = 'Azimuthally Averaged Surface Density', c = 'firebrick')
+        ax[0].plot(RadialBins, SS73.surface_density_profile(RadialBins), linewidth = 2, linestyle='dashed', label = 'Expected Density Profile (SS73)'     , c = 'black')
+        ax[0].set_ylabel(r'$\langle \Sigma \rangle_\phi$')
+        ax[0].set_yscale('log')
+        ax[0].legend()
+
+
+        ax[1].plot(RadialBins, DiskStructure['Deviation'], linewidth = 2, label = 'Surface Density Standard Deviation', c = 'cornflowerblue')
+        ax[1].set_xlabel(r'Radius $[a_0]$')
+        ax[1].set_ylabel(r'Standard Deviation $\sigma$')
+        ax[1].set_yscale('log')
+        ax[1].legend()
+
+
+
+        Savename = os.path.join(args.Outputs, f"MeanValues_{chkpt['time'] / 2 / np.pi:.2f}.png")
+        plt.savefig(Savename, dpi=400, bbox_inches='tight')
+
+
 
 
     if args.print_model_parameters:
