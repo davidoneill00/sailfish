@@ -149,8 +149,8 @@ PRIVATE void point_mass_source_term(
     //     sink_rate = mass->sink_rate * pow(1.0 - pow(dr / r_sink, 2.0), 2.0);
     // }
 
-    double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
-    //double sink_rate = (dr < 1.02 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 200.0)) : 0.0;
+    //double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
+    double sink_rate = (dr < 1.02 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 200.0)) : 0.0;
     double fgrav_numerator = sigma * mass->mass * pow(r2 + r_soft * r_soft, -1.5);
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
@@ -168,7 +168,7 @@ PRIVATE void point_mass_source_term(
             delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vx * vx + vy * vy)) + dt * (fx * vx + fy * vy);
             break;
         }
-        case 2: // torque-free
+                case 2: // torque-free
         {
             double vx = prim[1];
             double vy = prim[2];
@@ -183,6 +183,13 @@ PRIVATE void point_mass_source_term(
             delta_cons[1] = dt * mdot * vxstar + dt * fx;
             delta_cons[2] = dt * mdot * vystar + dt * fy;
             delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vxstar * vxstar + vystar * vystar)) + dt * (fx * vx + fy * vy);
+            // NEED EXTRA TERM OR ELSE SINK DOES WORK
+            double phatx = -dy / (dr + 1e-12);
+            double phaty =  dx / (dr + 1e-12);
+            double dvphi = (vx - vx0) * phatx + (vy - vy0) * phaty;
+            // double delta =  dt * sink_rate;
+            // delta_cons[3] += dt / (delta - 1.0) * 0.5 * mdot * dvphi * dvphi;
+            delta_cons[3] -= dt * 0.5 * mdot * dvphi * dvphi;
             break;
         }
         case 3: // force-free
