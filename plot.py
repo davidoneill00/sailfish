@@ -910,18 +910,40 @@ def main_cbdgam_2d():
             title         = 'Effective Temperature [K] '
             cmap          = 'inferno'
             savename      = 'TemperatureMap'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}T_\mathrm{eff}$'
+            else:
+                ColourbarLabel = r'$T_\mathrm{eff}$'
 
-        elif args.field == 't4':
+        elif args.field == 'pressure':
+            f             = Pressure.T
+            title         = 'Pressure '
+            cmap          = 'inferno'
+            savename      = 'PressureMap'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}P$'
+            else:
+                ColourbarLabel = r'$P$'
+
+        elif args.field == 'T4':
             f             = (Teff.T)**4
             title         = 'Emitted Flux [$\mathrm{K^4}$] '
             cmap          = 'inferno'
             savename      = 'FluxMap'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}T^4$'
+            else:
+                ColourbarLabel = r'$T^4$'
 
         elif args.field == 'tau':
             f             = optical_depth.T
             title         = 'Optical Depth'
             savename      = 'TauMap'
             cmap          = 'cividis'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\tau$'
+            else:
+                ColourbarLabel = r'$\tau$'
 
         elif args.field == 'viscosity':
             primary, secondary = chkpt['point_masses']
@@ -937,6 +959,10 @@ def main_cbdgam_2d():
             title              = 'Viscosity'
             savename           = 'ViscosityMap'
             cmap               = 'cividis'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\nu$'
+            else:
+                ColourbarLabel = r'$\nu$'
 
         elif args.field == 'speed':
             Vx, Vy  = chkpt['solution'][:, :, 1], chkpt['solution'][:, :, 2]
@@ -944,6 +970,10 @@ def main_cbdgam_2d():
             title   = 'Speed Map'
             savename= 'SpeedMap'
             cmap    = 'inferno'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}|\mathbf{v}|$'
+            else:
+                ColourbarLabel = r'$|\mathbf{v}|$'
 
         elif args.field == 'dt':
             Vx, Vy  = chkpt['solution'][:, :, 1], chkpt['solution'][:, :, 2]
@@ -955,6 +985,10 @@ def main_cbdgam_2d():
             cfl     = chkpt['cfl_number']
             f       = (dx * cfl / max_sp).T
             cmap    = 'magma_r'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}dt$'
+            else:
+                ColourbarLabel = r'$dt$'
 
             title     = 'Time Step Map'
             savename  = 'Timestepping'
@@ -978,6 +1012,10 @@ def main_cbdgam_2d():
             title              = 'Mach Number'
             savename           = 'MachMap'
             MachNumber_a       = chkpt["model_parameters"]["mach_number_a"] * Mdrop**(-1./5.)
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\mathcal{M}$'
+            else:
+                ColourbarLabel = r'$\mathcal{M}$'
 
             # ===== Plot midplane cuts ========
             plt.figure(figsize = (column_width,3*column_width/4))
@@ -988,12 +1026,34 @@ def main_cbdgam_2d():
             plt.ylim([0 ,2*MachNumber_a])
             plt.legend()
             plt.savefig(args.Outputs + "/MidplaneMach.png", dpi = 300)
+
+        elif args.field == 'eccentricity':
+            X, Y     = np.meshgrid(x, y, indexing="ij")
+            Vx, Vy   = chkpt["solution"][:, :, 1], chkpt["solution"][:, :, 2]
+            r        = np.sqrt(X**2 + Y**2)
+            h        = X * Vy - Y * Vx
+            eps      = 0.5 * (Vx**2 + Vy**2) - 1 / r 
+            e        = np.sqrt(1 + 2 * eps * h**2)
+            f        = e.T
+            title    = 'Disk Eccentricity'
+            savename = 'DiskEccentricityMap'
+            cmap     = 'plasma'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}e$'
+            else:
+                ColourbarLabel = r'$e$'
             
         else:
             f        = fields[args.field](prim).T
             title    = 'Density'
             savename = 'DensityMap'
-            cmap   = 'magma'
+            cmap     = 'magma'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\Sigma$'
+            else:
+                ColourbarLabel = r'$\Sigma$'
+
+            
 
         if args.log:
             f = np.log10(f)
@@ -1010,6 +1070,7 @@ def main_cbdgam_2d():
             extent=extent,
         )
         cbar = fig.colorbar(cm, ax=ax, shrink=0.805, aspect=20, pad=0.05)
+        cbar.ax.set_title(ColourbarLabel, pad=6)          # puts text above the bar
         ax.tick_params(axis='x')
         ax.tick_params(axis='y')
         ax.set_aspect("equal")
@@ -1144,6 +1205,7 @@ def main_cbdgam_2d():
         Savename = os.path.join(args.Outputs, f"SED_{chkpt['time'] / 2 / np.pi:.2f}.png")
         plt.savefig(Savename, dpi=400, bbox_inches='tight')
 
+
     if args.axisymmetry:
         Nbins         = 1000
         RadialBins    = np.linspace(0,mesh.x1,Nbins)
@@ -1164,10 +1226,12 @@ def main_cbdgam_2d():
             Sigma_sigma = np.sqrt(np.mean(Sigma_devt))       # standard deviation of disk density
             DiskStructure['MeanValues'].append(Sigma_mean)
             DiskStructure['Deviation'].append(Sigma_sigma)
-            
 
+        ## optional -- 
+        with open('/groups/astro/davidon/sailfish/DomainSize_TimeAverages/Time.%g.pk'%(chkpt["time"]/2/np.pi), "wb") as f:
+            pk.dump(DiskStructure, f)
+        ## optional -- 
 
-        
         fig, ax = plt.subplots(2, 1, figsize=(text_width, text_width))
         plt.subplots_adjust(hspace=0.1, wspace=0.1)
         
@@ -1183,8 +1247,6 @@ def main_cbdgam_2d():
         ax[1].set_ylabel(r'Standard Deviation $\sigma$')
         ax[1].set_yscale('log')
         ax[1].legend()
-
-
 
         Savename = os.path.join(args.Outputs, f"MeanValues_{chkpt['time'] / 2 / np.pi:.2f}.png")
         plt.savefig(Savename, dpi=400, bbox_inches='tight')
