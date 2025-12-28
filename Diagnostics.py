@@ -2,26 +2,22 @@ import numpy as np
 import pickle as pk
 import matplotlib.pyplot as plt 
 import sailfish
-#import os
 import argparse
-#from sailfish.setup_base import SetupBase
 from sailfish.physics.kepler import OrbitalState, PointMass
-#from sailfish.physics.cooling import gamma_law_index#, EffectiveTemperature#, cgs
 from sailfish.physics.cooling import cgs
-
-class FixNumpyCoreUnpickler(pk.Unpickler):
-    def find_class(self, module, name):
-        if module.startswith("numpy._core"):
-            module = module.replace("numpy._core", "numpy.core")
-        return super().find_class(module, name)
+import os
+from plot import configure_matplotlib
+from scipy.signal import lombscargle
 
 
 def load_checkpoint(filename, require_solver=None):
     with open(filename, "rb") as f:
-        #chkpt = FixNumpyCoreUnpickler(f).load()
         chkpt = pk.load(f)
     return chkpt
 
+text_width   = 3.55
+column_width = text_width / 2.
+configure_matplotlib()
 
 class DavidTimeseries:
     def __init__(self, Checkpoint):
@@ -29,39 +25,48 @@ class DavidTimeseries:
         self.pointmasses = Checkpoint["point_masses"]
         self.currenttime = Checkpoint["time"] / 2 / np.pi 
         self.modelparams = Checkpoint['model_parameters'] 
+        self.SS73        = Checkpoint['SS73']
         max_length       = max(len(arr) for arr in timeseries_data)
         ts               = np.array([np.pad(arr, (0, max_length - len(arr)), 'constant') for arr in timeseries_data])
 
-        self.time            = np.array([s[ 0] for s in ts])
-        self.semimajor_axis  = np.array([s[ 1] for s in ts])
-        self.eccentricity    = np.array([s[ 2] for s in ts])
-        self.density_floor   = np.array([s[ 3] for s in ts])
-        self.pressure_floor  = np.array([s[ 4] for s in ts])
-        self.Accreted_energy = np.array([s[ 5] for s in ts])
+        if Checkpoint['driver'].model_parameters['which_diagnostics'] == 'david':
+            self.time            = np.array([s[ 0] for s in ts])
+            self.semimajor_axis  = np.array([s[ 1] for s in ts])
+            self.eccentricity    = np.array([s[ 2] for s in ts])
+            self.density_floor   = np.array([s[ 3] for s in ts])
+            self.pressure_floor  = np.array([s[ 4] for s in ts])
+            self.Accreted_energy = np.array([s[ 5] for s in ts])
 
-        self.infared         = np.array([s[ 6] for s in ts])
-        self.optical         = np.array([s[ 7] for s in ts])
-        self.bolometric      = np.array([s[ 8] for s in ts])
-        self.uv              = np.array([s[ 9] for s in ts])
-        self.xray            = np.array([s[10] for s in ts])
+            self.infared         = np.array([s[ 6] for s in ts])
+            self.optical         = np.array([s[ 7] for s in ts])
+            self.bolometric      = np.array([s[ 8] for s in ts])
+            self.uv              = np.array([s[ 9] for s in ts])
+            self.xray            = np.array([s[10] for s in ts])
 
-        self.uncounted_cells = np.array([s[11] for s in ts])
-        self.mdot1           = np.array([s[12] for s in ts])
-        self.mdot2           = np.array([s[13] for s in ts])
-        self.torque_g        = np.array([s[14] for s in ts])
-        self.torque_a        = np.array([s[15] for s in ts])
-        self.power_g1        = np.array([s[16] for s in ts])
-        self.power_g2        = np.array([s[17] for s in ts])
-        self.power_a1        = np.array([s[18] for s in ts])
-        self.power_a2        = np.array([s[19] for s in ts])
-        self.jdisk           = np.array([s[20] for s in ts])
-        self.Max_temp        = np.array([s[21] for s in ts])
+            self.uncounted_cells = np.array([s[11] for s in ts])
+            self.mdot1           = np.array([s[12] for s in ts])
+            self.mdot2           = np.array([s[13] for s in ts])
+            self.torque_g        = np.array([s[14] for s in ts])
+            self.torque_a        = np.array([s[15] for s in ts])
+            self.power_g1        = np.array([s[16] for s in ts])
+            self.power_g2        = np.array([s[17] for s in ts])
+            self.power_a1        = np.array([s[18] for s in ts])
+            self.power_a2        = np.array([s[19] for s in ts])
+            self.jdisk           = np.array([s[20] for s in ts])
+            self.Max_temp        = np.array([s[21] for s in ts])
 
+    @property
+    def power_g(self):
+        return self.power_g1 + self.power_g2
+    
+    @property
+    def power_a(self):
+        return self.power_a1 + self.power_a2
 
     @property
     def dt(self):
         return np.r_[0.0, np.diff(self.time * 2 * np.pi)]
-    
+
     @property
     def mean_anomaly(self):
         return self.time * 2 * np.pi
@@ -72,41 +77,27 @@ class DavidTimeseries:
 
     @property
     def binary_delta_j(self):
-        return (self.torque_g + self.torque_a) * self.dt
+        return self.binary_torque * self.dt
 
-    @property
-    def buffer_delta_j(self):
-        return self.torque_b * self.dt
+    #@property
+    #def buffer_delta_j(self):
+    #    return self.torque_b * self.dt
 
-    @property
-    def total_angular_momentum(self):
-    	return self.jdisk + self.binary_delta_j + self.buffer_delta_j # self.gw_delta_j
-      
-    
+    #@property
+    #def total_angular_momentum(self):
+    #    return self.jdisk + self.binary_delta_j + self.buffer_delta_j # self.gw_delta_j
+
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoints", type=str, nargs="+")
+    parser.add_argument("--Number_of_Orbits", "-N", default=20., type=float, help="Number of orbits to plot")
     parser.add_argument(
-        "--Output",
+        "--Outputs",
         "-o",
         default=None,
         type=str,
         help="Where to save the output png files",
-    )
-    parser.add_argument(
-        "--Disk_Momentum",
-        "-jd",
-        action='store_true',
-        help="whether to plot the total change in momentum timeseries",
-    )
-
-    parser.add_argument(
-        "--Torque_Components",
-        "-t",
-        action='store_true',
-        help="whether to plot the torque components from the binary",
     )
     parser.add_argument(
         "--Accretion",
@@ -115,10 +106,10 @@ if __name__ == '__main__':
         help="whether to plot the binary's accretion timeseries",
     )
     parser.add_argument(
-        "--Orbital_Elements",
-        "-OE",
+        "--Torque_Components",
+        "-t",
         action='store_true',
-        help="whether to plot the binary's changing orbital elements",
+        help="whether to plot the torque components from the binary",
     )
     parser.add_argument(
         "--Power_Components",
@@ -127,16 +118,28 @@ if __name__ == '__main__':
         help="whether to plot the power exerted on the binary",
     )
     parser.add_argument(
+        "--Lightcurves",
+        "-lc",
+        action='store_true',
+        help="whether to plot the optical and infared luminosities of the disk",
+    )
+    parser.add_argument(
+        "--Orbital_Elements",
+        "-oe",
+        action='store_true',
+        help="whether to plot the binary's changing orbital elements",
+    )
+    parser.add_argument(
         "--Accreted_Energy",
         "-ae",
         action='store_true',
         help="whether to plot the energy of the gas accreted by the binary",
     )
     parser.add_argument(
-        "--Lightcurves",
-        "-lc",
+        "--Disk_Momentum",
+        "-jd",
         action='store_true',
-        help="whether to plot the optical and infared luminosities of the disk",
+        help="whether to plot the total change in momentum timeseries",
     )
     parser.add_argument(
         "--FloorCount",
@@ -150,186 +153,243 @@ if __name__ == '__main__':
         action='store_true',
         help="whether to plot the maximum temperature of the disk",
     )
+    parser.add_argument(
+        "--Fourier",
+        "-f",
+        action='store_true',
+        help="whether to plot the Fourier transforms",
+    )
     args     = parser.parse_args()
     filename = args.checkpoints[0]
     chkpt    = load_checkpoint(filename)
     ts       = DavidTimeseries(chkpt)
 
-    #primary, secondary  = chkpt['point_masses']
+    # ======= Useful timeseries data ========
+    SS73                = ts.SS73
+    gamma               = ts.modelparams['gamma_law_index']
+    alpha               = ts.modelparams["alpha"]
+    primary, secondary  = ts.pointmasses
     OrbitalEccentricity = ts.eccentricity[-1]
-    Number_of_Orbits    = 10.
-    CurrentTime         = ts.currenttime
-    Model_Parameters    = ts.modelparams
-    Final_Orbits        = ts.time[ts.time>CurrentTime-Number_of_Orbits]
+    Final_Orbits        = ts.time[ts.time>(ts.currenttime-args.Number_of_Orbits)]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
-    hist, edges         = np.histogram(Final_Orbits, bins=int(Number_of_Orbits))
+    hist, edges         = np.histogram(Final_Orbits, bins=int(args.Number_of_Orbits))
     CumulativeTimeBin   = np.cumsum(hist)
-    alpha               = Model_Parameters["alpha"]
-    gamma               = Model_Parameters['gamma_law_index']
-    SS73                = chkpt['SS73']
-
-    if args.Max_temperature:
-        plt.figure()
-        plt.plot(ts.time[-len(Final_Orbits):], ts.Max_temp[-len(Final_Orbits):], c = 'black')
-        plt.xlabel('time')
-        plt.title('Maximum Temperature e = %g'%(np.round(OrbitalEccentricity,3)))
-        plt.yscale('log')
-        try:
-            #savename = os.getcwd() + "/MaxTemperature.%04d.png"%(CurrentTime)
-            savename = "/groups/astro/davidon/sailfish/MaxTemperature.%04d.png"%(CurrentTime)
-            plt.savefig(savename, dpi=400)
-        except:
-            plt.show()
-
     
 
-    if args.Max_temperature:
-        plt.figure()
-        plt.plot(ts.time[-len(Final_Orbits):], ts.Max_temp[-len(Final_Orbits):], c = 'black')
-        plt.xlabel('time')
-        plt.title('Maximum Temperature e = %g'%(np.round(OrbitalEccentricity,3)))
-        plt.yscale('log')
-        try:
-            savename = os.getcwd() + "/MaxTemperature.%04d.png"%(CurrentTime)
-            plt.savefig(savename, dpi=400)
-        except:
+    # ======= Plotting Blocks ========
+    if args.Accretion:
+        cs_a          = (SS73.gamma * (SS73.surface_pressure_profile(r=1) / SS73.surface_density_profile(r=1)))**0.5
+        nu_a          = SS73.alpha * cs_a**2 # in code units as omega_bin = 1 at r = 1
+        M_dot_0       = 3 * np.pi * (nu_a * SS73.surface_density_profile(r=1))
+        Accretion_1   = ts.mdot1[-len(Final_Orbits):] / M_dot_0
+        Accretion_2   = ts.mdot2[-len(Final_Orbits):] / M_dot_0
+        AccretionRate = Accretion_1 + Accretion_2
+        MeanAccretion = np.array([np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))])
+
+        if args.Fourier:
+            signal = AccretionRate - np.mean(AccretionRate)
+            freq   = np.logspace(-2, 2, 100)      # cycles / orbit
+            omega  = 2 * np.pi * freq             # rad / orbit
+            power  = lombscargle(Final_Orbits, signal, omega)
+            power /= np.var(signal)
+
+
+            fig, ax = plt.subplots(figsize=[text_width, text_width])
+            ax.plot(freq, power, c='black')
+            ax.set_xscale('log')
+            ax.set_xlabel(r'$f\ \mathrm{[cycles/orbit]}$')   # or just f
+            ax.set_ylabel('Power')
+            ax.set_xlim([4e-2, 10])
+
+            ax.set_ylabel('Power')
+            savename      = "Accretion_Fourier"
+
+        else:
+            fig, ax = plt.subplots(figsize=[2*text_width, text_width])
+            plt.plot(Final_Orbits, -AccretionRate, label='mdot',linewidth = 0.1, c = 'black')
+            plt.plot(Final_Orbits, -Accretion_1  , label='mdot1',linewidth = 0.1, c = 'blue' )
+            plt.plot(Final_Orbits, -Accretion_2  , label='mdot2',linewidth = 0.1, c = 'red'  )
+            #plt.plot(TimeBins[1:], -MeanAccretion,linewidth = 1, label = 'Binned Means', c = 'black')
+            plt.yscale('log')
+            plt.xlabel('Time [P]')
+            plt.ylabel(r'$\log_{10}\left(\dot{M}/\langle\dot{M}_0\rangle\right)$')
+            plt.title(r'Accretion Rate')
+            plt.legend(loc = 'upper right')
+            savename       = "Accretion"
+
+        if args.Outputs is None:
             plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
 
-    if args.FloorCount:
-        plt.figure()
-        plt.plot(ts.time[-len(Final_Orbits):], ts.density_floor[-len(Final_Orbits):], c = 'black', label = r'$N_\mathrm{cells}$ at density floor')     
-        plt.plot(ts.time[-len(Final_Orbits):], ts.pressure_floor[-len(Final_Orbits):], c = 'black', linestyle ='dashed', label = r'$N_\mathrm{cells}$ at pressure floor')     
-        plt.plot(ts.time[-len(Final_Orbits):], ts.uncounted_cells[-len(Final_Orbits):], c = 'red', label = r'$N_\mathrm{cells}$ ignored by lightcurves') 
-        plt.axhline(y = 4000000)
-        plt.savefig("FloorCount.%04d.png"%(CurrentTime), dpi=400)
-
-    
-    if args.Lightcurves:
-        plt.figure(figsize = (10,3))
-        plt.plot(Final_Orbits, ts.infared[-len(Final_Orbits):], c = 'red', label = 'infared luminosity')
-        plt.plot(Final_Orbits, ts.optical[-len(Final_Orbits):], c = 'blue', label = 'optical luminosity')
-        plt.plot(Final_Orbits, ts.uv[-len(Final_Orbits):],   c = 'purple', label = 'uv')
-        plt.plot(Final_Orbits, ts.xray[-len(Final_Orbits):], c = 'green', label = 'xray', linewidth = 0.6) 
-        plt.plot(Final_Orbits, ts.bolometric[-len(Final_Orbits):], c = 'black', label = 'bolometric luminosity', linewidth = 0.6)
-        plt.xlabel('time')
-        plt.title('Multiband Lightcurves')
-        plt.yscale('log')
-
-        #print(chkpt['solver_options'])
-
-        plt.title('Multiband Lightcurves e = %g'%(np.round(OrbitalEccentricity,3)))
-        #plt.ylim([1e43, 1e44])
-        plt.legend(loc='lower left')
-        savename = args.Output + "/Lightcurves.%04d.png"%(CurrentTime)
-        plt.savefig(savename, dpi=400, bbox_inches='tight')
-
-
-    if args.Disk_Momentum:
-        plt.figure()
-        plt.plot(Final_Orbits, ts.total_angular_momentum[-len(Final_Orbits):], c = 'black')
-        plt.xlabel('time')
-        plt.title('Total Angular Momentum e = %g Retrograde'%(np.round(OrbitalEccentricity,3)))
-        try:
-            savename = os.getcwd() + "/TotalAngularMomentum.%04d.png"%(CurrentTime)
-            plt.savefig(savename, dpi=400)
-        except:
-            plt.show()
 
     if args.Torque_Components:
-        #InnerClipped_Torque = ts.innertorque[-len(Final_Orbits):] / M_dot_0
-        #OuterClipped_Torque = ts.outertorque[-len(Final_Orbits):] / M_dot_0
-        Normalised_Torque_g = ts.torque_g[-len(Final_Orbits):] #/ M_dot_0
-        Normalised_Torque_a = ts.torque_a[-len(Final_Orbits):] #/ M_dot_0
+        Normalised_Torque_g = ts.torque_g[-len(Final_Orbits):] / M_dot_0
+        Normalised_Torque_a = ts.torque_a[-len(Final_Orbits):] / M_dot_0
+        Mean_Torque_g       = [np.mean(Normalised_Torque_g[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        Mean_Torque_a       = [np.mean(Normalised_Torque_a[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        Total_Torque        = Normalised_Torque_g + Normalised_Torque_a
+        savename            = "Torque"
 
-
-        plt.figure()
-        plt.xlabel('time')
-        if Model_Parameters['retrograde']:
-            plt.title(r'Torque Retrograde $\alpha = %g$'%(chkpt['model_parameters']['alpha']))
-        else:
-            plt.title(r'Torque Prograde $\alpha = %g$'%(chkpt['model_parameters']['alpha']))
-        
-        MeanTorque_g = [np.mean(Normalised_Torque_g[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
-        MeanTorque_a = [np.mean(Normalised_Torque_a[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
-
-        plt.plot(TimeBins[1:],MeanTorque_g,linewidth = 0.5, label = 'Binned Torque Mean Gravitational', c = 'black')
-        plt.plot(TimeBins[1:],MeanTorque_a,linewidth = 0.5, label = 'Binned Torque Mean Accretion',linestyle = 'dashed', c = 'black')
-        plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
-        plt.legend(loc = 'upper right')
+        fig, ax = plt.subplots(figsize=[2*text_width, text_width])
+        plt.plot(Final_Orbits, Normalised_Torque_g, c = 'blue'    , label = 'Gravitational Torque', linewidth = 0.1)
+        #plt.plot(Final_Orbits, Normalised_Torque_a, c = 'darkblue', label = 'Accretion Torque'    , linewidth = 0.1) 
+        plt.plot(TimeBins[1:], Mean_Torque_g, linewidth = 0.5, label = 'Gravitational Mean ', c = 'black')
+        #plt.plot(TimeBins[1:], Mean_Torque_a, linewidth = 0.5, label = 'Accretion Mean'     , c = 'black')
+        #plt.plot(Final_Orbits, Total_Torque , linewidth = 0.5, label = 'Total Torque'       , c = 'black')
+        plt.xlabel('Time [P]')
         plt.ylabel(r'$\tau/\dot{M}_0$')
-        plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
-        try:
-            savename = args.Output +  "/MeanTorque.%04d.png"%(CurrentTime)
-            plt.savefig(savename, dpi=400)
-        except:
+        plt.legend(loc = 'upper right')
+
+        if args.Outputs is None:
             plt.show()
-
-
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
 
 
     if args.Power_Components:
-        Normalised_Power    = (ts.power_g1[-len(Final_Orbits):]+ts.power_g2[-len(Final_Orbits):]) #/ M_dot_0
-        #InnerClipped_Power  = (ts.innerpower_1[-len(Final_Orbits):]+ts.innerpower_2[-len(Final_Orbits):])# / M_dot_0
-        #OuterClipped_Power  = (ts.outerpower_1[-len(Final_Orbits):]+ts.outerpower_2[-len(Final_Orbits):]) #/ M_dot_0
-        
-        plt.figure()
-        plt.xlabel('time')
-        #if Model_Parameters['retrograde']:
-        #    plt.title(r'Power Retrograde $\nu = %g$'%(viscosity))
-        #else:
-        #    plt.title(r'Power Prograde $\nu = %g$'%(viscosity))
+        Normalised_Power_g = ts.power_g[-len(Final_Orbits):] / M_dot_0
+        Normalised_Power_a = ts.power_a[-len(Final_Orbits):] / M_dot_0
+        Mean_Power_g       = [np.mean(Normalised_Power_g[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        Mean_Power_a       = [np.mean(Normalised_Power_a[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        savename           = "Power"
 
-        MeanPower = [np.mean(Normalised_Power[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
-        
-        plt.plot(Final_Orbits,Normalised_Power, c = 'Purple', label = 'Power', linewidth = 0.1,)
-        plt.plot(TimeBins[1:],MeanPower,linewidth = 0.5, label = 'Binned Means', c = 'black')
-        plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
-        plt.legend(loc = 'upper right')
-        plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
-        plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
-        try:
-            savename = args.Output +  "/MeanPower.%04d.png"%(CurrentTime)
-            plt.savefig(savename, dpi=400)
-        except:
-            plt.show()
-
-
-
-
-    if args.Accretion:
-        plt.figure()
-        AccretionRate = (ts.mdot1[-len(Final_Orbits):]+ts.mdot2[-len(Final_Orbits):])
-        plt.plot(Final_Orbits, AccretionRate,label='mdot',linewidth = 0.1, c = 'red')
-
+        fig, ax = plt.subplots(figsize=[2*text_width, text_width])
+        plt.plot(Final_Orbits, Normalised_Power_g, c = 'Purple'    , label = 'Gravitational Power', linewidth = 0.1)
+        #plt.plot(Final_Orbits, Normalised_Power_a, c = 'darkblue', label = 'Accretion Power'    , linewidth = 0.1) 
+        plt.plot(Final_Orbits, Mean_Power_g,linewidth = 0.5, label = 'Gravitational Mean ', c = 'black')
+        #plt.plot(Final_Orbits, Mean_Power_a,linewidth = 0.5, label = 'Accretion Mean'     , c = 'black', linestyle = 'dashed')
+        #plt.plot(Final_Orbits, Total_Power, linewidth = 0.5, label = 'Total Power'        , c = 'black')
         plt.xlabel('Time [P]')
-        plt.ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
-        plt.title(r'Accretion Rate e = %g, $\alpha=%g$'%(np.round(OrbitalEccentricity,3),alpha))
-        #plt.axvline(x = 1000., linestyle = 'dashed', label ='Inspiral start', c = 'gray')
-
-        plt.xlim([CurrentTime-Number_of_Orbits,CurrentTime])
-        MeanAccretion = np.array([np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))])#/M_dot_0
-
-        plt.plot(TimeBins[1:],MeanAccretion,linewidth = 0.5, label = 'Binned Means', c = 'black')
-        #plt.ylim([-1e-22, 1e-22])
+        plt.ylabel(r'$\mathcal{P}/\dot{M}_0$')
         plt.legend(loc = 'upper right')
-        try:
-            savename = args.Output +  "/AccretionRate.%04d_nu%g.png"%(CurrentTime,alpha)
-            plt.savefig(savename, dpi=400)
-        except:
-            plt.show()
 
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+
+    if args.Lightcurves:
+        fig, ax = plt.subplots(figsize=[2*text_width, text_width])
+        plt.plot(Final_Orbits, ts.infared[-len(Final_Orbits):]   , c = 'red'   , label = 'infared luminosity')
+        plt.plot(Final_Orbits, ts.optical[-len(Final_Orbits):]   , c = 'blue'  , label = 'optical luminosity')
+        plt.plot(Final_Orbits, ts.uv[-len(Final_Orbits):]        , c = 'purple', label = 'uv')
+        plt.plot(Final_Orbits, ts.xray[-len(Final_Orbits):]      , c = 'green' , label = 'xray') 
+        plt.plot(Final_Orbits, ts.bolometric[-len(Final_Orbits):], c = 'black' , label = 'bolometric luminosity')
+        
+        plt.xlabel('Time [P]')
+        plt.title('Electromagnetic Emission from Disk')
+        plt.yscale('log')
+        plt.ylim([1e40, 1e48])
+        plt.legend(loc='lower left')
+        savename = "Lightcurves"
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
 
 
     if args.Orbital_Elements:
-        plt.figure()
-        plt.plot(ts.time,ts.semimajor_axis, label = 'SemiMajor Axis')
-        plt.plot(ts.time,ts.eccentricity, label = 'Eccentricity')
-        plt.title(r'Orbital Elements $e_0 =$%g Retrograde'%(np.round(OrbitalEccentricity,3)))
-        plt.xlabel('Time')
-        plt.ylabel('Orbital Elements')
-        plt.legend()
-        try:
-            savename = args.Output +  "/OrbitalElements.%04d.png"%(CurrentTime)
-            plt.savefig(savename, dpi=400)
-        except:
+        SemiMajorAxis = ts.semimajor_axis[-len(Final_Orbits):]
+        Eccentricity  = ts.eccentricity[-len(Final_Orbits):]
+        savename      = "OrbitalElements"
+
+        fig, ax = plt.subplots(figsize=[2*text_width, text_width])
+        plt.plot(Final_Orbits,SemiMajorAxis, label = 'Semi-major axis')
+        plt.plot(Final_Orbits,Eccentricity , label = 'Eccentricity')
+        plt.xlabel('Time [P]')
+        plt.title('Orbital Elements')
+        #plt.yscale('log')
+        plt.legend(loc='lower left')
+        
+        if args.Outputs is None:
             plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+
+    if args.Disk_Momentum:
+        DiskMomentum = ts.jdisk[-len(Final_Orbits):]
+
+        fig, ax = plt.subplots(figsize=[2*text_width, text_width])
+        plt.plot(Final_Orbits, DiskMomentum, c = 'black')
+        plt.xlabel('Time [P]')
+        plt.title('Disk Angular Momentum')
+        plt.legend(loc='lower left')
+        savename = "JDisk"
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+
+    if args.FloorCount:
+        DensityFloor   = ts.density_floor[-len(Final_Orbits):]
+        PressureFloor  = ts.pressure_floor[-len(Final_Orbits):] 
+        UncountedCells = ts.uncounted_cells[-len(Final_Orbits):]
+
+        fig, ax = plt.subplots(figsize=[text_width, text_width])
+        plt.plot(Final_Orbits, DensityFloor  , c = 'black', label = r'$N_\mathrm{cells}$ at density floor'      , linewidth = 0.2)     
+        plt.plot(Final_Orbits, PressureFloor , c = 'black', label = r'$N_\mathrm{cells}$ at pressure floor'     , linewidth = 0.2, linestyle ='dashed')     
+        plt.plot(Final_Orbits, UncountedCells, c = 'red'  , label = r'$N_\mathrm{cells}$ ignored by lightcurves', linewidth = 0.2) 
+        plt.legend()
+        plt.yscale('log')
+        plt.xlabel('Time')
+        plt.title('Floor Count')
+        savename = "FloorCount"
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+
+    if args.Max_temperature:
+        MaxTemp = ts.Max_temp[-len(Final_Orbits):]
+
+        fig, ax = plt.subplots(figsize=[text_width, text_width])
+        plt.plot(Final_Orbits, MaxTemp, c = 'black')
+        plt.xlabel('Time')
+        plt.title('Maximum Temperature')
+        plt.yscale('log')
+        savename = "MaxTemperature"
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
