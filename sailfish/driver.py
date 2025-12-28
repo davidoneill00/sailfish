@@ -391,7 +391,7 @@ def simulate(driver):
             logger.warning("older checkpoint version: no timeseries")
 
         for event in driver.events:
-            if event not in event_states:
+            if event not in event_states or event =='timeseries':
                 event_states[event] = RecurringEvent()
 
     else:

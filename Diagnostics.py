@@ -54,6 +54,8 @@ class DavidTimeseries:
             self.power_a2        = np.array([s[19] for s in ts])
             self.jdisk           = np.array([s[20] for s in ts])
             self.Max_temp        = np.array([s[21] for s in ts])
+            self.torque_b        = np.array([s[22] for s in ts])
+            self.inflow_b        = np.array([s[23] for s in ts])
 
     @property
     def power_g(self):
@@ -79,9 +81,13 @@ class DavidTimeseries:
     def binary_delta_j(self):
         return self.binary_torque * self.dt
 
-    #@property
-    #def buffer_delta_j(self):
-    #    return self.torque_b * self.dt
+    @property
+    def buffer_torque(self):
+        return self.torque_b
+    
+    @property
+    def buffer_inflow(self):
+        return self.inflow_b
 
     #@property
     #def total_angular_momentum(self):
@@ -142,6 +148,12 @@ if __name__ == '__main__':
         help="whether to plot the total change in momentum timeseries",
     )
     parser.add_argument(
+        "--Buffer_Torque",
+        "-b",
+        action='store_true',
+        help="whether to plot the buffer torque",
+    )
+    parser.add_argument(
         "--FloorCount",
         "-fc",
         action='store_true',
@@ -185,6 +197,8 @@ if __name__ == '__main__':
         Accretion_2   = ts.mdot2[-len(Final_Orbits):] / M_dot_0
         AccretionRate = Accretion_1 + Accretion_2
         MeanAccretion = np.array([np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))])
+        Inflow        = ts.buffer_inflow[-len(Final_Orbits):] / M_dot_0
+        print(np.max(np.abs(ts.buffer_inflow[-len(Final_Orbits):])))
 
         if args.Fourier:
             signal = AccretionRate - np.mean(AccretionRate)
@@ -206,9 +220,10 @@ if __name__ == '__main__':
 
         else:
             fig, ax = plt.subplots(figsize=[2*text_width, text_width])
-            plt.plot(Final_Orbits, -AccretionRate, label='mdot',linewidth = 0.1, c = 'black')
-            plt.plot(Final_Orbits, -Accretion_1  , label='mdot1',linewidth = 0.1, c = 'blue' )
-            plt.plot(Final_Orbits, -Accretion_2  , label='mdot2',linewidth = 0.1, c = 'red'  )
+            plt.plot(Final_Orbits, Inflow,         label='inflow', linewidth = 1, c = 'green')
+            plt.plot(Final_Orbits, -AccretionRate, label='mdot'  , linewidth = 0.1, c = 'black')
+            plt.plot(Final_Orbits, -Accretion_1  , label='mdot1' , linewidth = 0.1, c = 'blue' )
+            plt.plot(Final_Orbits, -Accretion_2  , label='mdot2' , linewidth = 0.1, c = 'red'  )
             #plt.plot(TimeBins[1:], -MeanAccretion,linewidth = 1, label = 'Binned Means', c = 'black')
             plt.yscale('log')
             plt.xlabel('Time [P]')
@@ -243,6 +258,29 @@ if __name__ == '__main__':
         #plt.plot(Final_Orbits, Total_Torque , linewidth = 0.5, label = 'Total Torque'       , c = 'black')
         plt.xlabel('Time [P]')
         plt.ylabel(r'$\tau/\dot{M}_0$')
+        plt.legend(loc = 'upper right')
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+
+
+    if args.Buffer_Torque:
+        Normalised_Torque = ts.torque_b[-len(Final_Orbits):] / M_dot_0
+        Mean_Torque_b     = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
+        savename          = "BufferTorque"
+
+        fig, ax = plt.subplots(figsize=[2*text_width, text_width])
+        plt.plot(Final_Orbits, Normalised_Torque, c = 'blue', label = 'Buffer Torque', linewidth = 0.1)
+        plt.plot(TimeBins[1:], Mean_Torque_b    , c = 'black', label = 'Binned Means ', linewidth = 0.5 )
+        plt.xlabel('Time [P]')
+        plt.ylabel(r'$\tau_\mathrm{b}/\dot{M}_0$')
         plt.legend(loc = 'upper right')
 
         if args.Outputs is None:
