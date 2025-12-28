@@ -180,6 +180,44 @@ class Patch:
                 self.physics.gamma_law_index,
             )
             return cons_rate[ng:-ng, ng:-ng]
+        
+
+    def buffer_source_term(self):
+        """
+        (Adopted from C. Tiede for isothermal)
+        Return an array of the rates of conserved quantities, resulting from
+        the application of the buffer source terms near the outer boundary
+        """
+        ng = 2
+        m1, m2 = self.physics.point_masses(self.time)
+        buffer_central_mass = m1.mass + m2.mass
+
+        with self.execution_context:
+            conserved1 = self.xp.zeros_like(self.conserved0)
+            cons_rate  = self.xp.zeros_like(self.conserved0)
+
+            self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
+                self.primitive1,
+                conserved1,
+            )
+
+            self.lib.cbdgam_2d_buffer_source_term[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.physics.gamma_law_index,
+                self.buffer_surface_density,
+                buffer_central_mass,
+                self.physics.buffer_driving_rate,
+                self.buffer_outer_radius,
+                self.physics.buffer_onset_width,
+                int(self.physics.buffer_is_enabled),
+                int(self.retrograde),
+                conserved1,
+                #cons_rate,
+            )
+        return cons_rate[ng:-ng, ng:-ng]
 
     def maximum_wavespeed(self):
         with self.execution_context:
@@ -493,10 +531,6 @@ class Solver(SolverBase):
                     0.0
                 )
 
-
-            if self.xp.max(Teff) > self.setup.Temperature[-1]:
-                raise IndexError(f"Interpolated temperature range limit needs to be higher in cbdgam_2d.py. Current value is logT_max ={self.xp.max(Teff):0.4f} due to zero surface density")
-
             EmissionTable = self._EmissionTable_cache[dev_id]
             Optical_N0    = self.xp.take(EmissionTable[0],N0, axis=0)
             Optical_N1    = self.xp.take(EmissionTable[0],N0+1,axis=0)
@@ -529,7 +563,6 @@ class Solver(SolverBase):
         da = self.mesh.dx * self.mesh.dy
         ng = self.num_guard
         diagnostics = self._physics.diagnostics
-
         gpu_results = []
 
         # Helper to make sure we can always stack safely
@@ -547,6 +580,8 @@ class Solver(SolverBase):
                     udots_cache[key] = [p.point_mass_source_term(which_mass, accretion=True) for p in self.patches]
                 elif term == "grv":
                     udots_cache[key] = [p.point_mass_source_term(which_mass, gravity=True) for p in self.patches]
+                elif term == "buf":
+                    udots_cache[key] = [p.buffer_source_term() for p in self.patches]
                 else:
                     raise ValueError("Invalid source term")
             return udots_cache[key]
@@ -560,7 +595,7 @@ class Solver(SolverBase):
         m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y)
         orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
 
-        # Utility for hydrodynamic quantities (reusing your original get_field logic)
+        # Utility for hydrodynamic quantities
         def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False):
             x, y, r = patch.coordinate_array_x, patch.coordinate_array_y, patch.r
 
@@ -595,19 +630,20 @@ class Solver(SolverBase):
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
 
-            if quantity == "angular_momentum":
+            if quantity == "total_angular_momentum":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
                 vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
                 vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
                 return sigma * (x * vy - y * vx)
 
+            # generalise this to mass 0, 1 and 2? ie. outer buffer and two inner buffers?
             if quantity == "buffer_torque":
-                fx = get_field(patch, 1, cut, mass, False, False, buffer=True)
-                fy = get_field(patch, 2, cut, mass, False, False, buffer=True)
+                fx = get_field(patch, 1, cut, mass=0, gravity=False, accretion=False, buffer=True)
+                fy = get_field(patch, 2, cut, mass=0, gravity=False, accretion=False, buffer=True)
                 return x * fy - y * fx
 
             if quantity == "buffer_mass_rate":
-                return get_field(patch, 0, cut, mass, False, False, buffer=True)
+                return get_field(patch, 0, cut, mass=0, gravity=False,  accretion=False, buffer=True)
 
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
@@ -641,6 +677,9 @@ class Solver(SolverBase):
                 f = udots1[i][..., q]
             elif mass == 2:
                 f = udots2[i][..., q]
+            elif mass == 0:
+                udots = get_udots(0, "buf")
+                f = udots[i][..., q]
             else:
                 raise ValueError("Invalid mass specifier")
 

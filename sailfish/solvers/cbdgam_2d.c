@@ -71,7 +71,6 @@ struct KeplerianBuffer {
     int is_retrograde;
 };
 
-
 // ============================ GRAVITY =======================================
 // ============================================================================
 PRIVATE double disk_height(
@@ -150,7 +149,8 @@ PRIVATE void point_mass_source_term(
     // }
 
     //double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
-    double sink_rate = (dr < 1.02 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 200.0)) : 0.0;
+    double sink_rate = (dr < 1.5 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 8.0)) : 0.0;
+    sink_rate = min2(sink_rate, 0.9 / dt); // prevent removing more mass than is present in the cell during this step
     double fgrav_numerator = sigma * mass->mass * pow(r2 + r_soft * r_soft, -1.5);
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
@@ -706,6 +706,54 @@ PUBLIC void cbdgam_2d_advance_rk(
 
         double *pout = &primitive_wr[ncc];
         conserved_to_primitive(ucc, pout, &mass_list, xc, yc, velocity_ceiling, density_floor, pressure_floor, gamma_law_index);
+    }
+}
+
+// Adopted from C. Tiede buffer source term for isothermal
+PUBLIC void cbdgam_2d_buffer_source_term(
+    int ni,
+    int nj,
+    double patch_xl, // mesh
+    double patch_xr,
+    double patch_yl,
+    double patch_yr,
+    double gamma_law_index,
+    double buffer_surface_density,
+    double buffer_central_mass,
+    double buffer_driving_rate,
+    double buffer_outer_radius,
+    double buffer_onset_width,
+    int    buffer_is_enabled,
+    int    retro,
+    double *conserved // :: $.shape == (ni + 4, nj + 4, 4)
+)
+    //double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 4)
+{
+    struct KeplerianBuffer buffer = {
+        buffer_surface_density,      
+        buffer_central_mass,
+        buffer_driving_rate,
+        buffer_outer_radius,
+        buffer_onset_width,
+        buffer_is_enabled,
+    };
+
+    int ng = 2; // number of guard zones
+    int si = NCONS * (nj + 2 * ng);
+    int sj = NCONS;
+
+    double dx = (patch_xr - patch_xl) / ni;
+    double dy = (patch_yr - patch_yl) / nj;
+
+    FOR_EACH_2D(ni, nj)
+    {
+        int ncc = (i + ng) * si + (j + ng) * sj;
+
+        double xc = patch_xl + (i + 0.5) * dx;
+        double yc = patch_yl + (j + 0.5) * dy;
+        double *uc = &conserved[ncc];
+        //double *du = &cons_rate[ncc];
+        buffer_source_term(&buffer, xc, yc, 1.0, uc, gamma_law_index);
     }
 }
 

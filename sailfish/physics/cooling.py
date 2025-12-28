@@ -220,7 +220,6 @@ class ShakuraSunyaevDisk(NamedTuple):
 		return self.length_scale_pc * cgs['pc']
 
 
-
 # def gamma_law_index(beta, gamma_law_index_gas):
 # 	"""
 # 	For a mixture of radiation and gas, we can define beta as the ratiom between gas pressure and

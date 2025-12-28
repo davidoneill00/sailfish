@@ -31,8 +31,11 @@ class Diagnostic(NamedTuple):
     accretion: bool = False
     """ Whether to include the accretion term (if applicable) """
 
+    buffer: bool = False
+    """ Whether to include the buffer source term (if applicable)"""
+
     which_mass: Union[int, str] = None
-    """ 1, 2, or 'both' """
+    """ 0, 1, 2, or 'both' """
 
     radial_cut: tuple = None
     """ None is ok, or a radial annulus to include e.g. (1.0, 2.0) """
