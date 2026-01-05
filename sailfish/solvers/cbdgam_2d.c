@@ -67,6 +67,10 @@ struct KeplerianBuffer {
     double driving_rate;
     double outer_radius;
     double onset_width;
+    //double xframe;
+    //double yframe;
+    //double vxframe;
+    //double vyframe;
     int is_enabled;
     int is_retrograde;
 };
@@ -252,10 +256,19 @@ PRIVATE void buffer_source_term(
     double yc,
     double dt,
     double *cons,
-    double gamma_law_index)
+    double gamma_law_index
+    )
 {
     if (buffer->is_enabled)
     {
+        //double xframe  = buffer->xframe;
+        //double yframe  = buffer->yframe;
+        //double vxframe = buffer->vxframe;
+        //double vyframe = buffer->vyframe;
+        //double xr = xc - xframe;
+        //double yr = yc - yframe;
+        //double rr = sqrt(xr * xr + yr * yr);
+
         double rc = sqrt(xc * xc + yc * yc);
         double surface_density = buffer->surface_density;
         double surface_pressure = buffer->surface_pressure;
@@ -719,23 +732,26 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     double patch_yr,
     double gamma_law_index,
     double buffer_surface_density,
+    double buffer_surface_pressure,
     double buffer_central_mass,
     double buffer_driving_rate,
     double buffer_outer_radius,
     double buffer_onset_width,
     int    buffer_is_enabled,
     int    retro,
-    double *conserved // :: $.shape == (ni + 4, nj + 4, 4)
+    double *conserved, // :: $.shape == (ni + 4, nj + 4, 4)
+    double *cons_rate // :: $.shape == (ni + 4, nj + 4, 4)
 )
-    //double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 4)
 {
     struct KeplerianBuffer buffer = {
-        buffer_surface_density,      
+        buffer_surface_density,
+        buffer_surface_pressure,     
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
         buffer_is_enabled,
+        retro
     };
 
     int ng = 2; // number of guard zones
@@ -752,8 +768,20 @@ PUBLIC void cbdgam_2d_buffer_source_term(
         double xc = patch_xl + (i + 0.5) * dx;
         double yc = patch_yl + (j + 0.5) * dy;
         double *uc = &conserved[ncc];
-        //double *du = &cons_rate[ncc];
+        double *du = &cons_rate[ncc];
+
+        double uc_before[NCONS];
+        for (int q = 0; q < NCONS; ++q)
+        {
+            uc_before[q] = uc[q];
+        }
+
         buffer_source_term(&buffer, xc, yc, 1.0, uc, gamma_law_index);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            du[q] = uc[q] - uc_before[q];
+        }
     }
 }
 

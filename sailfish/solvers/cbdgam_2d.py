@@ -199,6 +199,7 @@ class Patch:
             self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
                 self.primitive1,
                 conserved1,
+                self.physics.gamma_law_index
             )
 
             self.lib.cbdgam_2d_buffer_source_term[self.shape](
@@ -208,6 +209,7 @@ class Patch:
                 self.yr,
                 self.physics.gamma_law_index,
                 self.buffer_surface_density,
+                self.buffer_surface_pressure,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
@@ -215,7 +217,7 @@ class Patch:
                 int(self.physics.buffer_is_enabled),
                 int(self.retrograde),
                 conserved1,
-                #cons_rate,
+                cons_rate,
             )
         return cons_rate[ng:-ng, ng:-ng]
 
