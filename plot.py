@@ -978,7 +978,6 @@ def main_cbdgam_2d():
 
         elif args.field == 'speed':
             speed   = np.sqrt(Vx**2 + Vy**2)
-            print('Max speed is', np.max(speed))
             f       = speed
             title   = 'Speed Map'
             savename= 'SpeedMap'
@@ -1213,6 +1212,7 @@ def main_cbdgam_2d():
         r_secondary        = [X  - secondary.position_x, Y  - secondary.position_y]
         V_primary          = [Vx - primary.velocity_x  , Vy - primary.velocity_y  ]
         V_secondary        = [Vx - secondary.velocity_x, Vy - secondary.velocity_y]
+        cs                 = (gamma * Pressure / Sigma)**0.5
 
         primary_speed , secondary_speed  = np.sqrt(V_primary[0]**2 + V_primary[1]**2), np.sqrt(V_secondary[0]**2 + V_secondary[1]**2)
         primary_radius, secondary_radius = np.sqrt(r_primary[0]**2 + r_primary[1]**2), np.sqrt(r_secondary[0]**2 + r_secondary[1]**2)
@@ -1223,14 +1223,18 @@ def main_cbdgam_2d():
         ey_primary        = (v_dot_v_primary * r_primary[1] - v_dot_r_primary * V_primary[1]) / GMu_primary - r_primary[1] / primary_radius
         omega_primary     = np.arctan2(ey_primary, ex_primary)
         e_primary         = np.sqrt(ex_primary**2 + ey_primary**2)
+        mach_primary      = np.sqrt(v_dot_v_primary)/cs
+
         v_dot_v_secondary = secondary_speed**2
         v_dot_r_secondary = V_secondary[0] * r_secondary[0] + V_secondary[1] * r_secondary[1]
         ex_secondary      = (v_dot_v_secondary * r_secondary[0] - v_dot_r_secondary * V_secondary[0]) / GMu_secondary - r_secondary[0] / secondary_radius
         ey_secondary      = (v_dot_v_secondary * r_secondary[1] - v_dot_r_secondary * V_secondary[1]) / GMu_secondary - r_secondary[1] / secondary_radius
         omega_secondary   = np.arctan2(ey_secondary, ex_secondary)
         e_secondary       = np.sqrt(ex_secondary**2 + ey_secondary**2)
-        PrimaryMiniDisk   = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanW': [], 'MinW': [], 'MaxW': []}
-        SecondaryMiniDisk = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanW': [], 'MinW': [], 'MaxW': []}
+        mach_secondary    = np.sqrt(v_dot_v_secondary)/cs
+
+        PrimaryMiniDisk   = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanW': [], 'MinW': [], 'MaxW': [], 'MeanM': [], 'MinM': [], 'MaxM': []}
+        SecondaryMiniDisk = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanW': [], 'MinW': [], 'MaxW': [], 'MeanM': [], 'MinM': [], 'MaxM': []}
 
         for i in range(len(RadialBins)-1):
             primary_mask   = (RadialBins[i] < primary_radius) & (primary_radius < RadialBins[i+1])
@@ -1246,29 +1250,32 @@ def main_cbdgam_2d():
             secondary_density_mask = Sigma[secondary_mask]
             primary_phase_mask     = omega_primary[primary_mask]
             secondary_phase_mask   = omega_secondary[secondary_mask]
-
+            primary_mach_mask      = mach_primary[primary_mask]
+            secondary_mach_mask    = mach_secondary[secondary_mask]
+            
             # plt.figure()
             # plt.imshow(primary_density_mask, origin='lower', cmap='magma')
             # plt.colorbar(label='Sigma')
             # plt.title(f'Primary density, bin {i}')
             # plt.savefig(os.path.join(args.Outputs, f"PrimaryMinidiskDensityBin{i}.png"), dpi=300, bbox_inches='tight')
 
-
             SaveBinStats(
                 PrimaryMiniDisk,
-                ['MeanV', 'MinV', 'MaxV', 'MeanE', 'MinE', 'MaxE', 'MeanD', 'MinD', 'MaxD', 'MeanW', 'MinW', 'MaxW'], 
+                ['MeanV', 'MinV', 'MaxV', 'MeanE', 'MinE', 'MaxE', 'MeanD', 'MinD', 'MaxD', 'MeanW', 'MinW', 'MaxW', 'MeanM', 'MinM', 'MaxM'], 
                 [np.mean(primary_speed_mask)  , np.min(primary_speed_mask)  , np.max(primary_speed_mask),
                  np.mean(primary_e_mask)      , np.min(primary_e_mask)      , np.max(primary_e_mask),
                  np.mean(primary_density_mask), np.min(primary_density_mask), np.max(primary_density_mask),
-                 np.mean(primary_phase_mask)  , np.min(primary_phase_mask)  , np.max(primary_phase_mask)]
+                 np.mean(primary_phase_mask)  , np.min(primary_phase_mask)  , np.max(primary_phase_mask),
+                 np.mean(primary_mach_mask)   , np.min(primary_mach_mask)   , np.max(primary_mach_mask)]
             )
             SaveBinStats(
                 SecondaryMiniDisk,
-                ['MeanV', 'MinV', 'MaxV', 'MeanE', 'MinE', 'MaxE', 'MeanD', 'MinD', 'MaxD', 'MeanW', 'MinW', 'MaxW'], 
+                ['MeanV', 'MinV', 'MaxV', 'MeanE', 'MinE', 'MaxE', 'MeanD', 'MinD', 'MaxD', 'MeanW', 'MinW', 'MaxW', 'MeanM', 'MinM', 'MaxM'], 
                 [np.mean(secondary_speed_mask)  , np.min(secondary_speed_mask)  , np.max(secondary_speed_mask),
                  np.mean(secondary_e_mask)      , np.min(secondary_e_mask)      , np.max(secondary_e_mask),
                  np.mean(secondary_density_mask), np.min(secondary_density_mask), np.max(secondary_density_mask),
-                 np.mean(secondary_phase_mask)  , np.min(secondary_phase_mask)  , np.max(secondary_phase_mask)]
+                 np.mean(secondary_phase_mask)  , np.min(secondary_phase_mask)  , np.max(secondary_phase_mask),
+                 np.mean(secondary_mach_mask)   , np.min(secondary_mach_mask)   , np.max(secondary_mach_mask)]
             )
 
         vlim            = 1.1 * np.nanmax([np.nanmax(PrimaryMiniDisk['MaxV']), np.nanmax(SecondaryMiniDisk['MaxV'])])
@@ -1277,12 +1284,13 @@ def main_cbdgam_2d():
         SecondaryRadius = RadialBins[1:] / SinkRadius[1]
 
         fig = plt.figure(figsize=(1.0 * text_width, 1.0 * text_width))
-        gs  = fig.add_gridspec(4, 2, height_ratios=[1, 0.5, 0.6, 0.6], hspace=0.1, wspace=0.1)
+        gs  = fig.add_gridspec(5, 2, height_ratios=[1, 0.2, 0.6, 0.6, 0.6], hspace=0.15, wspace=0.1)
         ax0 = fig.add_subplot(gs[0, 0])
         ax1 = fig.add_subplot(gs[0, 1])
         ax_ = fig.add_subplot(gs[1, :])
         ax2 = fig.add_subplot(gs[2, :]) 
         ax3 = fig.add_subplot(gs[3, :]) 
+        ax4 = fig.add_subplot(gs[4, :]) 
 
         ax0.set_title('Primary Minidisk')
         ax0.set_xlim([0, PrimaryRadius[-1]])
@@ -1304,18 +1312,8 @@ def main_cbdgam_2d():
         ax1.tick_params(axis='y', colors='white')#; ax1.set_yscale('log')
         ax1.set_xlabel(r'Distance $[r_\mathrm{sink}]$')#; ax1.set_xscale('log')
         ax1.axvline(x = SoftRadius[1]/SinkRadius[1], linestyle='dotted', c = 'black', label = 'Softening Radius')
-        #ax1.legend()
 
         ax_.axis('off')
-
-        # ax_.plot(PrimaryRadius  , PrimaryMiniDisk['MeanW'], color='red' , alpha=0.8, label = r'Primary $\omega$')
-        # ax_.plot(SecondaryRadius, SecondaryMiniDisk['MeanW'], color='blue', alpha=0.8, label = r'Secondary $\omega$')
-        # ax_.set_xlim([0, SecondaryRadius[-1]])
-        # ax_.set_ylim([-np.pi, np.pi])
-        # ax_.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black', alpha=0.6)
-        # ax_.set_xticks([])
-        # ax_.set_ylabel(r'$\omega$ [rad]')
-        # ax_.legend(loc='upper right')
 
         ax2.plot(PrimaryRadius  , PrimaryMiniDisk['MeanE']  , color='red' , alpha=0.8, label = 'Primary Mean')
         ax2.plot(SecondaryRadius, SecondaryMiniDisk['MeanE'], color='blue', alpha=0.8, label = 'Secondary Mean')
@@ -1327,19 +1325,29 @@ def main_cbdgam_2d():
         ax2.set_ylabel(r'Eccentricity')
 
         SS73_coeff   = PrimaryMiniDisk['MeanD'][Nbins//2]/PrimaryRadius[Nbins//2]**(-3/5)
-        SS73_profile = [SS73_coeff * r**(-3./5.) for r in PrimaryRadius]
+        SS73_profile = [SS73_coeff * r**(-3./5.) * (1-r**(-0.5))**(-3/5) if r > 1 else 1e-10 for r in PrimaryRadius]
         ax3.plot(PrimaryRadius  , PrimaryMiniDisk['MeanD']  , color='red' , alpha=0.8)
         ax3.plot(SecondaryRadius, SecondaryMiniDisk['MeanD'], color='blue', alpha=0.8)
         ax3.plot(PrimaryRadius  , SS73_profile              , color='peru', linestyle='dashed', label = r'$r^{-3/5}$')
         ax3.fill_between(PrimaryRadius  , PrimaryMiniDisk['MinD']  , PrimaryMiniDisk['MaxD']  , color='red', alpha=0.1)
         ax3.fill_between(SecondaryRadius, SecondaryMiniDisk['MinD'], SecondaryMiniDisk['MaxD'], color='blue', alpha=0.1)
         ax3.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black')
-        ax3.set_xlim([0, SecondaryRadius[-1]]); ax3.set_xlabel(r'Distance $[r_\mathrm{sink}]$')
+        ax3.set_xlim([0, SecondaryRadius[-1]]); ax3.set_xticks([])
         ax3.set_ylim([dlim*1e-4,dlim]); ax3.set_ylabel(r'$\langle\Sigma\rangle_\phi$')
         ax3.set_yscale('log')
         ax3.legend(loc='upper right')
 
-        # Include phase!
+        ax4.plot(PrimaryRadius          , PrimaryMiniDisk['MeanM']  , color='red' , alpha=0.8)
+        ax4.plot(SecondaryRadius        , SecondaryMiniDisk['MeanM'], color='blue' , alpha=0.8)
+        ax4.fill_between(PrimaryRadius  , PrimaryMiniDisk['MinM']  , PrimaryMiniDisk['MaxM']  , color='red', alpha=0.1)
+        ax4.fill_between(SecondaryRadius, SecondaryMiniDisk['MinM'], SecondaryMiniDisk['MaxM'], color='blue', alpha=0.1)
+        ax4.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black'); ax4.set_xlabel(r'Distance $[r_\mathrm{sink}]$')
+        ax4.set_xlim([0, SecondaryRadius[-1]]); ax3.set_xlabel(r'Distance $[r_\mathrm{sink}]$')
+        ax4.set_ylabel(r'$v/c_\mathrm{s}$')
+        ax4.set_yscale('log')
+
+
+        
         
         #plt.suptitle(r'\textbf{Minidisk Profiles with} $r_\mathrm{sink}$ = %g'%(SinkRadius[0]), y=0.95, fontweight="heavy")
         handles = []
@@ -1371,8 +1379,9 @@ def main_cbdgam_2d():
         ey                 = (v_dot_v * Y - v_dot_r * Vy) / (GMu_primary + GMu_secondary) - Y / radius
         omega              = np.arctan2(ey, ex)
         e                  = np.sqrt(ex**2 + ey**2)
-        DiskStats          = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanW': [], 'MinW': [], 'MaxW': []}
-        
+        cs                 = (gamma * Pressure / Sigma)**0.5
+        mach               = np.sqrt(v_dot_v)/cs
+        DiskStats          = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanW': [], 'MinW': [], 'MaxW': [], 'MeanM': [], 'MinM': [], 'MaxM': []}
         
 
         for i in range(len(RadialBins)-1):
@@ -1383,69 +1392,66 @@ def main_cbdgam_2d():
             e_mask         = e[mask]
             density_mask   = Sigma[mask]
             phase_mask     = omega[mask]
+            mach_mask      = mach[mask]
 
             SaveBinStats(
                 DiskStats,
-                ['MeanV', 'MinV', 'MaxV', 'MeanE', 'MinE', 'MaxE', 'MeanD', 'MinD', 'MaxD', 'MeanW', 'MinW', 'MaxW'], 
+                ['MeanV', 'MinV', 'MaxV', 'MeanE', 'MinE', 'MaxE', 'MeanD', 'MinD', 'MaxD', 'MeanM', 'MinM', 'MaxM'], 
                 [np.mean(speed_mask)  , np.min(speed_mask)  , np.max(speed_mask),
                  np.mean(e_mask)      , np.min(e_mask)      , np.max(e_mask),
-                 np.mean(density_mask), np.min(density_mask), np.max(density_mask),
-                 np.mean(phase_mask)  , np.min(phase_mask)  , np.max(phase_mask)]
+                 np.mean(density_mask), np.min(density_mask), np.max(density_mask), 
+                 np.mean(mach_mask)   , np.min(mach_mask)   , np.max(mach_mask)]
             )
 
 
         vlim     = min([1.1 * np.nanmax(DiskStats['MaxV']), 5])
         dlim     = min([3   * np.nanmax(DiskStats['MaxD']), 1e-3])
-        Radius   = RadialBins[1:] / SinkRadius[0]
+        Radius   = RadialBins[1:]
 
         fig = plt.figure(figsize=(1.0 * text_width, 1.0 * text_width))
-        gs  = fig.add_gridspec(4, 2, height_ratios=[1, 0.5, 0.6, 0.6], hspace=0.1, wspace=0.1)
-        ax0 = fig.add_subplot(gs[0, 0])
-        ax1 = fig.add_subplot(gs[0, 1])
-        ax_ = fig.add_subplot(gs[1, :])
-        ax2 = fig.add_subplot(gs[2, :]) 
-        ax3 = fig.add_subplot(gs[3, :]) 
+        gs  = fig.add_gridspec(4, 1, height_ratios=[0.8, 0.8, 0.8, 0.8], hspace=0.1, wspace=0.1)
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1]) 
+        ax3 = fig.add_subplot(gs[2]) 
+        ax4 = fig.add_subplot(gs[3]) 
 
-        ax0.set_title('Disk')
-        ax0.set_xlim([0, Radius[-1]])
-        ax0.set_ylim([0, vlim])
-        ax0.plot(Radius, DiskStats['MeanV']  , label = 'Mean Velocity'  , c = 'red')
-        ax0.fill_between(Radius, DiskStats['MinV'], DiskStats['MaxV'], color='red', alpha=0.3, label = 'Range')
-        ax0.plot(Radius, [np.sqrt(1/r) for r in RadialBins[1:]], linestyle='dashed', c = 'black', label = 'Keplerian Profile')
-        ax0.set_xlabel(r'Distance $[r_\mathrm{sink}]$')#; ax0.set_xscale('log')
-        ax0.set_ylabel(r'Velocity $[a_0\Omega_0]$')#; ax0.set_yscale('log')
-        ax0.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black', label = 'Softening Radius')
-        
-        ax_.axis('off')
+        ax1.set_title('Disk Profile')
+        ax1.set_ylim([0, vlim])
+        ax1.plot(Radius, DiskStats['MeanV']  , label = 'Mean Velocity'  , c = 'red')
+        ax1.fill_between(Radius, DiskStats['MinV'], DiskStats['MaxV'], color='red', alpha=0.3, label = 'Range')
+        ax1.plot(Radius, [np.sqrt(1/r) for r in RadialBins[1:]], linestyle='dashed', c = 'black', label = 'Keplerian Profile')
+        ax1.set_xticklabels([]); ax1.set_xlim([0, mesh.x1])
+        ax1.set_ylabel(r'Velocity $[a_0\Omega_0]$')#; ax0.set_yscale('log')
 
         ax2.plot(Radius  , DiskStats['MeanE']  , color='red' , alpha=0.8, label = 'Primary Mean')
-        ax2.fill_between(PrimaryRadius  , PrimaryMiniDisk['MinE']  , PrimaryMiniDisk['MaxE']  , color='red', alpha=0.1, label = 'Min/Max')        
-        ax2.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black', label = 'Softening Radius')
-        ax2.set_xticks([])
+        ax2.fill_between(Radius  , DiskStats['MinE']  , DiskStats['MaxE']  , color='red', alpha=0.1, label = 'Min/Max')        
+        ax2.set_xticklabels([]); ax1.set_xlim([0, mesh.x1])
         ax2.set_ylabel(r'Eccentricity')
 
-        SS73_coeff   = DiskStats['MeanD'][Nbins//2]/Radius[Nbins//2]**(-3/5)
+        SS73_coeff   = DiskStats['MeanD'][-1]/Radius[-1]**(-3/5)
         SS73_profile = [SS73_coeff * r**(-3./5.) for r in Radius]
         ax3.plot(Radius  , DiskStats['MeanD']  , color='red' , alpha=0.8)
         ax3.plot(Radius  , SS73_profile              , color='peru', linestyle='dashed', label = r'$r^{-3/5}$')
         ax3.fill_between(Radius  , DiskStats['MinD']  , DiskStats['MaxD']  , color='red', alpha=0.1)
-        ax3.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black')
-        ax3.set_xlim([0, Radius[-1]]); ax3.set_xlabel(r'Distance $[r_\mathrm{sink}]$')
+        ax3.set_xticklabels([]); ax1.set_xlim([0, mesh.x1])
         ax3.set_ylim([dlim*1e-4,dlim]); ax3.set_ylabel(r'$\langle\Sigma\rangle_\phi$')
         ax3.set_yscale('log')
         ax3.legend(loc='upper right')
 
-        
-        #plt.suptitle(r'\textbf{Minidisk Profiles with} $r_\mathrm{sink}$ = %g'%(SinkRadius[0]), y=0.95, fontweight="heavy")
+        ax4.plot(Radius          , DiskStats['MeanM'] , color='red' , alpha=0.8)
+        ax4.fill_between(Radius  , DiskStats['MinM']  , DiskStats['MaxM'], color='red', alpha=0.1)
+        ax4.set_xlabel(r'Distance $[a_0]$'); ax1.set_xlim([0, mesh.x1])
+        ax4.set_ylabel(r'$v/c_\mathrm{s}$')
+        ax4.set_yscale('log')
+
         handles = []
         labels  = []
 
-        for ax in [ax0, ax1]:
-            h, l = ax.get_legend_handles_labels()
-            for hi, li in zip(h, l):
-                if li not in labels:   # avoid duplicates
-                    handles.append(hi)
-                    labels.append(li)
+        h, l = ax1.get_legend_handles_labels()
+        for hi, li in zip(h, l):
+            if li not in labels:   # avoid duplicates
+                handles.append(hi)
+                labels.append(li)
         fig.legend(handles, labels, loc='lower center', ncol=3, bbox_to_anchor=(0.5, -0.06))
         plt.savefig(f"Axisymmetry_{chkpt['time'] / 2 / np.pi:.2f}.png", dpi=400, bbox_inches='tight')
 
