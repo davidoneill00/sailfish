@@ -1062,8 +1062,7 @@ def main_cbdgam_2d():
 
         if args.log:
             f = np.log10(f)
-
-        
+            
         # ========== Plotting ============
         extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
         cm     = ax.imshow(
@@ -1132,7 +1131,7 @@ def main_cbdgam_2d():
             mass_ratio   = chkpt['model_parameters']['mass_ratio']
             Orbital_Path = np.array([Position(t, semimaj, eccentr, mass_ratio) for t in np.linspace(0,2*np.pi,1000)])
             plt.plot(Orbital_Path[:,0,0], Orbital_Path[:,0,1], linestyle = 'dashed', c = 'gray')
-            plt.plot(Orbital_Path[:,1,0], Orbital_Path[:,1,1], linestyle = 'dashed', c = 'gray')
+            plt.plot(-Orbital_Path[:,1,0], Orbital_Path[:,1,1], linestyle = 'dashed', c = 'gray')
 
 
         if args.Outputs is None:

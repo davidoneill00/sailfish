@@ -182,6 +182,9 @@ if __name__ == '__main__':
     alpha               = ts.modelparams["alpha"]
     primary, secondary  = ts.pointmasses
     OrbitalEccentricity = ts.eccentricity[-1]
+    cs_a                = (SS73.gamma * (SS73.surface_pressure_profile(r=1) / SS73.surface_density_profile(r=1)))**0.5
+    nu_a                = SS73.alpha * cs_a**2
+    M_dot_0             = 3 * np.pi * (nu_a * SS73.surface_density_profile(r=1))
     Final_Orbits        = ts.time[ts.time>(ts.currenttime-args.Number_of_Orbits)]
     TimeBins            = np.arange(Final_Orbits[0],Final_Orbits[-1],1)
     hist, edges         = np.histogram(Final_Orbits, bins=int(args.Number_of_Orbits))
@@ -190,15 +193,11 @@ if __name__ == '__main__':
 
     # ======= Plotting Blocks ========
     if args.Accretion:
-        cs_a          = (SS73.gamma * (SS73.surface_pressure_profile(r=1) / SS73.surface_density_profile(r=1)))**0.5
-        nu_a          = SS73.alpha * cs_a**2 # in code units as omega_bin = 1 at r = 1
-        M_dot_0       = 3 * np.pi * (nu_a * SS73.surface_density_profile(r=1))
         Accretion_1   = ts.mdot1[-len(Final_Orbits):] / M_dot_0
         Accretion_2   = ts.mdot2[-len(Final_Orbits):] / M_dot_0
         AccretionRate = Accretion_1 + Accretion_2
         MeanAccretion = np.array([np.mean(AccretionRate[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))])
         Inflow        = ts.buffer_inflow[-len(Final_Orbits):] / M_dot_0
-        print(np.max(np.abs(ts.buffer_inflow[-len(Final_Orbits):])))
 
         if args.Fourier:
             signal = AccretionRate - np.mean(AccretionRate)
@@ -220,10 +219,10 @@ if __name__ == '__main__':
 
         else:
             fig, ax = plt.subplots(figsize=[2*text_width, text_width])
-            plt.plot(Final_Orbits, Inflow,         label='inflow', linewidth = 1, c = 'green')
-            plt.plot(Final_Orbits, -AccretionRate, label='mdot'  , linewidth = 0.1, c = 'black')
-            plt.plot(Final_Orbits, -Accretion_1  , label='mdot1' , linewidth = 0.1, c = 'blue' )
-            plt.plot(Final_Orbits, -Accretion_2  , label='mdot2' , linewidth = 0.1, c = 'red'  )
+            plt.plot(Final_Orbits, Inflow,         label='Buffer In'   , linewidth = 0.3, c = 'green')
+            plt.plot(Final_Orbits, -AccretionRate, label='Sinks Out'   , linewidth = 0.3, c = 'black')
+            plt.plot(Final_Orbits, -Accretion_1  , label=r'$\dot{M}_1$', linewidth = 0.1, c = 'blue' )
+            plt.plot(Final_Orbits, -Accretion_2  , label=r'$\dot{M}_2$', linewidth = 0.1, c = 'red'  )
             #plt.plot(TimeBins[1:], -MeanAccretion,linewidth = 1, label = 'Binned Means', c = 'black')
             plt.yscale('log')
             plt.xlabel('Time [P]')
@@ -273,12 +272,11 @@ if __name__ == '__main__':
 
     if args.Buffer_Torque:
         Normalised_Torque = ts.torque_b[-len(Final_Orbits):] / M_dot_0
-        Mean_Torque_b     = [np.mean(Normalised_Torque[CumulativeTimeBin[i-1]:CumulativeTimeBin[i]]) for i in range(1,len(TimeBins))]
         savename          = "BufferTorque"
 
         fig, ax = plt.subplots(figsize=[2*text_width, text_width])
-        plt.plot(Final_Orbits, Normalised_Torque, c = 'blue', label = 'Buffer Torque', linewidth = 0.1)
-        plt.plot(TimeBins[1:], Mean_Torque_b    , c = 'black', label = 'Binned Means ', linewidth = 0.5 )
+        plt.plot(Final_Orbits, Normalised_Torque, c = 'navy', label = 'Buffer Torque', linewidth = 1)
+        plt.axhline(y=0, c = 'black', linestyle='dashed')
         plt.xlabel('Time [P]')
         plt.ylabel(r'$\tau_\mathrm{b}/\dot{M}_0$')
         plt.legend(loc = 'upper right')
