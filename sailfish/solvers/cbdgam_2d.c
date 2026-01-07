@@ -726,26 +726,27 @@ PUBLIC void cbdgam_2d_advance_rk(
 PUBLIC void cbdgam_2d_buffer_source_term(
     int ni,
     int nj,
-    double patch_xl, // mesh
-    double patch_xr,
-    double patch_yl,
-    double patch_yr,
-    double gamma_law_index,
-    double buffer_surface_density,
-    double buffer_surface_pressure,
-    double buffer_central_mass,
-    double buffer_driving_rate,
-    double buffer_outer_radius,
-    double buffer_onset_width,
-    int    buffer_is_enabled,
-    int    retro,
-    double *conserved, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *cons_rate // :: $.shape == (ni + 4, nj + 4, 4)
-)
+    double *p,
+    double *conserved,
+    double *cons_rate)
 {
+    double patch_xl = p[0];
+    double patch_xr = p[1];
+    double patch_yl = p[2];
+    double patch_yr = p[3];
+    double gamma_law_index         = p[4];
+    double buffer_surface_density  = p[5];
+    double buffer_surface_pressure = p[6];
+    double buffer_central_mass     = p[7];
+    double buffer_driving_rate     = p[8];
+    double buffer_outer_radius     = p[9];
+    double buffer_onset_width      = p[10];
+    int buffer_is_enabled          = (int)p[11];
+    int retro                      = (int)p[12];
+
     struct KeplerianBuffer buffer = {
         buffer_surface_density,
-        buffer_surface_pressure,     
+        buffer_surface_pressure,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
@@ -754,7 +755,7 @@ PUBLIC void cbdgam_2d_buffer_source_term(
         retro
     };
 
-    int ng = 2; // number of guard zones
+    int ng = 2;
     int si = NCONS * (nj + 2 * ng);
     int sj = NCONS;
 
@@ -771,19 +772,14 @@ PUBLIC void cbdgam_2d_buffer_source_term(
         double *du = &cons_rate[ncc];
 
         double uc_before[NCONS];
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uc_before[q] = uc[q];
-        }
+        for (int q = 0; q < NCONS; ++q) uc_before[q] = uc[q];
 
         buffer_source_term(&buffer, xc, yc, 1.0, uc, gamma_law_index);
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            du[q] = uc[q] - uc_before[q];
-        }
+        for (int q = 0; q < NCONS; ++q) du[q] = uc[q] - uc_before[q];
     }
 }
+
 
 PUBLIC void cbdgam_2d_wavespeed(
     int ni,

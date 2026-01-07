@@ -17,11 +17,22 @@ from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
 from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, EffectiveTemperature
 import numpy as np
-from cupy import fuse
+#from cupy import fuse
 
-@fuse()
-def interpolate_band(N0, N1, frac):
-    return N0 + frac * (N1 - N0)
+try:
+    import cupy as cp
+    from cupy import fuse
+    @fuse()
+    def interpolate_band(N0, N1, frac):
+        return N0 + frac * (N1 - N0)
+except Exception:
+    def interpolate_band(N0, N1, frac):
+        return N0 + frac * (N1 - N0)
+
+
+# @fuse()
+# def interpolate_band(N0, N1, frac):
+#     return N0 + frac * (N1 - N0)
 
 
 logger = getLogger(__name__)
@@ -202,11 +213,9 @@ class Patch:
                 self.physics.gamma_law_index
             )
 
-            self.lib.cbdgam_2d_buffer_source_term[self.shape](
-                self.xl,
-                self.xr,
-                self.yl,
-                self.yr,
+
+            params = self.xp.ascontiguousarray(self.xp.array([
+                self.xl, self.xr, self.yl, self.yr,
                 self.physics.gamma_law_index,
                 self.buffer_surface_density,
                 self.buffer_surface_pressure,
@@ -214,20 +223,26 @@ class Patch:
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
-                int(self.physics.buffer_is_enabled),
-                int(self.retrograde),
+                float(int(self.physics.buffer_is_enabled)),
+                float(int(self.retrograde)),
+            ], dtype=self.xp.float64))
+
+            self.lib.cbdgam_2d_buffer_source_term[self.shape](
+                params,
                 conserved1,
                 cons_rate,
             )
+
         return cons_rate[ng:-ng, ng:-ng]
 
     def maximum_wavespeed(self):
         with self.execution_context:
-            import numpy as np
-
-            # 1. Check primitive BEFORE calling the kernel
-            prim = self.primitive1
-            if not np.isfinite(prim).all():
+            # import numpy as np
+            # # 1. Check primitive BEFORE calling the kernel
+            # prim = self.primitive1
+            # if not np.isfinite(prim).all():
+            xp = self.xp
+            if not bool(xp.all(xp.isfinite(self.primitive1))):
                 raise RuntimeError(
                     f"[Patch.maximum_wavespeed PRE] Non-finite values in primitive1 "
                     f"on device {self.execution_context.id}.\n"
@@ -243,7 +258,7 @@ class Patch:
             )
 
             # 3. Check the wavespeeds themselves
-            if not np.isfinite(self.wavespeeds).all():
+            if not xp.isfinite(self.wavespeeds).all():
                 raise RuntimeError(
                     f"[Patch.maximum_wavespeed POST] Non-finite values in wavespeeds "
                     f"on device {self.execution_context.id}."
@@ -461,22 +476,25 @@ class Solver(SolverBase):
         This solver uses primitive data as the solution array.
         """
         return None
-
+    
     def detect_density_floor(self, patch):
         with patch.execution_context:
             rho  = patch.primitive1[:, :, 0]
             mask = rho <= patch.options.density_floor * 1.01
-            return float(self.xp.sum(mask).get()) 
-    
+            s = self.xp.sum(mask)
+            return float(s.get() if hasattr(s, "get") else s)
+
     def detect_pressure_floor(self, patch):
         with patch.execution_context:
             pressure = patch.primitive1[:, :, 3]
             mask     = pressure <= patch.options.pressure_floor * 1.01
-            return float(self.xp.sum(mask).get())  
+            s        = self.xp.sum(mask)
+            return float(s.get() if hasattr(s, "get") else s)
 
     def Band_Luminosity(self, patch):
         with patch.execution_context:
-            dev_id = int(patch.execution_context.id)
+            #dev_id = int(patch.execution_context.id)
+            dev_id = int(getattr(patch.execution_context, "id", 0))
             if not hasattr(self, "_EmissionTable_cache"):
                 self._EmissionTable_cache = {}
             if dev_id not in self._EmissionTable_cache:
@@ -749,8 +767,8 @@ class Solver(SolverBase):
             gpu_results.append(gpu_sum * da)
 
         gpu_results = xp.stack([xp.asarray(r) for r in gpu_results])
-        return gpu_results.get().tolist()
-
+        host_results = gpu_results.get() if hasattr(gpu_results, "get") else gpu_results
+        return host_results.tolist()
 
     @property
     def time(self):
