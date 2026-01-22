@@ -61,16 +61,14 @@ struct PointMassList {
 };
 
 struct KeplerianBuffer {
-    double surface_density;
-    double surface_pressure;
+    double surface_density_onset;
+    double pressure_onset;
+    double surface_density_powerlaw;
+    double pressure_powerlaw; 
     double central_mass;
     double driving_rate;
     double outer_radius;
     double onset_width;
-    //double xframe;
-    //double yframe;
-    //double vxframe;
-    //double vyframe;
     int is_enabled;
     int is_retrograde;
 };
@@ -261,38 +259,37 @@ PRIVATE void buffer_source_term(
 {
     if (buffer->is_enabled)
     {
-        //double xframe  = buffer->xframe;
-        //double yframe  = buffer->yframe;
-        //double vxframe = buffer->vxframe;
-        //double vyframe = buffer->vyframe;
-        //double xr = xc - xframe;
-        //double yr = yc - yframe;
-        //double rr = sqrt(xr * xr + yr * yr);
 
-        double rc = sqrt(xc * xc + yc * yc);
-        double surface_density = buffer->surface_density;
-        double surface_pressure = buffer->surface_pressure;
-        double central_mass = buffer->central_mass;
-        double driving_rate = buffer->driving_rate;
-        double outer_radius = buffer->outer_radius;
-        double onset_width = buffer->onset_width;
-        double onset_radius = outer_radius - onset_width;
+        double rc                      = sqrt(xc * xc + yc * yc);
+        double target_surface_density  = buffer->surface_density_onset;
+        double target_pressure         = buffer->pressure_onset;
+        double surface_density_p       = buffer->surface_density_powerlaw;
+        double pressure_p              = buffer->pressure_powerlaw;
+        double central_mass            = buffer->central_mass;
+        double driving_rate            = buffer->driving_rate;
+        double outer_radius            = buffer->outer_radius;
+        double onset_width             = buffer->onset_width;
+        double onset_radius            = outer_radius - onset_width;
+
 
         if (rc > onset_radius)
         {
             double v_kep = sqrt(central_mass / rc);
+            // double v_kep2 = central_mass / rc;
+            // double v_sub  = sqrt(v_kep2 - pressure_p * target_pressure / target_surface_density);
             if (buffer->is_retrograde)
                 v_kep = -v_kep;
-            //double pf = surface_density * sqrt(central_mass / rc);
-            double px = surface_density * (-yc / rc) * v_kep;
-            double py = surface_density * (+xc / rc) * v_kep;
-            double kinetic_energy = 0.5 * (px * px + py * py) / surface_density;
-            double energy = surface_pressure / (gamma_law_index - 1.0) + kinetic_energy;
-            double u0[NCONS] = {surface_density, px, py, energy};
+            
+            // Target values
+            double pressure         = target_pressure * pow(rc / onset_radius, -pressure_p);
+            double surface_density  = target_surface_density  * pow(rc / onset_radius, -surface_density_p);
+            double px               = surface_density * (-yc / rc) * v_kep;
+            double py               = surface_density * (+xc / rc) * v_kep;
+            double energy           = 0.5 * (px * px + py * py) / surface_density + pressure / (gamma_law_index - 1.0);
+            double u0[NCONS]        = {surface_density, px, py, energy};
 
-            double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-            //double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
-            double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
+            double omega_outer      = sqrt(central_mass * pow(onset_radius, -3.0));
+            double buffer_rate      = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -485,8 +482,10 @@ PUBLIC void cbdgam_2d_advance_rk(
     double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, 4)
     double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, 4)
     double gamma_law_index,
-    double buffer_surface_density,
-    double buffer_surface_pressure,
+    double buffer_surface_density_onset,
+    double buffer_pressure_onset,
+    double surface_density_powerlaw,
+    double pressure_powerlaw,
     double buffer_central_mass,
     double buffer_driving_rate,
     double buffer_outer_radius,
@@ -522,8 +521,10 @@ PUBLIC void cbdgam_2d_advance_rk(
     int constant_softening)
 {
     struct KeplerianBuffer buffer = {
-        buffer_surface_density,
-        buffer_surface_pressure,
+        buffer_surface_density_onset,
+        buffer_pressure_onset,
+        surface_density_powerlaw,
+        pressure_powerlaw,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
@@ -730,23 +731,28 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     double *conserved,
     double *cons_rate)
 {
-    double patch_xl = p[0];
-    double patch_xr = p[1];
-    double patch_yl = p[2];
-    double patch_yr = p[3];
-    double gamma_law_index         = p[4];
-    double buffer_surface_density  = p[5];
-    double buffer_surface_pressure = p[6];
-    double buffer_central_mass     = p[7];
-    double buffer_driving_rate     = p[8];
-    double buffer_outer_radius     = p[9];
-    double buffer_onset_width      = p[10];
-    int buffer_is_enabled          = (int)p[11];
-    int retro                      = (int)p[12];
+    double patch_xl                      = p[0];
+    double patch_xr                      = p[1];
+    double patch_yl                      = p[2];
+    double patch_yr                      = p[3];
+    double gamma_law_index               = p[4];
+    double buffer_surface_density_onset  = p[5];
+    double buffer_pressure_onset         = p[6];
+    double surface_density_powerlaw      = p[7];
+    double pressure_powerlaw             = p[8];
+    double buffer_central_mass           = p[9];
+    double buffer_driving_rate           = p[10];
+    double buffer_outer_radius           = p[11];
+    double buffer_onset_width            = p[12];
+    int buffer_is_enabled                = (int)p[13];
+    int retro                            = (int)p[14];
+
 
     struct KeplerianBuffer buffer = {
-        buffer_surface_density,
-        buffer_surface_pressure,
+        buffer_surface_density_onset,
+        buffer_pressure_onset,
+        surface_density_powerlaw,
+        pressure_powerlaw,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
@@ -766,8 +772,8 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     {
         int ncc = (i + ng) * si + (j + ng) * sj;
 
-        double xc = patch_xl + (i + 0.5) * dx;
-        double yc = patch_yl + (j + 0.5) * dy;
+        double xc  = patch_xl + (i + 0.5) * dx;
+        double yc  = patch_yl + (j + 0.5) * dy;
         double *uc = &conserved[ncc];
         double *du = &cons_rate[ncc];
 

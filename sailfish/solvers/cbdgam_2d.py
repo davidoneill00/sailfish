@@ -77,28 +77,32 @@ class Patch:
         physics,
         options,
         buffer_outer_radius,
-        buffer_surface_density,
-        buffer_surface_pressure,
+        buffer_surface_density_onset,
+        buffer_surface_pressure_onset,
+        surface_density_powerlaw,
+        pressure_powerlaw,
         lib,
         xp,
         execution_context,
     ):
-        i0, i1 = index_range
-        ni, nj = i1 - i0, mesh.shape[1]
-        self.lib = lib
-        self.mesh = mesh
-        self.xp = xp
-        self.execution_context = execution_context
-        self.time = self.time0 = time
-        self.shape = (i1 - i0, nj)  # not including guard zones
-        self.physics = physics
-        self.options = options
-        self.xl, self.yl = mesh.vertex_coordinates(i0, 0)
-        self.xr, self.yr = mesh.vertex_coordinates(i1, nj)
-        self.buffer_outer_radius = buffer_outer_radius
-        self.buffer_surface_density = buffer_surface_density
-        self.buffer_surface_pressure = buffer_surface_pressure
-        self.retrograde = physics.retrograde
+        i0, i1                             = index_range
+        ni, nj                             = i1 - i0, mesh.shape[1]
+        self.lib                           = lib
+        self.mesh                          = mesh
+        self.xp                            = xp
+        self.execution_context             = execution_context
+        self.time                          = self.time0 = time
+        self.shape                         = (i1 - i0, nj)  # not including guard zones
+        self.physics                       = physics
+        self.options                       = options
+        self.xl, self.yl                   = mesh.vertex_coordinates(i0, 0)
+        self.xr, self.yr                   = mesh.vertex_coordinates(i1, nj)
+        self.buffer_outer_radius           = buffer_outer_radius
+        self.buffer_surface_density_onset  = buffer_surface_density_onset
+        self.buffer_surface_pressure_onset = buffer_surface_pressure_onset
+        self.surface_density_powerlaw      = surface_density_powerlaw
+        self.pressure_powerlaw             = pressure_powerlaw
+        self.retrograde                    = physics.retrograde
 
         # option to vary the cooling coefficient dynamically
         def dynamic_cooling(_self):
@@ -217,8 +221,10 @@ class Patch:
             params = self.xp.ascontiguousarray(self.xp.array([
                 self.xl, self.xr, self.yl, self.yr,
                 self.physics.gamma_law_index,
-                self.buffer_surface_density,
-                self.buffer_surface_pressure,
+                self.buffer_surface_density_onset,
+                self.buffer_surface_pressure_onset,
+                self.surface_density_powerlaw,
+                self.pressure_powerlaw,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
@@ -239,7 +245,7 @@ class Patch:
         with self.execution_context:
             # import numpy as np
             # # 1. Check primitive BEFORE calling the kernel
-            # prim = self.primitive1
+            prim = self.primitive1
             # if not np.isfinite(prim).all():
             xp = self.xp
             if not bool(xp.all(xp.isfinite(self.primitive1))):
@@ -266,17 +272,6 @@ class Patch:
 
             return self.wavespeeds.max()
 
-
-
-    # def maximum_wavespeed(self):
-    #     with self.execution_context:
-    #         self.lib.cbdgam_2d_wavespeed[self.shape](
-    #             self.primitive1,
-    #             self.wavespeeds,
-    #             self.physics.gamma_law_index,
-    #         )
-    #         return self.wavespeeds.max()
-
     def recompute_conserved(self):
         with self.execution_context:
             return self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
@@ -286,10 +281,25 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
-        m1, m2 = self.physics.point_masses(self.time)
+        m1, m2              =  self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
-        buffer_surface_density = self.buffer_surface_density
-        buffer_surface_pressure = self.buffer_surface_pressure
+
+        # Here we should measure the binary torque over the previous ~ 50 orbits and 
+        # use that to set F_J,0. We need to do this measurement before the outer domain
+        # is viscously relaxed, otherwise the torque measurement will be contaminated by
+        # the buffer torque. Then, we wait until the outer domain is viscously relaxed, and
+        # we set the buffer target accordingly, using Rafikov's steady-state solution.
+        # Or maybe not the steady-state since we will never really be at Mdot_inf  at the
+        # outer buffer.....
+
+        # (1) Measure viscous rate at domain edge.
+        # t_visc = 0.1 * (buffer_outer_radius**2) / physics.viscosity_coefficient # 0.1 for safety
+        # (2) Ensure that viscous rate at cavity is satisfied
+        # (3) Measure total binary torque
+        # (4) Set F_J,0 = total binary torque + viscous rate at cavity
+        # (5) Save this value.
+        # (6) Continue to measure F_J,0 until viscous rate reaches buffer radius.
+        # (7) Set buffer target profile using this best guess F_J,0 value.
 
         with self.execution_context:
             self.lib.cbdgam_2d_advance_rk[self.shape](
@@ -301,8 +311,10 @@ class Patch:
                 self.primitive1,
                 self.primitive2,
                 self.physics.gamma_law_index,
-                buffer_surface_density,
-                buffer_surface_pressure,
+                self.buffer_surface_density_onset,
+                self.buffer_surface_pressure_onset,
+                self.surface_density_powerlaw,
+                self.pressure_powerlaw,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
@@ -421,7 +433,7 @@ class Solver(SolverBase):
         self.patches = []
         ni, nj = mesh.shape
         self.domain_radius = self.mesh.x1
-        self.buffer_onset_width = 0.1
+        #self.buffer_onset_width = 0.1
 
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
@@ -429,20 +441,21 @@ class Solver(SolverBase):
             primitive = solution
 
         if physics.buffer_is_enabled:
-            # Here we sample the initial condition at the buffer onset radius
-            # to determine the disk surface density at the radius where the
-            # buffer begins to ramp up. This procedure makes sense as long as
-            # the initial condition is axisymmetric.
-            buffer_prim = [0.0] * 4
-            buffer_outer_radius = mesh.x1  # this assumes the mesh is a centered squared
-            buffer_onset_radius = buffer_outer_radius - physics.buffer_onset_width
+            buffer_prim                   = [0.0] * 4
+            buffer_outer_radius           = mesh.x1  # this assumes the mesh is a centered squared
+            buffer_onset_radius           = buffer_outer_radius - physics.buffer_onset_width
             setup.primitive(time, [buffer_onset_radius, 0.0], buffer_prim)
-            buffer_surface_density = buffer_prim[0]
-            buffer_surface_pressure = buffer_prim[3]
+            buffer_surface_density_onset  = buffer_prim[0]
+            buffer_surface_pressure_onset = buffer_prim[3]
+            surface_density_powerlaw      = setup.surface_density_powerlaw
+            pressure_powerlaw             = setup.pressure_powerlaw
+
         else:
-            buffer_outer_radius = 0.0
-            buffer_surface_density = 0.0
-            buffer_surface_pressure = 0.0
+            buffer_outer_radius           = 0.0
+            buffer_surface_density_onset  = 0.0
+            buffer_surface_pressure_onset = 0.0
+            surface_density_powerlaw      = 0.0
+            pressure_powerlaw             = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
             prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
@@ -455,8 +468,10 @@ class Solver(SolverBase):
                 physics,
                 options,
                 buffer_outer_radius,
-                buffer_surface_density,
-                buffer_surface_pressure,
+                buffer_surface_density_onset,
+                buffer_surface_pressure_onset,
+                surface_density_powerlaw,
+                pressure_powerlaw,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
@@ -490,6 +505,7 @@ class Solver(SolverBase):
             mask     = pressure <= patch.options.pressure_floor * 1.01
             s        = self.xp.sum(mask)
             return float(s.get() if hasattr(s, "get") else s)
+
 
     def Band_Luminosity(self, patch):
         with patch.execution_context:
