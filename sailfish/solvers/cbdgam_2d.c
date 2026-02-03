@@ -69,6 +69,7 @@ struct KeplerianBuffer {
     double driving_rate;
     double outer_radius;
     double onset_width;
+    double Mdot_inf;
     int is_enabled;
     int is_retrograde;
 };
@@ -269,27 +270,30 @@ PRIVATE void buffer_source_term(
         double driving_rate            = buffer->driving_rate;
         double outer_radius            = buffer->outer_radius;
         double onset_width             = buffer->onset_width;
+        double Mdot_inf                = buffer->Mdot_inf;
         double onset_radius            = outer_radius - onset_width;
 
 
         if (rc > onset_radius)
         {
-            double v_kep = sqrt(central_mass / rc);
-            // double v_kep2 = central_mass / rc;
-            // double v_sub  = sqrt(v_kep2 - pressure_p * target_pressure / target_surface_density);
-            if (buffer->is_retrograde)
-                v_kep = -v_kep;
-            
-            // Target values
-            double pressure         = target_pressure * pow(rc / onset_radius, -pressure_p);
-            double surface_density  = target_surface_density  * pow(rc / onset_radius, -surface_density_p);
-            double px               = surface_density * (-yc / rc) * v_kep;
-            double py               = surface_density * (+xc / rc) * v_kep;
-            double energy           = 0.5 * (px * px + py * py) / surface_density + pressure / (gamma_law_index - 1.0);
-            double u0[NCONS]        = {surface_density, px, py, energy};
+            // double v_kep = sqrt(central_mass / rc);
+            double v_kep2 = central_mass / rc;
 
-            double omega_outer      = sqrt(central_mass * pow(onset_radius, -3.0));
-            double buffer_rate      = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
+            // Target values
+            double pressure        = target_pressure        * pow(rc / onset_radius, pressure_p);
+            double surface_density = target_surface_density * pow(rc / onset_radius, surface_density_p);
+            // Pressure-supported rotation: v_phi^2 = v_kep^2 + (r/Sigma) * dP/dr
+            double v_phi           = sqrt(v_kep2 + pressure_p * pressure / surface_density);
+            if (buffer->is_retrograde)
+                v_phi = -v_phi;
+            double v_r             = - Mdot_inf / (2 * 3.1415926 * rc * surface_density);
+            double px              = surface_density * (-yc / rc) * v_phi + surface_density * (xc / rc) * v_r;
+            double py              = surface_density * (+xc / rc) * v_phi + surface_density * (yc / rc) * v_r;
+            double energy          = 0.5 * (px * px + py * py) / surface_density + pressure / (gamma_law_index - 1.0);
+            double u0[NCONS]       = {surface_density, px, py, energy};
+
+            double omega_outer     = sqrt(central_mass * pow(onset_radius, -3.0));
+            double buffer_rate     = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -490,6 +494,7 @@ PUBLIC void cbdgam_2d_advance_rk(
     double buffer_driving_rate,
     double buffer_outer_radius,
     double buffer_onset_width,
+    double buffer_Mdot_inf,
     int buffer_is_enabled,
     int retrograde,
     double x1, // point mass 1
@@ -529,6 +534,7 @@ PUBLIC void cbdgam_2d_advance_rk(
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
+        buffer_Mdot_inf,
         buffer_is_enabled,
         retrograde
     };
@@ -744,8 +750,9 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     double buffer_driving_rate           = p[10];
     double buffer_outer_radius           = p[11];
     double buffer_onset_width            = p[12];
-    int buffer_is_enabled                = (int)p[13];
-    int retro                            = (int)p[14];
+    double buffer_Mdot_inf               = p[13];
+    int buffer_is_enabled                = (int)p[14];
+    int retro                            = (int)p[15];
 
 
     struct KeplerianBuffer buffer = {
@@ -757,6 +764,7 @@ PUBLIC void cbdgam_2d_buffer_source_term(
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
+        buffer_Mdot_inf,
         buffer_is_enabled,
         retro
     };

@@ -276,14 +276,16 @@ class SetupBase(ABC):
         """
         pass
 
-    def checkpoint_diagnostics(self, time):
+    def checkpoint_diagnostics(self, solver):
         """
         Return a dict of post-processing data to include in checkpoint files.
 
         An example use case is to record the positions of point masses (with
         prescribed trajectory) in a gravitating hydrodynmics problem.
         """
+        AngularMomentumFlux_FJ0 = dict(FJ0_interval = solver.FJ0_interval, FJ0_time_interval = solver.FJ0_time_interval)
         return dict(
-            SS73         = self.SS73,
-            point_masses = self.point_masses(time)
+            SS73          = self.SS73,
+            point_masses  = self.point_masses(solver.time),
+            ConstFlux_FJ0 = AngularMomentumFlux_FJ0
             )

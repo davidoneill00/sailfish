@@ -177,16 +177,11 @@ class ShakuraSunyaevDisk(NamedTuple):
 		kappa_code  = cgs['kappa'] / (self._length**2 / self._mass)
 		sigmab_code = cgs['sigmab'] / (self._mass / self._time**3)	
 		qdot_coeff = 8. / 3. * sigmab_code / kappa_code * (mp_code / kb_code)**4 * (self.gamma - 1.)**4
-		logger.info(f"density coefficient : {self.surface_density_coefficient:0.2e}")
-		logger.info(f"pressure coefficient : {self.surface_pressure_coefficient:0.2e}")
-		logger.info(f"implied eddington fraction : {self._eddington_fraction:0.2e}")
-		logger.info(f"approximate optical depth : {self.optical_depth(1.):0.4f}")
-		logger.info(f"cooling coefficient : {qdot_coeff:0.2e}")
-		return qdot_coeff
-
-	# Only for temporary testing
-	# =============================================================================
-	def surface_density_goodman(self):
+	# logger.info(f"density coefficient : {self.surface_density_coefficient:0.2e}")
+	# logger.info(f"pressure coefficient : {self.surface_pressure_coefficient:0.2e}")
+	# logger.info(f"implied eddington fraction : {self._eddington_fraction:0.2e}")
+	# logger.info(f"approximate optical depth : {self.optical_depth(1.):0.4f}")
+	# logger.info(f"cooling coefficient : {qdot_coeff:0.2e}")
 		coeff = 2**(4./5.) / 3. / pi**(3./5.)
 		s0 = coeff * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.)
 		return s0 * self.alpha**(-4./5.) * self._GM**(1./5.) * self._accretion_rate**(3./5.) * self._length**(-3./5.)
@@ -199,6 +194,14 @@ class ShakuraSunyaevDisk(NamedTuple):
 	def surface_pressure_goodman(self):
 		return cgs['kb'] / cgs['mp'] * self.midplane_temperature_goodman() * self.surface_density_goodman()
 	
+	@property
+	def Mdot_inf(self):
+		cs_a    = (self.gamma * (self.surface_pressure_profile(1.) / self.surface_density_profile(1.)))**0.5
+		Omega_a = 1.0**(-3./2.)
+		Hs_a    = cs_a /Omega_a
+		nu_a    = self.alpha * cs_a * Hs_a
+		return 3 * pi * self.surface_density_profile(1.) * nu_a * 1.0
+		
 	# =============================================================================
 	# ========================== Code unit conversions ============================
 	# =============================================================================
@@ -206,6 +209,10 @@ class ShakuraSunyaevDisk(NamedTuple):
 	@property
 	def kb_code(self):
 		return cgs['kb'] / (self._mass * self._length**2 / self._time**2)
+	
+	@property
+	def sigmab_code(self):
+		return cgs['sigmab'] / (self._mass / self._time**3)	
 
 	@property
 	def mp_code(self):
@@ -269,7 +276,7 @@ def BandEmission(temperature, nu_low, nu_high):
     with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
         integrand = np.where(x_grid > 700.0, 0.0, x_grid**3 / np.expm1(x_grid))
 
-    integral  = np.trapz(integrand, x_grid, axis=0)
+    integral  = np.trapezoid(integrand, x_grid, axis=0)
     prefactor = (2 * (cgs['kb'] * temperature)**4) / cgs['c2h3']
     return np.pi * prefactor * integral
 
@@ -297,7 +304,7 @@ if __name__ == '__main__':
 	ss = ShakuraSunyaevDisk(
         	central_mass_msun = 8e6, 
         	length_scale_pc   = 9.7e-4,
-        	mach_number_a     = 21,
+        	mach_number_a     = 10,
         	alpha             = 0.1,
 			gamma             = 5./3.,
 			target_accretion_rate=10.0,
