@@ -281,15 +281,18 @@ PRIVATE void buffer_source_term(
                 v_kep = -v_kep;
             
             // Target values
-            double pressure         = target_pressure * pow(rc / onset_radius, -pressure_p);
-            double surface_density  = target_surface_density  * pow(rc / onset_radius, -surface_density_p);
+            double pressure         = target_pressure * pow(rc / onset_radius, pressure_p);
+            double surface_density  = target_surface_density  * pow(rc / onset_radius, surface_density_p);
             double px               = surface_density * (-yc / rc) * v_kep;
             double py               = surface_density * (+xc / rc) * v_kep;
             double energy           = 0.5 * (px * px + py * py) / surface_density + pressure / (gamma_law_index - 1.0);
             double u0[NCONS]        = {surface_density, px, py, energy};
 
             double omega_outer      = sqrt(central_mass * pow(onset_radius, -3.0));
-            double buffer_rate      = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
+            
+            // Smooth exponential ramp instead of linear to avoid sharp boundary effects
+            double xi               = (rc - onset_radius) / (outer_radius - onset_radius);  // xi in [0, 1]
+            double buffer_rate      = driving_rate * omega_outer * (exp(2.0*xi) - 1.0) / (exp(2.0) - 1.0);
 
             for (int q = 0; q < NCONS; ++q)
             {

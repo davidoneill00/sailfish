@@ -284,6 +284,6 @@ class SetupBase(ABC):
         prescribed trajectory) in a gravitating hydrodynmics problem.
         """
         return dict(
-            SS73         = self.SS73,
-            point_masses = self.point_masses(time)
+            SS73          = self.SS73,
+            point_masses  = self.point_masses(time)
             )

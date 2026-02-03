@@ -29,13 +29,14 @@ def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
             plot_args = [
                 "python", plot_script,
                 name,
-                #"-f", str('t4'),
+                #"-f", str('t'),
                 "-l",           
-                "--radius", str(1.0),
+                #"--radius", str(3),
                 "--vmap",
-                "--vmin", str(-3),
-                "--vmax", str(0.5),
-                "-o", "output-figures/"
+                "--vmin", str(-1),
+                "--vmax", str(-0.5),
+                "-o", "output-figures/",
+                #"--remap", str(True)
             ]
 
             subprocess.run(plot_args, check=True)
@@ -67,7 +68,7 @@ def make_movie(current_path, movie_outdir, filename):
 
     cmd = [
         "ffmpeg", "-y",
-        "-framerate", "30",
+        "-framerate", "60",
         "-start_number", "0",
         "-i", str(input_pattern),
         # Single filter chain: make dimensions even + slow to 0.5x

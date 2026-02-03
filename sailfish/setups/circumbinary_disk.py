@@ -12,7 +12,7 @@ from sailfish.physics.circumbinary import (
 )
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup_base import SetupBase, SetupError, param
-from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, gamma_law_index, cgs, ShakuraSunyaevDisk
+from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, ShakuraSunyaevDisk
 import numpy as np
 
 class CircumbinaryDisk(SetupBase):
@@ -629,14 +629,21 @@ class CoolBinary(SetupBase):
     retrograde            = param(False, "is disk retrograde?")
     which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
 
+    # buffer 
+    live_buffer           = param(False, "whether to set the buffer targets by the binary torque")
+    live_buffer_cadence   = param(50.0, "binned intervals of binary torque for computing target values")
+    buffer_driving_rate   = param(100.0, "rate at which the buffer drives the solution towards target values")
+    buffer_onset_width    = param(0.2, "buffer ramp distance")
+
     # Cooling specific parameters
     central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
     mach_number_a         = param(10, "Disk Mach number") 
     target_accretion_rate = param(1., "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
     OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
+    Cooling_N             = param(1e6, "N samples of temperatures in tabulated emission", mutable=True) 
     # Inspiral specific parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
-    init_eccentricity     = param(0.0, "orbital eccentricity of the binary")
+    #init_eccentricity     = param(0.0, "orbital eccentricity of the binary")
     #inspiral_start_time   = param(1000., "how many orbits before inspiral starts")
     #integration_timestep  = param(0.001, "timestep for integrating the inspiral")
     #semi_major_axis_list  = param([]," List of all semi-major axes over the inspiral")
@@ -644,7 +651,18 @@ class CoolBinary(SetupBase):
     #inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
     #gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ", mutable=True)
     #Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
-    
+    # Sweep specific parameters
+    init_eccentricity  = param(0.0 , "orbital eccentricity at start of sweep")
+    final_eccentricity = param(0.0 , "orbital eccentricity at end of sweep"  )
+    init_mass_ratio    = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
+    final_mass_ratio   = param(1.0 , "component mass ratio at end of sweep")
+    init_mach_number   = param(10.0, "orbital Mach number (isothermal) at start of sweep")
+    final_mach_number  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
+    sweep_start_time   = param(1e4 , "orbit where parameter sweeping begins")
+    sweep_end_time     = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ")
+    sweep_logspace     = param(False, "perform the sweep in logspace")
+    #ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
+
     
     a0 = 1.0
     GM = 1.0
@@ -657,14 +675,6 @@ class CoolBinary(SetupBase):
     def length_scale_pc(self):
         r_g = self.Gravitational_Radius_pc
         return r_g * self.init_separation_rg 
-
-    @property
-    def is_isothermal(self):
-        return self.eos == "isothermal"
-
-    @property
-    def is_gamma_law(self):
-        return self.eos == "gamma-law"
 
     @property
     def SS73(self):
@@ -684,18 +694,18 @@ class CoolBinary(SetupBase):
     
     @property
     def Temperature(self):
-        return np.logspace(0,10,int(1e6))
+        return np.logspace(0,10,int(self.Cooling_N))
     
     @property   
     def EmissionTable(self):
-        optical_emission   = OpticalEmission(self.Temperature, self.SS73.Length_Scale_CGS)
-        infared_emission   = InfaredEmission(self.Temperature, self.SS73.Length_Scale_CGS)
-        uv_emission        = UVEmission(self.Temperature     , self.SS73.Length_Scale_CGS)
-        xray_emission      = XrayEmission(self.Temperature   , self.SS73.Length_Scale_CGS)
+        optical_emission   = OpticalEmission(self.Temperature)
+        infared_emission   = InfaredEmission(self.Temperature)
+        uv_emission        = UVEmission(self.Temperature)
+        xray_emission      = XrayEmission(self.Temperature)
 
         return np.asarray([np.asarray(optical_emission), np.asarray(infared_emission), np.asarray(uv_emission), np.asarray(xray_emission)])
-    
-    
+
+
 
     def primitive(self, t, coords, primitive):
         x, y       = coords
@@ -707,19 +717,27 @@ class CoolBinary(SetupBase):
         sign = 1.0
         if self.retrograde == True:
                 sign = -1.
-        if self.is_isothermal:
-            primitive[0] = 1.0
-            primitive[1] = sqrt(self.GM / r_softened) * phi_hat_x * sign
-            primitive[2] = sqrt(self.GM / r_softened) * phi_hat_y * sign
-        elif self.is_gamma_law:
-            sigma    = self.SS73.surface_density_profile(r_softened)
-            pressure = self.SS73.surface_pressure_profile(r_softened)
-            primitive[0] = sigma * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
-            primitive[1] = sign  * sqrt(self.GM / r_softened) * phi_hat_x
-            primitive[2] = sign  * sqrt(self.GM / r_softened) * phi_hat_y
-            primitive[3] = pressure * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+
+        sigma        = self.SS73.surface_density_profile(r_softened)
+        pressure     = self.SS73.surface_pressure_profile(r_softened)
+        primitive[0] = sigma    * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+        vkep2        = self.GM / r_softened
+        v_phi        = np.sqrt(vkep2 + self.pressure_powerlaw * pressure / sigma) 
+        v_r          = - self.SS73.Mdot_inf / (2 * 3.1415926 * r * sigma) if r > 1e-3 else 0.0
+        
+        primitive[1] = sign     * v_phi * phi_hat_x + v_r * x / r
+        primitive[2] = sign     * v_phi * phi_hat_y + v_r * y / r
+        primitive[3] = pressure * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30))) # cavity at r=1
 
         return primitive
+
+    @property
+    def surface_density_powerlaw(self):
+        return -0.75  # SS73 value
+    
+    @property
+    def pressure_powerlaw(self):
+        return -1.5  # SS73 value
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -730,41 +748,23 @@ class CoolBinary(SetupBase):
 
     @property
     def physics(self):
-        if self.is_isothermal:
-            return dict(
-                eos_type              = EquationOfState.LOCALLY_ISOTHERMAL,
-                mach_number           = self.mach_number_a,
-                point_mass_function   = self.point_masses,
-                buffer_is_enabled     = self.buffer_is_enabled,
-                buffer_driving_rate   = 100.0,
-                buffer_onset_width    = 1.0,
-                cooling_coefficient   = 0.0,
-                constant_softening    = self.constant_softening,
-                viscosity_model       = ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
-                viscosity_coefficient = self.nu,
-                alpha                 = 0.0,
-                diagnostics           = self.diagnostics,
-                retrograde            = self.retrograde,
-            )
-
-        elif self.is_gamma_law:
-            return dict(
-                eos_type               = EquationOfState.GAMMA_LAW,
-                gamma_law_index        = self.gamma_law_index,
-                point_mass_function    = self.point_masses,
-                buffer_is_enabled      = self.buffer_is_enabled,
-                buffer_driving_rate    = 1000.0,  # default value in circumbinary.py
-                buffer_onset_width     = 0.1,  # default value in circumbinary.py
-                dynamic_cooling_base   = self.dynamic_cooling_base,
-                constant_softening     = self.constant_softening,
-                viscosity_model        = ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
-                viscosity_coefficient  = 0.0,
-                alpha                  = self.alpha,
-                diagnostics            = self.diagnostics,
-                retrograde             = self.retrograde,
-                disk_structure         = self.SS73,
-                optical_depth_floor    = self.OpticalDepthFloor,
-            )
+        return dict(
+            eos_type               = EquationOfState.GAMMA_LAW,
+            gamma_law_index        = self.gamma_law_index,
+            point_mass_function    = self.point_masses,
+            buffer_is_enabled      = self.buffer_is_enabled,
+            buffer_driving_rate    = self.buffer_driving_rate,  # default value in circumbinary.py
+            buffer_onset_width     = self.buffer_onset_width,    # default value in circumbinary.py
+            dynamic_cooling_base   = self.dynamic_cooling_base,
+            constant_softening     = self.constant_softening,
+            viscosity_model        = ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
+            viscosity_coefficient  = 0.0,
+            alpha                  = self.alpha,
+            diagnostics            = self.diagnostics,
+            retrograde             = self.retrograde,
+            disk_structure         = self.SS73,
+            optical_depth_floor    = self.OpticalDepthFloor,
+        )
 
 
     @property
@@ -787,12 +787,16 @@ class CoolBinary(SetupBase):
                 dict(quantity="mdot"  , which_mass=2, accretion=True),
                 dict(quantity="torque", which_mass='both', gravity=True),
                 dict(quantity="torque", which_mass='both', accretion=True),
-                dict(quantity="power" , which_mass=1,gravity=True),
-                dict(quantity="power" , which_mass=2,gravity=True),
-                dict(quantity="power" , which_mass=1,accretion=True),
-                dict(quantity="power" , which_mass=2,accretion=True),
-                dict(quantity="angular_momentum"),
+                dict(quantity="power" , which_mass=1, gravity=True),
+                dict(quantity="power" , which_mass=2, gravity=True),
+                dict(quantity="power" , which_mass=1, accretion=True),
+                dict(quantity="power" , which_mass=2, accretion=True),
+                dict(quantity="total_angular_momentum"),
                 dict(quantity="max_temperature"),
+                dict(quantity="buffer_torque", which_mass=0, buffer=True),
+                #dict(quantity="buffer_torque_dynamical", which_mass=0, buffer=True),
+                dict(quantity="buffer_mass_rate", which_mass=0, buffer=True),
+                
             ]
         else:
             return [
@@ -803,10 +807,7 @@ class CoolBinary(SetupBase):
         
     @property
     def solver(self):
-        if self.is_isothermal:
-            return "cbdiso_2d"
-        elif self.is_gamma_law:
-            return "cbdgam_2d"
+        return "cbdgam_2d"
 
     @property
     def boundary_condition(self):
@@ -816,18 +817,69 @@ class CoolBinary(SetupBase):
     def reference_time_scale(self):
         return 2.0 * pi
     
+    """
+    Eccentricity sweep adopted from C.Tiede (AdiabaticParamSweep)
+    """
+    @property
+    def sweep_time(self):
+        return self.reference_time_scale * (self.sweep_end_time - self.sweep_start_time)
 
     @property
-    def orbital_elements(self):
+    def sweep_rate_e(self):
+        e0 = self.init_eccentricity  if (self.init_eccentricity  > 0.0) else 1e-10
+        e1 = self.final_eccentricity if (self.final_eccentricity > 0.0) else 1e-10
+        estart = e0 if (not self.sweep_logspace) else log10(e0)
+        efinal = e1 if (not self.sweep_logspace) else log10(e1)
+        return (efinal - estart) / self.sweep_time
+
+    @property
+    def sweep_rate_q(self):
+        q0 = self.init_mass_ratio
+        q1 = self.final_mass_ratio
+        qstart = q0 if (not self.sweep_logspace) else log10(q0)
+        qfinal = q1 if (not self.sweep_logspace) else log10(q1)
+        return (qfinal - qstart) / self.sweep_time
+
+    @property
+    def sweep_rate_mach(self):
+        ma0 = self.init_mach_number
+        ma1 = self.final_mach_number
+        mastart = ma0 if (not self.sweep_logspace) else log10(ma0)
+        mafinal = ma1 if (not self.sweep_logspace) else log10(ma1)
+        return (mafinal - mastart) / self.sweep_time
+
+    def mach_number(self, time):
+        start = self.sweep_start_time * self.reference_time_scale
+        sflag = (time >= start)
+        return self.init_mach_number + self.sweep_rate_mach * (time - start) * sflag
+
+    def orbital_elements(self, time):
+        start = self.sweep_start_time * self.reference_time_scale
+        sflag = (time >= start)
+        delta = (time - start) * sflag
+        efix  = (self.final_eccentricity == self.init_eccentricity)
+        e0 = self.init_eccentricity if (self.init_eccentricity > 0.0) else 1e-10
+        q0 = self.init_mass_ratio
+        e  = e0 + self.sweep_rate_e * delta
+        q  = q0 + self.sweep_rate_q * delta
+        if self.sweep_logspace:
+            loge = log10(e0) + self.sweep_rate_e * delta
+            logq = log10(q0) + self.sweep_rate_q * delta
+            e = 10**loge
+            q = 10**logq
+        if q > self.final_mass_ratio:
+            q = self.final_mass_ratio
+        if e > self.final_eccentricity:
+            e = self.final_eccentricity
         return OrbitalElements(
             semimajor_axis=1.0,
             total_mass=1.0,
-            mass_ratio=self.mass_ratio,
-            eccentricity=self.init_eccentricity,
+            mass_ratio=q,
+            eccentricity=e if (not efix) else self.init_eccentricity,
         )
 
     def point_masses(self, time):
-        m1, m2 = self.orbital_elements.orbital_state(time)
+        m1, m2 = self.orbital_elements(time).orbital_state(time)
 
         return (
             PointMass(
@@ -987,6 +1039,3 @@ class CoolBinary(SetupBase):
 
     #         c1 = PointMass(0.97, x, y, vx, vy, softening_length=2 * self.softening_length, sink_model=SinkModel['ACCELERATION_FREE'], sink_rate=self.sink_rate, sink_radius=2 * self.sink_radius,)
     #         return c1
-
-    # def checkpoint_diagnostics(self, time):
-    #     return dict(point_masses=self.point_masses(time))
