@@ -283,9 +283,7 @@ class SetupBase(ABC):
         An example use case is to record the positions of point masses (with
         prescribed trajectory) in a gravitating hydrodynmics problem.
         """
-        AngularMomentumFlux_FJ0 = dict(FJ0_interval = solver.FJ0_interval, FJ0_time_interval = solver.FJ0_time_interval)
         return dict(
             SS73          = self.SS73,
             point_masses  = self.point_masses(solver.time),
-            ConstFlux_FJ0 = AngularMomentumFlux_FJ0
             )

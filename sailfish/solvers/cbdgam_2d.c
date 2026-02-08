@@ -60,14 +60,16 @@ struct PointMassList {
 };
 
 struct KeplerianBuffer {
-    //double pressure_onset;
-    //double pressure_powerlaw; 
+    double surface_density_onset;
+    double surface_density_powerlaw;
+    double pressure_onset;
+    double pressure_powerlaw; 
     double central_mass;
     double driving_rate;
     double outer_radius;
     double onset_width;
     double Mdot_inf;      // >0 means inward accretion (v_r < 0)
-    double FJ0;           // Rafikov integration constant (can be 0 initially)
+    //double FJ0;           // Rafikov integration constant (can be 0 initially)
     int is_enabled;
     int is_retrograde;
 };
@@ -258,149 +260,101 @@ PRIVATE void buffer_source_term(
     double *debug
 )
 {
+    // ==== constants and initialisation ====
     const double two_pi = 6.283185307179586;
     const double eps    = 1e-12;
+    double sign         = 1.0;
+
+    // ==== geometry and validation ====
     double rc           = sqrt(xc*xc + yc*yc);
     double rinv         = 1.0 / (rc + eps);
     double onset_radius = buffer->outer_radius - buffer->onset_width;
+    double onset_omega  = sqrt(buffer->central_mass * rinv * rinv * rinv);
     if (rc <= onset_radius) return;
     if (!buffer->is_enabled) return;
+    if (buffer->is_retrograde) sign = -1.0;
     
+    // ==== buffer damping profile and fraction ====
     double lambda       = (rc - onset_radius) / (buffer->onset_width + eps);
     if (lambda < 0.0) lambda = 0.0;
     if (lambda > 1.0) lambda = 1.0;
-    double ramp         = lambda*lambda*(3.0 - 2.0*lambda);
-
-    // Relaxation fraction for this step (dimensionless)
-    double frac = buffer->driving_rate * ramp * dt;
+    double ramp = lambda*lambda*(3.0 - 2.0*lambda); // smooth ramp function between 0 and 1
+    double frac = buffer->driving_rate * ramp * dt * onset_omega;
     if (frac < 0.0) frac = 0.0;
     if (frac > 1.0) frac = 1.0;
     if (frac == 0.0) return;
 
-    // Current state (conserved)
-    double Sigma = cons[0];
-    double px    = cons[1];
-    double py    = cons[2];
-    double Eold  = cons[3];
+    // ==== Current state ====
+    double Sigma          = cons[0];
+    double px             = cons[1];
+    double py             = cons[2];
+    double E              = cons[3]; 
+    double pr             = ( xc*px + yc*py ) * rinv;
+    double pphi           = (-yc*px + xc*py ) * rinv;
+    double vr             = pr / Sigma;
+    double vphi           = pphi / Sigma;
+    
 
-    double pr   = ( xc*px + yc*py ) * rinv;
-    double pphi = (-yc*px + xc*py ) * rinv;
-    double Mdot = buffer->Mdot_inf;
-    double vr_t = - Mdot / (two_pi * rc * Sigma); 
-    double pr_t = Sigma * vr_t;
-    double lK   = sqrt(buffer->central_mass * (rc + eps));
-    if (buffer->is_retrograde) lK = -lK;
+    // Here we enforce the Rafikov-inspired buffer via the conservative quantities in the buffer region.
+    // The target values are passed to the kernel and here we just do the damping to the steady state.
+    
+    bool x_center = (xc>-0.005000001 && xc<-0.004999999);
+    bool y_right  = (yc> 4.754900000 && yc< 4.755000001);
+    if (x_center){
+        if (y_right) 
+        debug[0] = frac;
+        debug[1] = pr;
+    }
 
-    // Rafikov-inspired: total angular momentum flux is
-    //     F_J(r) = Mdot * l_K(r) + FJ0
-    // Here we enforce it via the *advective* part, i.e. we choose p_phi so that
-    //     F_J,adv = Mdot * (p_phi / Sigma)  matches  Mdot*lK + FJ0
-    // This is consistent when viscous torques are negligible in the buffer region, 
-    // which is true when the buffer is narrow and/or the driving rate is fast. 
-    double FJ_t     = Mdot * lK + buffer->FJ0;
-    double l_adv_t  = FJ_t / (Mdot + eps);
-    double pphi_t   = Sigma * l_adv_t;  // no sigma relaxation
+    // --- Apply relaxation in (Sigma, pr, phi, Eint) ---
+    double Sigma_t = buffer->surface_density_onset * pow(rc/onset_radius, buffer->surface_density_powerlaw);
+    Sigma         += (Sigma_t - Sigma) * frac;
 
-    // --- Apply relaxation in (p_r, p_phi) only ---
-    pr   += (pr_t   - pr)   * frac;
-    //pr    = pr_t;
-    pphi += (pphi_t - pphi) * frac;
+    // --- vphi^2 = GM/r + r/Sigma dP/dr
+    double pP     = buffer->pressure_powerlaw;
+    double P_t    = buffer->pressure_onset        * pow(rc/onset_radius, buffer->pressure_powerlaw);
+    double vphi2  = buffer->central_mass * rinv + (pP * P_t) / (Sigma_t + eps); // using Sigma_t is fine
+    vphi2         = max2(vphi2, 0.0);
+    double vphi_t = sign * sqrt(vphi2);
+    vphi         += (vphi_t - vphi) * frac;
+    pphi          = vphi * Sigma;
 
-    // Reconstruct Cartesian momenta:
+    // relax vr to impose Mdot
+    double vr_t   = -buffer->Mdot_inf / (two_pi * rc * Sigma_t);  // use Sigma_t (recommended)
+    vr           += (vr_t - vr) * frac;
+    pr            = vr * Sigma;
+
+    // update internal energy consistently
+    double ke     = 0.5 * (pr*pr + pphi*pphi) / (Sigma + eps);
+    double eint   = E - ke;
+    double eint_t = P_t / (gamma_law_index - 1.0);
+    eint         += (eint_t - eint) * frac;
+    E             = eint + ke; 
+
+    // Reconstruct Cartesian conservatives:
+    cons[0] = Sigma;
     cons[1] = ( pr * xc - pphi * yc ) * rinv;
     cons[2] = ( pr * yc + pphi * xc ) * rinv;
+    cons[3] = E;
 
-    bool x_center = (xc>-0.005000001 && xc<-0.004999999);
-    bool x_right  = (xc> 4.754900000 && xc< 4.755000001);
-    bool x_left   = (xc>-4.755000001 && xc<-4.754900000);
-
-    bool y_center = (yc>-0.005000001 && yc<-0.004999999);
-    bool y_right  = (yc> 4.754900000 && yc< 4.755000001);
-    bool y_left   = (yc>-4.755000001 && yc<-4.754900000);
+    
 
     if (x_center){
-        if (y_right) debug[0] = frac;
-        if (y_left)  debug[1] = frac;
+        if (y_right) 
+        //debug[2] = pr_t;
+        debug[3] = pr;
+        debug[4] = debug[3] - debug[1];
     }
-    if (x_right){
-        if (y_center) debug[2] = frac;
-    }
-    if (x_left){
-        if (y_center) debug[3] = frac;
-    }
+
+    //     if (y_left)  {debug[1] = frac;}
+    // }
+    // if (x_right){
+    //     if (y_center) debug[2] = frac;
+    // }
+    // if (x_left){
+    //     if (y_center) debug[3] = frac;
+    // }
 }
-
-
-// PRIVATE void buffer_source_term(
-//     struct KeplerianBuffer *buffer,
-//     double xc,
-//     double yc,
-//     double dt,
-//     double *cons,
-//     double gamma_law_index
-// )
-// {
-//     double rc           = sqrt(xc * xc + yc * yc);
-//     double rinv         = 1.0 / (rc + 1e-12);
-//     double onset_radius = buffer->outer_radius - buffer->onset_width;
-//     if (!buffer->is_enabled) return;
-//     if (rc <= onset_radius) return;    
-
-//     // buffer damping: 
-//     // target density, pressure and (Keplerian) angular momentum profiles
-//     // Low radial velocity 
-
-
-//     // Target profiles
-//     double Sigma_t = buffer->surface_density_onset * pow(rc / onset_radius, buffer->surface_density_powerlaw);
-//     double P_t     = buffer->pressure_onset        * pow(rc / onset_radius, buffer->pressure_powerlaw);
-
-//     double Omega   = sqrt(buffer->central_mass * rinv * rinv * rinv);
-//     double l_t     = rc * rc * Omega;
-//     if (buffer->is_retrograde) l_t *= -1.0;
-
-//     // current state
-//     double Sigma = cons[0];
-//     double px    = cons[1];
-//     double py    = cons[2];
-//     double Eold  = cons[3];
-
-//     // decompose momentum
-//     double pr   = ( xc * px + yc * py ) * rinv;
-//     double pphi = (-yc * px + xc * py ) * rinv;
-//     double vr   = pr / (Sigma + 1e-12);
-
-//     // target azimuthal momentum
-//     double pphi_t = Sigma_t * l_t;
-
-//     // ramp function
-//     double lambda = (rc - onset_radius) / buffer->onset_width;
-//     lambda        = fmin(1.0, fmax(0.0, lambda));
-//     double ramp   = lambda * lambda * (3.0 - 2.0 * lambda);
-//     double rate   = buffer->driving_rate * ramp;
-//     double frac   = fmin(1.0, rate * dt);
-
-//     // relax surface density
-//     double Sigma_old = Sigma;
-//     Sigma           += (Sigma_t - Sigma) * frac;
-//     cons[0]          = Sigma;
-
-//     // relax angular momentum 
-//     pphi   += (pphi_t - pphi) * frac;
-
-//     // reconstruct momentum 
-//     //pr      = vr * Sigma;
-//     pr     *= (1.0 - frac);
-//     cons[1] = ( pr * xc - pphi * yc ) * rinv;
-//     cons[2] = ( pr * yc + pphi * xc ) * rinv;
-
-//     // gentle energy relaxation
-//     double ek_new  = 0.5 * (cons[1]*cons[1] + cons[2]*cons[2]) / (Sigma + 1e-12);
-//     double ein_old = Eold - 0.5 * (px*px + py*py) / (Sigma_old + 1e-12); // use old Sigma, old px,py
-//     double ein_t   = P_t / (gamma_law_index - 1.0);
-//     double ein_new = ein_old + (ein_t - ein_old) * frac;
-//     cons[3]        = ein_new + ek_new;
-// }
 
 
 PRIVATE void shear_strain(
@@ -586,16 +540,15 @@ PUBLIC void cbdgam_2d_advance_rk(
     double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, 4)
     double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, 4)
     double gamma_law_index,
-    //double buffer_surface_density_onset,
-    //double buffer_pressure_onset,
-    //double surface_density_powerlaw,
-    //double pressure_powerlaw,
+    double buffer_surface_density_onset,
+    double buffer_pressure_onset,
+    double surface_density_powerlaw,
+    double pressure_powerlaw,
     double buffer_central_mass,
     double buffer_driving_rate,
     double buffer_outer_radius,
     double buffer_onset_width,
     double buffer_Mdot_inf,
-    double buffer_FJ0,
     int buffer_is_enabled,
     int retrograde,
     double x1, // point mass 1
@@ -629,16 +582,15 @@ PUBLIC void cbdgam_2d_advance_rk(
 {
 
     struct KeplerianBuffer buffer = {
-        //buffer_surface_density_onset,
-        //_onset,
-        //surface_density_powerlaw,
-        //pressure_powerlaw,
+        buffer_surface_density_onset,
+        surface_density_powerlaw,
+        buffer_pressure_onset,
+        pressure_powerlaw,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
         buffer_Mdot_inf,
-        buffer_FJ0,
         buffer_is_enabled,
         retrograde
     };
@@ -847,31 +799,31 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     double patch_yl                      = p[2];
     double patch_yr                      = p[3];
     double gamma_law_index               = p[4];
-    //double buffer_surface_density_onset  = p[5];
-    //double buffer_pressure_onset         = p[5];
-    //double surface_density_powerlaw      = p[7];
-    //double pressure_powerlaw             = p[6];
-    double buffer_central_mass           = p[5];
-    double buffer_driving_rate           = p[6];
-    double buffer_outer_radius           = p[7];
-    double buffer_onset_width            = p[8];
-    double buffer_Mdot_inf               = p[9];
-    double buffer_FJ0                    = p[10];
-    int buffer_is_enabled                = (int)p[11];
-    int retro                            = (int)p[12];
+    double buffer_surface_density_onset  = p[5];
+    double buffer_pressure_onset         = p[6];
+    double surface_density_powerlaw      = p[7];
+    double pressure_powerlaw             = p[8];
+    double buffer_central_mass           = p[9];
+    double buffer_driving_rate           = p[10];
+    double buffer_outer_radius           = p[11];
+    double buffer_onset_width            = p[12];
+    double buffer_Mdot_inf               = p[13];
+    //double buffer_FJ0                    = p[14];
+    int buffer_is_enabled                = (int)p[14];
+    int retro                            = (int)p[15];
 
 
     struct KeplerianBuffer buffer = {
-        //buffer_surface_density_onset,
-        //buffer_pressure_onset,
-        //surface_density_powerlaw,
-        //pressure_powerlaw,
+        buffer_surface_density_onset,
+        surface_density_powerlaw,
+        buffer_pressure_onset,
+        pressure_powerlaw,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
         buffer_Mdot_inf,
-        buffer_FJ0,
+        //buffer_FJ0,
         buffer_is_enabled,
         retro
     };

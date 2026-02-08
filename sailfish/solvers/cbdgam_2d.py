@@ -77,9 +77,10 @@ class Patch:
         options,
         buffer_outer_radius,
         M_dot_inf,
-        FJ0,
-        #surface_density_powerlaw,
-        #pressure_powerlaw,
+        buffer_surface_density_onset,
+        buffer_pressure_onset,
+        surface_density_powerlaw,
+        pressure_powerlaw,
         lib,
         xp,
         execution_context,
@@ -98,12 +99,12 @@ class Patch:
         self.xr, self.yr                   = mesh.vertex_coordinates(i1, nj)
         self.retrograde                    = physics.retrograde
         self.buffer_outer_radius           = buffer_outer_radius
-        #self.buffer_surface_density_onset  = None      # assign all immediately after instantiation
-        #self.buffer_pressure_onset         = None
-        #self.surface_density_powerlaw      = surface_density_powerlaw
-        #self.pressure_powerlaw             = pressure_powerlaw
+        self.buffer_surface_density_onset  = buffer_surface_density_onset
+        self.buffer_pressure_onset         = buffer_pressure_onset
+        self.surface_density_powerlaw      = surface_density_powerlaw
+        self.pressure_powerlaw             = pressure_powerlaw
         self.Mdot_inf                      = M_dot_inf
-        self.FJ0                           = FJ0
+        #self.FJ0                           = FJ0
 
         # option to vary the cooling coefficient dynamically
         def dynamic_cooling(_self):
@@ -211,22 +212,22 @@ class Patch:
                 self.physics.gamma_law_index
             )
 
-            self.debugFake = self.xp.zeros(4, dtype=self.xp.float64)
+            self.debugFake = self.xp.zeros(5, dtype=self.xp.float64)
 
 
             params = self.xp.ascontiguousarray(self.xp.array([
                 self.xl, self.xr, self.yl, self.yr,
                 self.physics.gamma_law_index,
-                #self.buffer_surface_density_onset,
-                #self.buffer_pressure_onset,
-                #self.surface_density_powerlaw,
-                #self.pressure_powerlaw,
+                self.buffer_surface_density_onset,
+                self.buffer_pressure_onset,
+                self.surface_density_powerlaw,
+                self.pressure_powerlaw,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 self.Mdot_inf,
-                self.FJ0,
+                #self.FJ0,
                 float(int(self.physics.buffer_is_enabled)),
                 float(int(self.retrograde)),
             ], dtype=self.xp.float64))
@@ -282,7 +283,7 @@ class Patch:
     def advance_rk(self, rk_param, dt):
         m1, m2              =  self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
-        self.debug = self.xp.zeros(4, dtype=self.xp.float64)
+        self.debug = self.xp.zeros(5, dtype=self.xp.float64)
         with self.execution_context:
             self.lib.cbdgam_2d_advance_rk[self.shape](
                 self.xl,
@@ -293,16 +294,16 @@ class Patch:
                 self.primitive1,
                 self.primitive2,
                 self.physics.gamma_law_index,
-                #self.buffer_surface_density_onset,
-                #self.buffer_pressure_onset,
-                #self.surface_density_powerlaw,
-                #self.pressure_powerlaw,
+                self.buffer_surface_density_onset,
+                self.buffer_pressure_onset,
+                self.surface_density_powerlaw,
+                self.pressure_powerlaw,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 self.Mdot_inf,
-                self.FJ0,
+                #self.FJ0,
                 int(self.physics.buffer_is_enabled),
                 int(self.retrograde),
                 m1.position_x,
@@ -423,12 +424,13 @@ class Solver(SolverBase):
         self.cs_a                  = (self.setup.SS73.gamma * (self.setup.SS73.surface_pressure_profile(r=1) / self.setup.SS73.surface_density_profile(r=1)))**0.5
         self.nu_a                  = self.setup.SS73.alpha * self.cs_a**2
         self.M_dot_inf             = 3 * np.pi * (self.nu_a * self.setup.SS73.surface_density_profile(r=1))
-        self.FJ0                   = 0.0
         self.buffer_onset_radius   = self.domain_radius - physics.buffer_onset_width
         self.live_buffer           = self.setup.live_buffer
         self.live_buffer_cadence   = self.setup.live_buffer_cadence
         self.t_viscous_a           = 0.5 * ViscousTime(r=1, Mach_a=self.physics['mach_number'], alpha=self.physics['alpha'])                        # viscous time near cavity
-        #self.buffer_pressure_onset = None
+        
+        # self.buffer_surface_density_onset  = None
+        # self.buffer_pressure_onset         = None
 
         logger.info(f"Begin computing the binary torques at {self.t_viscous_a:.2f} orbital periods")
         if solution is None:
@@ -441,17 +443,17 @@ class Solver(SolverBase):
             buffer_outer_radius                = mesh.x1  # this assumes the mesh is a centered squared
             buffer_onset_radius                = buffer_outer_radius - physics.buffer_onset_width
             setup.primitive(time, [buffer_onset_radius, 0.0], buffer_prim)
-            #surface_density_powerlaw           = setup.surface_density_powerlaw
-            #pressure_powerlaw                  = setup.pressure_powerlaw
-            #self.buffer_surface_density_onset  = buffer_prim[0]
-            #self.buffer_pressure_onset         = buffer_prim[3]
-            # if this is a checkpoint restart, these will be overwritten again!
+            surface_density_powerlaw           = setup.surface_density_powerlaw
+            pressure_powerlaw                  = setup.pressure_powerlaw
+            # These values are only at initialization and can be overwritten in driver.append_timeseries
+            buffer_surface_density_onset       = buffer_prim[0]
+            buffer_pressure_onset              = buffer_prim[3]
         else:
             buffer_outer_radius                = 0.0
-            #self.buffer_surface_density_onset  = 0.0
-            #self.buffer_pressure_onset         = 0.0
-            #surface_density_powerlaw           = 0.0
-            #pressure_powerlaw                  = 0.0
+            buffer_surface_density_onset       = 0.0
+            buffer_pressure_onset              = 0.0
+            surface_density_powerlaw           = 0.0
+            pressure_powerlaw                  = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
             prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
@@ -465,9 +467,10 @@ class Solver(SolverBase):
                 options,
                 buffer_outer_radius,
                 self.M_dot_inf,
-                self.FJ0,
-                #surface_density_powerlaw,
-                #pressure_powerlaw,
+                buffer_surface_density_onset,
+                buffer_pressure_onset,
+                surface_density_powerlaw,
+                pressure_powerlaw,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
@@ -840,10 +843,6 @@ class Solver(SolverBase):
     def advance_rk(self, rk_param, dt):
         self.set_bc("primitive1")
         for patch in self.patches:
-            # Every call we update the buffer target values based whatever the solver has saved
-            #patch.buffer_surface_density_onset = self.buffer_surface_density_onset
-            #patch.buffer_pressure_onset        = self.buffer_pressure_onset
-            patch.FJ0 = self.FJ0
             # advance timestep
             patch.advance_rk(rk_param, dt)
 

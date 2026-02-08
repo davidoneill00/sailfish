@@ -29,24 +29,25 @@ def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
             plot_args = [
                 "python", plot_script,
                 name,
-                #"-f", str('t4'),
+                "-f", str('pressure'),
                 "-l",           
-                "--radius", str(1.0),
+                #"--radius", str(3),
                 "--vmap",
-                "--vmin", str(-3),
-                "--vmax", str(0.5),
-                "-o", "output-figures/"
+                "--vmin", str(-4.0),
+                "--vmax", str(-3.0),
+                "-o", "output-figures/",
+                #"--remap", str(True)
             ]
 
             subprocess.run(plot_args, check=True)
 
     # After all images are saved, rename them sequentially
-    ordered_frames = sorted(Path("output-figures").glob("DensityMap-*.png"))
+    ordered_frames = sorted(Path("output-figures").glob("PressureMap-*.png"))
     if not ordered_frames:
         raise FileNotFoundError("No frames were generated. Did you run with --quick_plotting?")
 
     for i, fname in enumerate(ordered_frames):
-        new_name = Path("output-figures") / f"DensityMap-{i:05d}.png"
+        new_name = Path("output-figures") / f"PressureMap-{i:05d}.png"
         if fname != new_name:
             move(fname, new_name)
     
@@ -63,11 +64,11 @@ def make_movie(current_path, movie_outdir, filename):
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"{filename}.mp4"
 
-    input_pattern = Path(current_path) / "output-figures" / "DensityMap-%05d.png"
+    input_pattern = Path(current_path) / "output-figures" / "PressureMap-%05d.png"
 
     cmd = [
         "ffmpeg", "-y",
-        "-framerate", "30",
+        "-framerate", "40",
         "-start_number", "0",
         "-i", str(input_pattern),
         # Single filter chain: make dimensions even + slow to 0.5x

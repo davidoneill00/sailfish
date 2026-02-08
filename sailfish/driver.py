@@ -79,7 +79,7 @@ def update_dict_where_none(new_dict, old_dict, frozen=[]):
             if new_val is None:
                 new_dict[key] = old_val
             elif key in frozen and new_val != old_val:
-                raise ConfigurationError(f"{key} cannot be changed")
+                raise ConfigurationError(f"{key} cannot be changed. Old value was {old_val}, new value is {new_val}")
 
 
 def update_where_none(new, old, frozen=[]):
@@ -111,9 +111,9 @@ def BufferTarget(r, FJ0, Mdot, setup):
     l     = Omega * r * r
     
     if setup.physics['retrograde']:
-        FJ    = np.abs(-Mdot * l + FJ0)  # require positive angular momentum flux   
+        FJ    = np.abs(-Mdot * l + FJ0)  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
     else:
-        FJ    = np.abs( Mdot * l + FJ0)  # require positive angular momentum flux   
+        FJ    = np.abs( Mdot * l + FJ0)  
 
     TargetPressure = FJ / (3 * np.pi * alpha * gamma * r**2)
     TargetDensity5 = 32 * np.pi * sigma * r**2 * mp**4 * TargetPressure**4 / (9 * Omega * kappa * kb**4 * FJ)
@@ -124,14 +124,10 @@ def BufferTarget(r, FJ0, Mdot, setup):
 def DetermineBufferSolution(solver, timeseries):    
     t = solver.time / solver.setup.reference_time_scale
     
-    if not solver.live_buffer:
-        return
-    
-    if (solver.t_viscous_a > solver.t_viscous_b):
-        raise ValueError("Buffer is too close. Viscous time at r=a is less than viscous time at buffer.")
-    
-    if t < solver.t_viscous_a:
-        return
+    if (not solver.live_buffer) or (t < solver.t_viscous_a):
+        # solver.FJ0 = 0.0
+        return 
+
     
     # Continue updating buffer throughout simulation using running average
     # Compute running average over the last live_buffer_cadence orbits
@@ -153,9 +149,9 @@ def DetermineBufferSolution(solver, timeseries):
         
         # Update buffer targets with the running average
         TargetPressure, TargetDensity        = BufferTarget(r=solver.buffer_onset_radius, FJ0=MeanTorque, Mdot=solver.M_dot_inf, setup=solver.setup)
-        solver.buffer_surface_density_onset  = TargetDensity
-        solver.buffer_surface_pressure_onset = TargetPressure
-
+        for patch in solver.patches:
+            patch.buffer_surface_density_onset  = TargetDensity
+            patch.buffer_surface_pressure_onset = TargetPressure
 
 
 
