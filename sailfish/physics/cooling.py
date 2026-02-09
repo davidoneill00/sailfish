@@ -177,11 +177,14 @@ class ShakuraSunyaevDisk(NamedTuple):
 		kappa_code  = cgs['kappa'] / (self._length**2 / self._mass)
 		sigmab_code = cgs['sigmab'] / (self._mass / self._time**3)	
 		qdot_coeff = 8. / 3. * sigmab_code / kappa_code * (mp_code / kb_code)**4 * (self.gamma - 1.)**4
-	# logger.info(f"density coefficient : {self.surface_density_coefficient:0.2e}")
-	# logger.info(f"pressure coefficient : {self.surface_pressure_coefficient:0.2e}")
-	# logger.info(f"implied eddington fraction : {self._eddington_fraction:0.2e}")
-	# logger.info(f"approximate optical depth : {self.optical_depth(1.):0.4f}")
-	# logger.info(f"cooling coefficient : {qdot_coeff:0.2e}")
+		return qdot_coeff
+
+	# Only for temporary testing
+	# =============================================================================
+	def surface_density_goodman(self):
+		coeff = 2**(4./5.) / 3. / pi**(3./5.)
+		s0 = coeff * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.)
+		return s0 * self.alpha**(-4./5.) * self._GM**(1./5.) * self._accretion_rate**(3./5.) * self._length**(-3./5.)
 		coeff = 2**(4./5.) / 3. / pi**(3./5.)
 		s0 = coeff * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.)
 		return s0 * self.alpha**(-4./5.) * self._GM**(1./5.) * self._accretion_rate**(3./5.) * self._length**(-3./5.)
