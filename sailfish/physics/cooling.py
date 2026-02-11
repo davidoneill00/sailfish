@@ -197,13 +197,16 @@ class ShakuraSunyaevDisk(NamedTuple):
 	def surface_pressure_goodman(self):
 		return cgs['kb'] / cgs['mp'] * self.midplane_temperature_goodman() * self.surface_density_goodman()
 	
+	def Mdot(self, r):
+		cs    = (self.gamma * (self.surface_pressure_profile(r) / self.surface_density_profile(r)))**0.5
+		Omega = r**(-3./2.)
+		Hs    = cs / Omega
+		nu    = self.alpha * cs * Hs
+		return 3 * pi * self.surface_density_profile(r) * nu
+	
 	@property
 	def Mdot_inf(self):
-		cs_a    = (self.gamma * (self.surface_pressure_profile(1.) / self.surface_density_profile(1.)))**0.5
-		Omega_a = 1.0**(-3./2.)
-		Hs_a    = cs_a /Omega_a
-		nu_a    = self.alpha * cs_a * Hs_a
-		return 3 * pi * self.surface_density_profile(1.) * nu_a * 1.0
+		return self.Mdot(1.0)
 		
 	# =============================================================================
 	# ========================== Code unit conversions ============================
@@ -229,13 +232,6 @@ class ShakuraSunyaevDisk(NamedTuple):
 	def Length_Scale_CGS(self): # physical units (not code units)
 		return self.length_scale_pc * cgs['pc']
 
-
-# def gamma_law_index(beta, gamma_law_index_gas):
-# 	"""
-# 	For a mixture of radiation and gas, we can define beta as the ratiom between gas pressure and
-# 	radiation pressure. When beta = 0, gamma=4/3, whereas when beta=0, gamma=gamma_gas. 
-# 	"""
-# 	return beta + (4-3*beta)**2 * (gamma_law_index_gas-1) / ( beta + 12 * (gamma_law_index_gas-1) * (1-beta) )
 
 def EffectiveTemperature(optical_depth, T):
 	"""
@@ -344,3 +340,8 @@ if __name__ == '__main__':
 	plt.tight_layout()
 	plt.subplots_adjust(hspace=0.1)
 	plt.show()
+
+	plt.figure()
+	plt.plot(r, 2 * np.pi * ss.Mdot(r), c='C0')
+	plt.ylim([-0.5,0.5])
+	plt.savefig('mdot_profile.png')

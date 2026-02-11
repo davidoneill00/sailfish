@@ -34,7 +34,7 @@ def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
                 #"--radius", str(3),
                 "--vmap",
                 "--vmin", str(-4.0),
-                "--vmax", str(-3.0),
+                "--vmax", str(-2.0),
                 "-o", "output-figures/",
                 #"--remap", str(True)
             ]
@@ -79,7 +79,6 @@ def make_movie(current_path, movie_outdir, filename):
         str(output_file),
     ]
     subprocess.run(cmd, check=True)
-
 
 
 

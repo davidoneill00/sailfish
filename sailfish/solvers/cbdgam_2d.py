@@ -76,7 +76,7 @@ class Patch:
         physics,
         options,
         buffer_outer_radius,
-        M_dot_inf,
+        Mdot_inf,
         buffer_surface_density_onset,
         buffer_pressure_onset,
         surface_density_powerlaw,
@@ -103,7 +103,7 @@ class Patch:
         self.buffer_pressure_onset         = buffer_pressure_onset
         self.surface_density_powerlaw      = surface_density_powerlaw
         self.pressure_powerlaw             = pressure_powerlaw
-        self.Mdot_inf                      = M_dot_inf
+        self.Mdot_inf                      = Mdot_inf
         #self.FJ0                           = FJ0
 
         # option to vary the cooling coefficient dynamically
@@ -212,8 +212,6 @@ class Patch:
                 self.physics.gamma_law_index
             )
 
-            self.debugFake = self.xp.zeros(5, dtype=self.xp.float64)
-
 
             params = self.xp.ascontiguousarray(self.xp.array([
                 self.xl, self.xr, self.yl, self.yr,
@@ -235,8 +233,7 @@ class Patch:
             self.lib.cbdgam_2d_buffer_source_term[self.shape](
                 params,
                 conserved1,
-                cons_rate,
-                self.debugFake
+                cons_rate
             )
 
         return cons_rate[ng:-ng, ng:-ng]
@@ -283,7 +280,7 @@ class Patch:
     def advance_rk(self, rk_param, dt):
         m1, m2              =  self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
-        self.debug = self.xp.zeros(5, dtype=self.xp.float64)
+
         with self.execution_context:
             self.lib.cbdgam_2d_advance_rk[self.shape](
                 self.xl,
@@ -332,12 +329,9 @@ class Patch:
                 self.options.mach_ceiling,
                 self.options.density_floor,
                 self.options.pressure_floor,
-                int(self.physics.constant_softening),
-                self.debug
+                int(self.physics.constant_softening)
             )
 
-            dbg = self.debug.get() if hasattr(self.debug, "get") else self.debug
-            #print("BUFFER DEBUG:", dbg)
             import numpy as np
             rho = self.primitive2[..., 0]
             pre = self.primitive2[..., 3]
@@ -421,9 +415,7 @@ class Solver(SolverBase):
         self.patches               = []
         ni, nj                     = mesh.shape
         self.domain_radius         = self.mesh.x1
-        self.cs_a                  = (self.setup.SS73.gamma * (self.setup.SS73.surface_pressure_profile(r=1) / self.setup.SS73.surface_density_profile(r=1)))**0.5
-        self.nu_a                  = self.setup.SS73.alpha * self.cs_a**2
-        self.M_dot_inf             = 3 * np.pi * (self.nu_a * self.setup.SS73.surface_density_profile(r=1))
+        self.Mdot_inf              = self.setup.SS73.Mdot_inf
         self.buffer_onset_radius   = self.domain_radius - physics.buffer_onset_width
         self.live_buffer           = self.setup.live_buffer
         self.live_buffer_cadence   = self.setup.live_buffer_cadence
@@ -466,7 +458,7 @@ class Solver(SolverBase):
                 physics,
                 options,
                 buffer_outer_radius,
-                self.M_dot_inf,
+                self.Mdot_inf,
                 buffer_surface_density_onset,
                 buffer_pressure_onset,
                 surface_density_powerlaw,

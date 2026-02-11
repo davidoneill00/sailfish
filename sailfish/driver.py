@@ -132,26 +132,32 @@ def DetermineBufferSolution(solver, timeseries):
     # Continue updating buffer throughout simulation using running average
     # Compute running average over the last live_buffer_cadence orbits
     # Optimization: only process recent data instead of entire timeseries
-    cutoff_time = t - solver.live_buffer_cadence
-    torque_sum  = 0.0
-    count       = 0
+    cutoff_time     = t - solver.live_buffer_cadence
+    ReversedTimes   = []
+    ReversedTorques = []
+    #torque_sum  = 0.0
+    #count       = 0
 
     # Walk backward from most recent data
     for entry in reversed(timeseries):
         entry_time = entry[0]
         if entry_time < cutoff_time:
             break  # Stop when we're outside the averaging window
-        torque_sum += entry[14] + entry[15]  # Sum binary torques
-        count += 1
+        torque_sum = entry[14] + entry[15]  # Sum binary torques
+        ReversedTimes.append(entry_time)
+        ReversedTorques.append(torque_sum)
+        #count += 1
     
-    if count > 0:  # Ensure we have data points in the window
-        MeanTorque = torque_sum / count
+    if len(ReversedTimes) > 0:  # Ensure we have data points in the window
+        MeanTorque = np.trapezoid(np.array(ReversedTorques), np.array(ReversedTimes), axis=0) / solver.live_buffer_cadence
         
         # Update buffer targets with the running average
-        TargetPressure, TargetDensity        = BufferTarget(r=solver.buffer_onset_radius, FJ0=MeanTorque, Mdot=solver.M_dot_inf, setup=solver.setup)
+        TargetPressure, TargetDensity        = BufferTarget(r=solver.buffer_onset_radius, FJ0=MeanTorque, Mdot=solver.Mdot_inf, setup=solver.setup)
         for patch in solver.patches:
             patch.buffer_surface_density_onset  = TargetDensity
             patch.buffer_surface_pressure_onset = TargetPressure
+
+    return MeanTorque
 
 
 
@@ -291,7 +297,8 @@ def append_timeseries(state):
             "timeseries event ignored because solver does not provide reductions"
         )
 
-    DetermineBufferSolution(state.solver, state.timeseries)
+    MeanTorque = DetermineBufferSolution(state.solver, state.timeseries)
+    # Add this to timeseries?
     
 
 
@@ -519,7 +526,7 @@ def simulate(driver):
     )
 
     if driver.chkpt_file:
-        DetermineBufferSolution(solver, chkpt['timeseries'])
+        MeanTorque = DetermineBufferSolution(solver, chkpt['timeseries'])
         logger.info("Reattributed constant angular momentum flux to the solver. Buffer target values will be updated accordingly")
 
     if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:

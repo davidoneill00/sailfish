@@ -1383,7 +1383,7 @@ def main_cbdgam_2d():
         SinkRadius         = (primary.sink_radius     , secondary.sink_radius)
         SoftRadius         = (primary.softening_length, secondary.softening_length)
         Nbins              = int(ni/2)
-        RadialBins         = np.linspace(2,mesh.x1,Nbins)
+        RadialBins         = np.linspace(1.0,mesh.x1,Nbins)
         GMu_primary        = primary.mass     # GM = 1.0 normalised in code units
         GMu_secondary      = secondary.mass
         Sigma             *= SS73.surface_density_coefficient # in units of Mb/a0^2
@@ -1475,7 +1475,7 @@ def main_cbdgam_2d():
         ax1.legend()
         ax1.set_ylabel(r'Velocity $[a_0\Omega_0]$')#; ax0.set_yscale('log')
 
-        Mach_profile = Radius**(-1/20) * (1-(Radius/primary.sink_radius)**(-0.5))**(-1/5)
+        Mach_profile = Radius**(-1/20) * (1-(Radius/0.1)**(-0.5))**(-1/5)
         ax2.yaxis.tick_right()
         ax2.yaxis.set_label_position("right")
         ax2.spines["right"].set_visible(True)
@@ -1484,21 +1484,21 @@ def main_cbdgam_2d():
         ax2.plot(Radius, DiskStats['MeanM'][-1]*Mach_profile/Mach_profile[-1], color='goldenrod', linestyle='dashed', label = r'$r^{-1/20}(1-r^{-1/2})^{-1/5}$')
         ax2.fill_between(Radius  , DiskStats['MinM']  , DiskStats['MaxM'], color='mediumblue', alpha=0.2)
         ax2.set_xlim([RadialBins[0], mesh.x1])
-        ax2.set_ylim([0, 1000])
+        ax2.set_ylim([7, 20])
         ax2.set_ylabel(r'$v/c_\mathrm{s}$')
         ax2.set_yticks([10, 12, 14, 16, 18])
         ax2.legend()
         ax2.set_xticklabels([])
 
-        ax3.plot(Radius  , DiskStats['MeanE']  , color='mediumblue')
-        ax3.axhline(y=0, color='goldenrod', linestyle='dashed', label = r'$e=0$')
+        ax3.plot(Radius, DiskStats['MeanE'], color='mediumblue')
+        ax3.axhline(y=0, color='goldenrod' , linestyle='dashed', label = r'$e=0$')
         ax3.fill_between(Radius  , DiskStats['MinE']  , DiskStats['MaxE']  , color='mediumblue', alpha=0.2)        
         ax3.set_xlim([RadialBins[0], mesh.x1])
         ax3.legend()
         ax3.set_ylabel(r'Eccentricity')
 
-        Sigma_profile = Radius**(-3/5) * (1-(Radius/primary.sink_radius)**(-0.5))**(3/5)
-        # SS73_coeff   = DiskStats['MeanD'][-1]/Radius[-1]**(-3/5)
+        Sigma_profile = Radius**(-3/5) * (1-(Radius/0.1)**(-0.5))**(3/5)
+        SS73_coeff   = DiskStats['MeanD'][-1]/Radius[-1]**(-3/5)
         # SS73_profile = [SS73_coeff * r**(-3./5.) for r in Radius]
         ax4.yaxis.tick_right()
         ax4.yaxis.set_label_position("right")
@@ -1508,7 +1508,7 @@ def main_cbdgam_2d():
         ax4.plot(Radius  , DiskStats['MeanD'][-1]*Sigma_profile/Sigma_profile[-1], color='goldenrod', linestyle='dashed', label = r'$r^{-3/5}(1-r^{-1/2})^{3/5}$')
         ax4.fill_between(Radius  , DiskStats['MinD'], DiskStats['MaxD']  , color='mediumblue', alpha=0.2)
         ax4.set_xlim([RadialBins[0], mesh.x1])
-        #ax4.set_ylim([SS73_coeff*1e-1,SS73_coeff*1e1])
+        ax4.set_ylim([SS73_coeff*1e-1,SS73_coeff*1e1])
         ax4.set_ylabel(r'$\Sigma~[M/a_0^2]$')
         ax4.set_yscale('log')
         ax4.legend(loc='upper right')
@@ -1526,12 +1526,7 @@ def main_cbdgam_2d():
         plt.savefig(f"Axisymmetry_{chkpt['time'] / 2 / np.pi:.2f}.png", dpi=400, bbox_inches='tight')
 
 
-    if args.mdot:
-        # if not chkpt['model_parameters']["single_point_mass"]:
-        #     primary, secondary = chkpt['point_masses']
-        #     xprim, yprim       = primary.position_x  , primary.position_y
-        #     xsec, ysec         = secondary.position_x, secondary.position_y
-        
+    if args.mdot:        
         R      = np.sqrt(X**2 + Y**2)
         Vr     = (Vx * X + Vy * Y) / (R + 1e-12)
         f      = 2*np.pi*R * Sigma * Vr / SS73.Mdot_inf
@@ -1606,7 +1601,7 @@ def main_cbdgam_2d():
         ax1.legend(loc='best', fontsize=7)
         ax1.grid(True, alpha=0.3)
         ax1.set_position([0.1975, 0.0505, 0.578, 0.25])  # [left, bottom, width, height]
-        #ax1.set_ylim([-5,5])
+        ax1.set_ylim([-1,1])
         
         # Save combined figure
         if args.Outputs is None:
@@ -1637,9 +1632,17 @@ def main_cbdgam_2d():
         print(chkpt["point_masses"])
         print('-------------Timestep dt-------------------')
         print(chkpt['timestep_dt'])
-        print('-------------FJ0-------------------')
-        print(chkpt['ConstFlux_FJ0'])
+        print('--------------------------------')
         
+        # old_event = chkpt['event_states']['checkpoint']
+        # from sailfish.event import RecurringEvent
+        # print(old_event.number)
+        # new_event = old_event._replace(number=15)
+        # chkpt['event_states']['checkpoint'] = new_event
+        
+        
+        # with open('/lustre/astro/davidon/Storage/sailfish/Gamma-Law/Retrograde/Mach10/Buffer_Test/LiveBuffer_ON/chkpt.0014.pk', "wb") as checkpoint:
+        #     pk.dump(chkpt, checkpoint)
 
 
     # with open('/groups/astro/davidon/sailfish/saveFJ0.pk', "rb") as f:

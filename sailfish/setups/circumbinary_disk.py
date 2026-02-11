@@ -627,46 +627,43 @@ class CoolBinary(SetupBase):
     constant_softening    = param(True, "whether to use constant softening (gamma-law)")
     retrograde            = param(False, "is disk retrograde?")
     which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
-    single_point_mass     = param(False, "put one point mass at the origin (no binary)")
 
     # buffer 
     live_buffer           = param(False, "whether to set the buffer targets by the binary torque")
     live_buffer_cadence   = param(50.0, "binned intervals of binary torque for computing target values")
     buffer_driving_rate   = param(100.0, "rate at which the buffer drives the solution towards target values", mutable=True)
-    buffer_onset_width    = param(0.2, "buffer ramp distance")
+    buffer_onset_width    = param(0.2, "buffer ramp distance", mutable=True)
     buffer_is_enabled     = param(True, "whether the buffer zone is enabled", mutable=True)
 
-    # Cooling specific parameters
+    # Cooling 
     central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
     mach_number_a         = param(10, "Disk Mach number") 
     target_accretion_rate = param(1., "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
     OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
     Cooling_N             = param(1e6, "N samples of temperatures in tabulated emission", mutable=True) 
-    # Inspiral specific parameters
+    
+    # binary parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
-    #init_eccentricity     = param(0.0, "orbital eccentricity of the binary")
-    #inspiral_start_time   = param(1000., "how many orbits before inspiral starts")
-    #integration_timestep  = param(0.001, "timestep for integrating the inspiral")
-    #semi_major_axis_list  = param([]," List of all semi-major axes over the inspiral")
-    #eccentricity_list     = param([]," List of all eccentricities axes over the inspiral")
-    #inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
-    #gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ", mutable=True)
-    #Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
-    # Sweep specific parameters
-    init_eccentricity  = param(0.0 , "orbital eccentricity at start of sweep")
-    final_eccentricity = param(0.0 , "orbital eccentricity at end of sweep"  )
-    init_mass_ratio    = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
-    final_mass_ratio   = param(1.0 , "component mass ratio at end of sweep")
-    init_mach_number   = param(10.0, "orbital Mach number (isothermal) at start of sweep")
-    final_mach_number  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
-    sweep_start_time   = param(1e4 , "orbit where parameter sweeping begins")
-    sweep_end_time     = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ")
-    sweep_logspace     = param(False, "perform the sweep in logspace")
-    #ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
+    init_eccentricity     = param(0.0 , "orbital eccentricity at start of sweep")
+    final_eccentricity    = param(0.0 , "orbital eccentricity at end of sweep"  )
+    init_mass_ratio       = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
+    final_mass_ratio      = param(1.0 , "component mass ratio at end of sweep")
+    init_mach_number      = param(10.0, "orbital Mach number (isothermal) at start of sweep")
+    final_mach_number     = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
+    sweep_start_time      = param(1e4 , "orbit where parameter sweeping begins")
+    sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ")
+    sweep_logspace        = param(False, "perform the sweep in logspace")
 
     
     a0 = 1.0
     GM = 1.0
+
+    @property
+    def single_point_mass(self):
+        if self.mass_ratio < 1e-10:
+            return True
+        else:
+            return False
 
     @property
     def Gravitational_Radius_pc(self):
@@ -721,14 +718,12 @@ class CoolBinary(SetupBase):
 
         sigma        = self.SS73.surface_density_profile(r_softened)
         pressure     = self.SS73.surface_pressure_profile(r_softened)
-        #vkep2        = self.GM / r_softened
         v_phi        = sqrt(self.GM / r_softened)  #* sqrt(1.0 - (3.0 * self.softening_length * self.softening_length) / (r_softened * r_softened))
-        #v_r          = - self.SS73.Mdot_inf / (2 * 3.1415926 * r * sigma) if r > 1e-3 else 0.0
         
         if not self.single_point_mass:
-            cavity_radius = 1.0
+            cavity_radius = 1.5
         else:
-            cavity_radius = 0.05
+            cavity_radius = 0.2
         
         primitive[0] = sigma    * (0.0001 + 0.9999 * exp(-((cavity_radius / r_softened) ** 30)))
         primitive[1] = sign     * v_phi * phi_hat_x
@@ -759,7 +754,7 @@ class CoolBinary(SetupBase):
             gamma_law_index        = self.gamma_law_index,
             point_mass_function    = self.point_masses,
             buffer_is_enabled      = self.buffer_is_enabled,
-            buffer_driving_rate    = self.buffer_driving_rate,  # default value in circumbinary.py
+            buffer_driving_rate    = self.buffer_driving_rate,   # default value in circumbinary.py
             buffer_onset_width     = self.buffer_onset_width,    # default value in circumbinary.py
             dynamic_cooling_base   = self.dynamic_cooling_base,
             constant_softening     = self.constant_softening,
