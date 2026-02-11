@@ -831,6 +831,13 @@ def main_cbdgam_2d():
         help="plot minidisk velocity profile",
     )
     parser.add_argument(
+        "--mdot",
+        "-mdot",
+        default=False,
+        action="store_true",
+        help="plot accretion rate onto the binary",
+    )
+    parser.add_argument(
         "--vmap",
         default=False,
         action="store_true",
@@ -878,6 +885,7 @@ def main_cbdgam_2d():
         default=False,
         help="Whether or not to rescale disk properties to target accretion rate",
     )
+
 
     args = parser.parse_args()
     for filename in args.checkpoints:
@@ -979,6 +987,7 @@ def main_cbdgam_2d():
                 ColourbarLabel = r'$\log_{10}\nu$'
             else:
                 ColourbarLabel = r'$\nu$'
+            
 
         elif args.field == 'speed':
             speed   = np.sqrt(Vx**2 + Vy**2)
@@ -1062,6 +1071,9 @@ def main_cbdgam_2d():
             else:
                 ColourbarLabel = r'$\Sigma$'
 
+        else:
+            raise ValueError(f"Unknown field: {args.field}")
+
         if args.log:
             f = np.log10(f)
             
@@ -1102,7 +1114,7 @@ def main_cbdgam_2d():
             plt.quiver(
                 Xv, Yv,
                 Vx_bound[::stride_y, ::stride_x], Vy_bound[::stride_y, ::stride_x],
-                width=0.002, angles='xy', scale_units='xy', scale=20,
+                width=0.002, angles='xy', scale_units='xy', scale=5,
                 color='darkgrey', headwidth=4
             )
 
@@ -1373,7 +1385,7 @@ def main_cbdgam_2d():
         SinkRadius         = (primary.sink_radius     , secondary.sink_radius)
         SoftRadius         = (primary.softening_length, secondary.softening_length)
         Nbins              = int(ni/2)
-        RadialBins         = np.linspace(2,mesh.x1,Nbins)
+        RadialBins         = np.linspace(1.0,mesh.x1,Nbins)
         GMu_primary        = primary.mass     # GM = 1.0 normalised in code units
         GMu_secondary      = secondary.mass
         Sigma             *= SS73.surface_density_coefficient # in units of Mb/a0^2
@@ -1465,7 +1477,7 @@ def main_cbdgam_2d():
         ax1.legend()
         ax1.set_ylabel(r'Velocity $[a_0\Omega_0]$')#; ax0.set_yscale('log')
 
-        Mach_profile = Radius**(-1/20) * (1-(Radius/primary.sink_radius)**(-0.5))**(-1/5)
+        Mach_profile = Radius**(-1/20) * (1-(Radius/0.1)**(-0.5))**(-1/5)
         ax2.yaxis.tick_right()
         ax2.yaxis.set_label_position("right")
         ax2.spines["right"].set_visible(True)
@@ -1474,21 +1486,21 @@ def main_cbdgam_2d():
         ax2.plot(Radius, DiskStats['MeanM'][-1]*Mach_profile/Mach_profile[-1], color='goldenrod', linestyle='dashed', label = r'$r^{-1/20}(1-r^{-1/2})^{-1/5}$')
         ax2.fill_between(Radius  , DiskStats['MinM']  , DiskStats['MaxM'], color='mediumblue', alpha=0.2)
         ax2.set_xlim([RadialBins[0], mesh.x1])
-        ax2.set_ylim([0, 1000])
+        ax2.set_ylim([7, 20])
         ax2.set_ylabel(r'$v/c_\mathrm{s}$')
         ax2.set_yticks([10, 12, 14, 16, 18])
         ax2.legend()
         ax2.set_xticklabels([])
 
-        ax3.plot(Radius  , DiskStats['MeanE']  , color='mediumblue')
-        ax3.axhline(y=0, color='goldenrod', linestyle='dashed', label = r'$e=0$')
+        ax3.plot(Radius, DiskStats['MeanE'], color='mediumblue')
+        ax3.axhline(y=0, color='goldenrod' , linestyle='dashed', label = r'$e=0$')
         ax3.fill_between(Radius  , DiskStats['MinE']  , DiskStats['MaxE']  , color='mediumblue', alpha=0.2)        
         ax3.set_xlim([RadialBins[0], mesh.x1])
         ax3.legend()
         ax3.set_ylabel(r'Eccentricity')
 
-        Sigma_profile = Radius**(-3/5) * (1-(Radius/primary.sink_radius)**(-0.5))**(3/5)
-        # SS73_coeff   = DiskStats['MeanD'][-1]/Radius[-1]**(-3/5)
+        Sigma_profile = Radius**(-3/5) * (1-(Radius/0.1)**(-0.5))**(3/5)
+        SS73_coeff   = DiskStats['MeanD'][-1]/Radius[-1]**(-3/5)
         # SS73_profile = [SS73_coeff * r**(-3./5.) for r in Radius]
         ax4.yaxis.tick_right()
         ax4.yaxis.set_label_position("right")
@@ -1498,7 +1510,7 @@ def main_cbdgam_2d():
         ax4.plot(Radius  , DiskStats['MeanD'][-1]*Sigma_profile/Sigma_profile[-1], color='goldenrod', linestyle='dashed', label = r'$r^{-3/5}(1-r^{-1/2})^{3/5}$')
         ax4.fill_between(Radius  , DiskStats['MinD'], DiskStats['MaxD']  , color='mediumblue', alpha=0.2)
         ax4.set_xlim([RadialBins[0], mesh.x1])
-        #ax4.set_ylim([SS73_coeff*1e-1,SS73_coeff*1e1])
+        ax4.set_ylim([SS73_coeff*1e-1,SS73_coeff*1e1])
         ax4.set_ylabel(r'$\Sigma~[M/a_0^2]$')
         ax4.set_yscale('log')
         ax4.legend(loc='upper right')
@@ -1515,6 +1527,93 @@ def main_cbdgam_2d():
         fig.legend(handles, labels, loc='lower center', ncol=3, bbox_to_anchor=(0.5, -0.06))
         plt.savefig(f"Axisymmetry_{chkpt['time'] / 2 / np.pi:.2f}.png", dpi=400, bbox_inches='tight')
 
+
+    if args.mdot:        
+        R      = np.sqrt(X**2 + Y**2)
+        Vr     = (Vx * X + Vy * Y) / (R + 1e-12)
+        f      = 2*np.pi*R * Sigma * Vr / SS73.Mdot_inf
+       
+        G      = Sigma * Vr   # mass flux density through circles (per area)
+        dx, dy = mesh.dx, mesh.dy
+        dA     = dx * dy
+        r_flat = R.ravel()
+        G_flat = G.ravel()
+
+        r_min, r_max = 1.0, np.max(r_flat)/np.sqrt(2)
+        n_bins       = min(100, mesh.shape[0] // 4)
+        r_bins       = np.linspace(r_min, r_max, n_bins)
+
+        mdot_ring    = np.full(n_bins-1, np.nan)
+        r_centers    = 0.5*(r_bins[:-1] + r_bins[1:])
+
+        for k in range(n_bins-1):
+            r0, r1 = r_bins[k], r_bins[k+1]
+            mask = (r_flat >= r0) & (r_flat < r1)
+            if mask.any():
+                dr = (r1 - r0)
+                mdot_ring[k] = (G_flat[mask] * r_flat[mask]).sum() * dA / dr  # ≈ ∮ Σ v_r r dφ
+        mdot_ring_norm = mdot_ring / SS73.Mdot_inf
+
+        title     = 'Mass Inflow Rate'
+        savename  = 'MdotMap'
+
+        # ======== Plotting ========
+        fig = plt.figure(figsize=(1.0 * text_width, 1.0 * text_width))
+        gs  = fig.add_gridspec(2, 1, height_ratios=[0.75, 0.25,], hspace=0.0, wspace=0.1)
+        ax0 = fig.add_subplot(gs[0])
+        ax1 = fig.add_subplot(gs[1])
+
+        extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
+        cm     = ax0.imshow(
+            f,
+            origin="lower",
+            vmin=-5,
+            vmax=5,
+            cmap='RdBu_r',
+            extent=extent,
+        )
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        divider = make_axes_locatable(ax0)
+        cax = divider.append_axes("right", size="5%", pad=0.12)
+        cbar = fig.colorbar(cm, cax=cax)
+        cax.set_position([cax.get_position().x0, ax0.get_position().y0, cax.get_position().width, ax0.get_position().height])
+        cbar.ax.set_title(r'$\frac{2\pi r \Sigma v_r}{\dot{M}_\infty}$', pad=8)          # puts text above the bar
+        ax0.tick_params(axis='x')
+        ax0.tick_params(axis='y')
+        ax0.set_aspect("equal")
+        ax0.set_ylabel(r'$y/a$')
+        buffer_ring  = Circle((0.0, 0.0)  , 4.5, color='black', fill=False, alpha=1, linewidth = 0.5)        # Radius of the circle
+        ax0.add_patch(buffer_ring)
+        #ax0.set_xlim([4.45, 4.55])
+        #ax0.set_ylim([-0.05, 0.05])
+        
+        ax0.set_title(title + r' at time $t = $ %g $\mathrm{[2\pi\Omega_0^{-1}]}$'%(np.round(chkpt["time"]/2/np.pi,3)))
+
+
+        if args.radius is not None:
+            ax0.set_xlim(-args.radius, args.radius)
+            ax0.set_ylim(-args.radius, args.radius)
+        
+        # Bottom panel: radial profile
+        ax1.plot(r_centers, mdot_ring_norm, 'o-', color='tab:blue', markersize=3, linewidth=1.5, label=r'$\dot{M}(r)$')
+        #ax1.plot(r_bin_centers, mdot_radial_mean, 'o-', color='tab:blue', markersize=3, linewidth=1.5, label=r'$\langle\dot{M}\rangle$')
+        ax1.axhline(y=0, color='k', linestyle='--', linewidth=1, alpha=0.5)
+        ax1.set_xlabel(r'Radius $r/a$')
+        ax1.set_ylabel(r'$\dot{M}$')
+        ax1.legend(loc='best', fontsize=7)
+        ax1.grid(True, alpha=0.3)
+        ax1.set_position([0.1975, 0.0505, 0.578, 0.25])  # [left, bottom, width, height]
+        ax1.set_ylim([-1,1])
+        
+        # Save combined figure
+        if args.Outputs is None:
+            pass  
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(CurrentTime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(CurrentTime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
 
 
 
@@ -1535,9 +1634,17 @@ def main_cbdgam_2d():
         print(chkpt["point_masses"])
         print('-------------Timestep dt-------------------')
         print(chkpt['timestep_dt'])
-        print('-------------FJ0-------------------')
-        print(chkpt['ConstFlux_FJ0'])
+        print('--------------------------------')
         
+        # old_event = chkpt['event_states']['checkpoint']
+        # from sailfish.event import RecurringEvent
+        # print(old_event.number)
+        # new_event = old_event._replace(number=15)
+        # chkpt['event_states']['checkpoint'] = new_event
+        
+        
+        # with open('/lustre/astro/davidon/Storage/sailfish/Gamma-Law/Retrograde/Mach10/Buffer_Test/LiveBuffer_ON/chkpt.0014.pk', "wb") as checkpoint:
+        #     pk.dump(chkpt, checkpoint)
 
 
     # with open('/groups/astro/davidon/sailfish/saveFJ0.pk', "rb") as f:

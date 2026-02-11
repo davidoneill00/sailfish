@@ -13,6 +13,7 @@ from sailfish.physics.circumbinary import (
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup_base import SetupBase, SetupError, param
 from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, ShakuraSunyaevDisk
+from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, ShakuraSunyaevDisk
 import numpy as np
 
 class CircumbinaryDisk(SetupBase):
@@ -620,7 +621,6 @@ class CoolBinary(SetupBase):
     sink_rate             = param(1.0, "component sink rate", mutable=True)
     sink_radius           = param(0.03, "component sink radius", mutable=True)
     softening_length      = param(0.03, "gravitational softening length", mutable=True)
-    buffer_is_enabled     = param(True, "whether the buffer zone is enabled", mutable=True)
     sink_model            = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
     alpha                 = param(0.1, "alpha-viscosity parameter (gamma-law)")
     nu                    = param(0.001, "kinematic viscosity parameter (isothermal)")
@@ -632,40 +632,39 @@ class CoolBinary(SetupBase):
     # buffer 
     live_buffer           = param(False, "whether to set the buffer targets by the binary torque")
     live_buffer_cadence   = param(50.0, "binned intervals of binary torque for computing target values")
-    buffer_driving_rate   = param(100.0, "rate at which the buffer drives the solution towards target values")
-    buffer_onset_width    = param(0.2, "buffer ramp distance")
+    buffer_driving_rate   = param(100.0, "rate at which the buffer drives the solution towards target values", mutable=True)
+    buffer_onset_width    = param(0.2, "buffer ramp distance", mutable=True)
+    buffer_is_enabled     = param(True, "whether the buffer zone is enabled", mutable=True)
 
-    # Cooling specific parameters
+    # Cooling 
     central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
     mach_number_a         = param(10, "Disk Mach number") 
     target_accretion_rate = param(1., "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
     OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
     Cooling_N             = param(1e6, "N samples of temperatures in tabulated emission", mutable=True) 
-    # Inspiral specific parameters
+    
+    # binary parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
-    #init_eccentricity     = param(0.0, "orbital eccentricity of the binary")
-    #inspiral_start_time   = param(1000., "how many orbits before inspiral starts")
-    #integration_timestep  = param(0.001, "timestep for integrating the inspiral")
-    #semi_major_axis_list  = param([]," List of all semi-major axes over the inspiral")
-    #eccentricity_list     = param([]," List of all eccentricities axes over the inspiral")
-    #inspiral_time_list    = param([]," List of all eccentricities axes over the inspiral")
-    #gw_inspiral_time      = param(0.," The circular inspiral time for a0 = 1 ", mutable=True)
-    #Eccentric_Anomalies   = param([]," Find the true anomaly given the mean anomaly")
-    # Sweep specific parameters
-    init_eccentricity  = param(0.0 , "orbital eccentricity at start of sweep")
-    final_eccentricity = param(0.0 , "orbital eccentricity at end of sweep"  )
-    init_mass_ratio    = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
-    final_mass_ratio   = param(1.0 , "component mass ratio at end of sweep")
-    init_mach_number   = param(10.0, "orbital Mach number (isothermal) at start of sweep")
-    final_mach_number  = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
-    sweep_start_time   = param(1e4 , "orbit where parameter sweeping begins")
-    sweep_end_time     = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ")
-    sweep_logspace     = param(False, "perform the sweep in logspace")
-    #ell0               = param(0.0 , "initial guess for angular momentum current in the CBD; ell0!=0 will initialize with a cavity")
+    init_eccentricity     = param(0.0 , "orbital eccentricity at start of sweep")
+    final_eccentricity    = param(0.0 , "orbital eccentricity at end of sweep"  )
+    init_mass_ratio       = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
+    final_mass_ratio      = param(1.0 , "component mass ratio at end of sweep")
+    init_mach_number      = param(10.0, "orbital Mach number (isothermal) at start of sweep")
+    final_mach_number     = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
+    sweep_start_time      = param(1e4 , "orbit where parameter sweeping begins")
+    sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ")
+    sweep_logspace        = param(False, "perform the sweep in logspace")
 
     
     a0 = 1.0
     GM = 1.0
+
+    @property
+    def single_point_mass(self):
+        if self.mass_ratio < 1e-10:
+            return True
+        else:
+            return False
 
     @property
     def Gravitational_Radius_pc(self):
@@ -720,14 +719,17 @@ class CoolBinary(SetupBase):
 
         sigma        = self.SS73.surface_density_profile(r_softened)
         pressure     = self.SS73.surface_pressure_profile(r_softened)
-        primitive[0] = sigma    * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
-        vkep2        = self.GM / r_softened
-        v_phi        = np.sqrt(vkep2 + self.pressure_powerlaw * pressure / sigma) 
-        v_r          = - self.SS73.Mdot_inf / (2 * 3.1415926 * r * sigma) if r > 1e-3 else 0.0
+        v_phi        = sqrt(self.GM / r_softened)  #* sqrt(1.0 - (3.0 * self.softening_length * self.softening_length) / (r_softened * r_softened))
         
-        primitive[1] = sign     * v_phi * phi_hat_x + v_r * x / r
-        primitive[2] = sign     * v_phi * phi_hat_y + v_r * y / r
-        primitive[3] = pressure * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30))) # cavity at r=1
+        if not self.single_point_mass:
+            cavity_radius = 1.5
+        else:
+            cavity_radius = 0.2
+        
+        primitive[0] = sigma    * (0.0001 + 0.9999 * exp(-((cavity_radius / r_softened) ** 30)))
+        primitive[1] = sign     * v_phi * phi_hat_x
+        primitive[2] = sign     * v_phi * phi_hat_y
+        primitive[3] = pressure * (0.0001 + 0.9999 * exp(-((cavity_radius / r_softened) ** 30))) # cavity at r=1
 
         return primitive
 
@@ -753,7 +755,7 @@ class CoolBinary(SetupBase):
             gamma_law_index        = self.gamma_law_index,
             point_mass_function    = self.point_masses,
             buffer_is_enabled      = self.buffer_is_enabled,
-            buffer_driving_rate    = self.buffer_driving_rate,  # default value in circumbinary.py
+            buffer_driving_rate    = self.buffer_driving_rate,   # default value in circumbinary.py
             buffer_onset_width     = self.buffer_onset_width,    # default value in circumbinary.py
             dynamic_cooling_base   = self.dynamic_cooling_base,
             constant_softening     = self.constant_softening,
@@ -794,7 +796,7 @@ class CoolBinary(SetupBase):
                 dict(quantity="total_angular_momentum"),
                 dict(quantity="max_temperature"),
                 dict(quantity="buffer_torque", which_mass=0, buffer=True),
-                #dict(quantity="buffer_torque_dynamical", which_mass=0, buffer=True),
+                dict(quantity="buffer_torque_dynamical", which_mass=0, buffer=True),
                 dict(quantity="buffer_mass_rate", which_mass=0, buffer=True),
                 
             ]
@@ -879,12 +881,20 @@ class CoolBinary(SetupBase):
         )
 
     def point_masses(self, time):
-        m1, m2 = self.orbital_elements(time).orbital_state(time)
-
-        return (
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
+        if self.single_point_mass:
+            m = {'mass': 1.0, 'position_x': 0.0, 'position_y': 0.0, 'velocity_x': 0.0, 'velocity_y': 0.0}
+            return PointMass(
+                    softening_length=self.softening_length,
+                    sink_model=SinkModel[self.sink_model.upper()],
+                    sink_rate=self.sink_rate,
+                    sink_radius=self.sink_radius,
+                    **m)
+        else:
+            m1, m2 = self.orbital_elements(time).orbital_state(time)
+            return (
+                PointMass(
+                    softening_length=self.softening_length,
+                    sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
                 **m1._asdict(),
@@ -897,145 +907,3 @@ class CoolBinary(SetupBase):
                 **m2._asdict(),
             ),
         )
-    
-    #@property
-    #def Omega_0(self):
-    #    return sqrt(self.GM/self.a0/self.a0/self.a0)
-    
-    #@property
-    #def Phase_at_Start(self):
-    #    return 0. # correct this later -- only if inspiral begins at t=0, then Phase_at_Start = 0
-
-    # @property
-    # def code_start_inspiral_time(self):
-    #     return self.inspiral_start_time * self.reference_time_scale
-    
-    # @property
-    # def kick_speed(self):
-    #     c_code         = (self.init_separation_rg)**0.5
-    #     Ratio_v_over_c = (530e5) / 2.99792458e10
-    #     return Ratio_v_over_c * c_code
-
-    
-    # def check_if_inspiral(self, time):
-    #     if (time <= self.code_start_inspiral_time):
-    #         return 'Burn-in'
-    #     elif (self.code_start_inspiral_time <= time <= self.code_start_inspiral_time + self.inspiral_time_list[-1]):
-    #         return 'Inspiralling'
-    #     elif (self.inspiral_time_list[-1] + self.code_start_inspiral_time <= time):
-    #         return 'Merged'
-        
-
-    # def Orbital_Elements_During_Inspiral(self, time):
-    #     if time < self.code_start_inspiral_time:
-    #         raise ValueError("Orbital_Elements_During_Inspiral has been called before inspiral is set to occur")
-
-    #     Inspiral_t                = time - self.code_start_inspiral_time
-    #     Inspiral_Progress         = Inspiral_t/self.integration_timestep
-    #     Nstep                     = floor(Inspiral_Progress)
-    #     Position_in_Bracket_N0_N1 = Inspiral_Progress - float(Nstep)
-
-    #     self.semi_major_axis_list.append(1e-5)
-    #     self.eccentricity_list.append(1e-5)
-    #     self.Eccentric_Anomalies.append(1e-5)
-        
-    #     try:
-    #         SemiMajorAxis_N0 = self.semi_major_axis_list[Nstep]
-    #         Eccentricity_N0  = self.eccentricity_list[Nstep]
-    #         EcctricPhase_N0  = self.Eccentric_Anomalies[Nstep]
-
-    #         SemiMajorAxis_N1 = self.semi_major_axis_list[Nstep+1]
-    #         Eccentricity_N1  = self.eccentricity_list[Nstep+1]
-    #         EcctricPhase_N1  = self.Eccentric_Anomalies[Nstep+1]
-
-    #         Interpolated_SMA  = SemiMajorAxis_N0 + Position_in_Bracket_N0_N1 * (SemiMajorAxis_N1 - SemiMajorAxis_N0)
-    #         Interpolated_ECC  = Eccentricity_N0  + Position_in_Bracket_N0_N1 * (Eccentricity_N1  - Eccentricity_N0)
-    #         Interpolated_Anom = EcctricPhase_N0  + Position_in_Bracket_N0_N1 * (EcctricPhase_N1  - EcctricPhase_N0)
-
-    #         #Phase_at_Start     = self.Omega_0 * self.code_start_inspiral_time
-    #         return [Interpolated_SMA , Interpolated_ECC , Interpolated_Anom+self.Phase_at_Start]
-        
-    #     except IndexError as e:
-    #         return 'Merged'
-
-
-
-    # def orbital_elements(self, time):
-    #     flag = self.check_if_inspiral(time)
-
-    #     if flag == 'Burn-in':
-    #         return OrbitalElements(
-    #             semimajor_axis=self.a0,
-    #             total_mass=1.0,
-    #             mass_ratio=self.mass_ratio,
-    #             eccentricity=self.init_eccentricity)
-
-    #     elif flag =='Inspiralling':
-    #         Inspiralling_Orbital_Elements = self.Orbital_Elements_During_Inspiral(time)
-    #         return OrbitalElements(
-    #                 semimajor_axis=Inspiralling_Orbital_Elements[0],
-    #                 total_mass=1.0,
-    #                 mass_ratio=self.mass_ratio,
-    #                 eccentricity=Inspiralling_Orbital_Elements[1])
-        
-    #     elif flag == 'Merged':
-    #         return 'Merged'
-
-
-
-    # def point_masses(self, time):
-    #     from math import cos, sin, sqrt
-    #     m1   = 1 / (1+self.mass_ratio)
-    #     m2   = self.mass_ratio/ (1+self.mass_ratio)
-    #     a1   = m2
-    #     a2   = m1
-    #     flag = self.check_if_inspiral(time)
-
-    #     # Case 1: Still at the burn-in stage
-    #     if flag == 'Burn-in':
-    #         primary, secondary = self.orbital_elements(time).orbital_state(time)
-
-    #         return (
-    #             PointMass(
-    #                 softening_length=self.softening_length,
-    #                 sink_model=SinkModel[self.sink_model.upper()],
-    #                 sink_rate=self.sink_rate,
-    #                 sink_radius=self.sink_radius,
-    #                 **primary._asdict(),),
-    #             PointMass(
-    #                 softening_length=self.softening_length,
-    #                 sink_model=SinkModel[self.sink_model.upper()],
-    #                 sink_rate=self.sink_rate,
-    #                 sink_radius=self.sink_radius,
-    #                 **secondary._asdict(),),
-    #                 )
-
-    #     # Case 2: Inspiral has begun
-    #     elif flag == 'Inspiralling':
-    #         semi_major, eccen, phase = self.Orbital_Elements_During_Inspiral(time)
-    #         Current_Omega            = sqrt(self.GM/semi_major/semi_major/semi_major)
-    #         dphase_dt                = Current_Omega / (1-eccen * cos(phase))
-            
-    #         x1  = a1 * semi_major * cos (phase) - a1 * semi_major * eccen
-    #         y1  = a2 * semi_major * (1 - eccen**2)**0.5 * sin (phase)
-    #         x2  = -x1 * self.mass_ratio
-    #         y2  = -y1 * self.mass_ratio
-    #         vx1 = - dphase_dt * (a1 * semi_major * sin (phase))
-    #         vy1 =   dphase_dt * (a2 * semi_major * (1 - eccen**2)**0.5 * cos (phase))
-    #         vx2 = -vx1 * self.mass_ratio
-    #         vy2 = -vy1 * self.mass_ratio
-
-    #         c1 = PointMass(m1, x1, y1, vx1, vy1, softening_length= self.softening_length,sink_model=SinkModel['TORQUE_FREE'],sink_rate=self.sink_rate,sink_radius= self.sink_radius,)
-    #         c2 = PointMass(m2, x2, y2, vx2, vy2, softening_length= self.softening_length,sink_model=SinkModel['TORQUE_FREE'],sink_rate=self.sink_rate,sink_radius= self.sink_radius,)
-    #         return (c1,c2)
-        
-    #     # Case 3: Merger has occurred
-    #     elif flag =='Merged':
-    #         tmerge = self.inspiral_time_list[-1] + self.code_start_inspiral_time
-    #         x  = 0.0
-    #         y  = - self.kick_speed * (time - tmerge)
-    #         vx = 0.0
-    #         vy = - self.kick_speed
-
-    #         c1 = PointMass(0.97, x, y, vx, vy, softening_length=2 * self.softening_length, sink_model=SinkModel['ACCELERATION_FREE'], sink_rate=self.sink_rate, sink_radius=2 * self.sink_radius,)
-    #         return c1

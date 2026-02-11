@@ -176,7 +176,7 @@ if __name__ == '__main__':
     primary, secondary  = ts.pointmasses
     cs_a                = (SS73.gamma * (SS73.surface_pressure_profile(r=1) / SS73.surface_density_profile(r=1)))**0.5
     nu_a                = SS73.alpha * cs_a**2
-    M_dot_0             = 3 * np.pi * (nu_a * SS73.surface_density_profile(r=1))
+    M_dot_0             = SS73.Mdot_inf
     Final_Orbits        = ts.time[ts.time>(ts.currenttime-args.Number_of_Orbits)]
     bin_size            = int(np.round(args.Number_of_Averages/ts.dt_cadence)) # average every "A" orbits
 
@@ -184,6 +184,7 @@ if __name__ == '__main__':
     if args.Accretion:
         Accretion_1   = ts.mdot1[-len(Final_Orbits):] / M_dot_0
         Accretion_2   = ts.mdot2[-len(Final_Orbits):] / M_dot_0
+        Inflow_buff   = ts.inflow_b[-len(Final_Orbits):] / M_dot_0
         AccretionRate = Accretion_1 + Accretion_2
         AccretionBins = AccretionRate[:len(AccretionRate) // bin_size * bin_size]
         MeanAccretion = AccretionBins.reshape(-1, bin_size).mean(axis=1)
@@ -205,12 +206,14 @@ if __name__ == '__main__':
         ax0.plot(Final_Orbits, -AccretionRate, label='$\dot{M}_\mathrm{t}$'   , linewidth = 2, c = cmap(0/n_lines))
         ax0.plot(Final_Orbits, -Accretion_1  , label=r'$\dot{M}_1$', linewidth = 1.2, c = cmap(0.8/n_lines) )
         ax0.plot(Final_Orbits, -Accretion_2  , label=r'$\dot{M}_2$', linewidth = 1.2, c = cmap(1.6/n_lines)  )
-        if Final_Orbits[-1] > args.Number_of_Averages:
-            ax0.plot(Final_Orbits[bin_size//2::bin_size], -MeanAccretion, label='Binned Means', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
+        #if Final_Orbits[-1] > args.Number_of_Averages:
+        #    ax0.plot(Final_Orbits[bin_size//2::bin_size], -MeanAccretion, label='Binned Means', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
+        ax0.plot(Final_Orbits, Inflow_buff, label=r'$\dot{M}_\mathrm{buffer}$', linewidth = 1.2, c = cmap(2.4/n_lines), linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         ax0.set_title(r'Accretion Timeseries')
         ax0.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.0))
+        ax0.set_ylim([-2, 2])
 
         ax1.yaxis.tick_right()
         ax1.yaxis.set_label_position("right")
@@ -294,8 +297,8 @@ if __name__ == '__main__':
 
         #upper_lim = np.min([np.max(np.nan_to_num(Buffer_Torque))*1.1, 10])
         #lower_lim = np.max([np.min(np.nan_to_num(Buffer_Torque))*1.1,-10])
-        upper_lim =  10.0
-        lower_lim = -10.0 
+        upper_lim =  4.0
+        lower_lim = -4.0 
 
         fig, ax = plt.subplots(figsize=[text_width, 0.5*text_width])
         plt.plot(Final_Orbits, Buffer_Torque  , c = 'blue', label = 'Buffer Torque'   , linewidth = 0.3)

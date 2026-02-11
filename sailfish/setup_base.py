@@ -276,7 +276,7 @@ class SetupBase(ABC):
         """
         pass
 
-    def checkpoint_diagnostics(self, time):
+    def checkpoint_diagnostics(self, solver):
         """
         Return a dict of post-processing data to include in checkpoint files.
 
@@ -285,5 +285,5 @@ class SetupBase(ABC):
         """
         return dict(
             SS73          = self.SS73,
-            point_masses  = self.point_masses(time)
+            point_masses  = self.point_masses(solver.time),
             )

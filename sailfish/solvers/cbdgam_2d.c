@@ -8,7 +8,6 @@ TODO:
     + add plm_theta as a solver option (currently it's hard-coded)
 */
 
-
 // ============================ PHYSICS =======================================
 // ============================================================================
 #define NCONS 4
@@ -62,13 +61,14 @@ struct PointMassList {
 
 struct KeplerianBuffer {
     double surface_density_onset;
-    double pressure_onset;
     double surface_density_powerlaw;
+    double pressure_onset;
     double pressure_powerlaw; 
     double central_mass;
     double driving_rate;
     double outer_radius;
     double onset_width;
+    double Mdot_inf;      // >0 means inward accretion (v_r < 0)
     int is_enabled;
     int is_retrograde;
 };
@@ -248,59 +248,190 @@ PRIVATE double sound_speed_squared(
     return prim[3] / prim[0] * gamma_law_index;
 }
 
+
+
 PRIVATE void buffer_source_term(
     struct KeplerianBuffer *buffer,
     double xc,
     double yc,
     double dt,
-    double *cons,
+    double *cons,              // [Sigma, px, py, E]
     double gamma_law_index
-    )
+)
 {
-    if (buffer->is_enabled)
-    {
+    if (!buffer->is_enabled) return;
 
-        double rc                      = sqrt(xc * xc + yc * yc);
-        double target_surface_density  = buffer->surface_density_onset;
-        double target_pressure         = buffer->pressure_onset;
-        double surface_density_p       = buffer->surface_density_powerlaw;
-        double pressure_p              = buffer->pressure_powerlaw;
-        double central_mass            = buffer->central_mass;
-        double driving_rate            = buffer->driving_rate;
-        double outer_radius            = buffer->outer_radius;
-        double onset_width             = buffer->onset_width;
-        double onset_radius            = outer_radius - onset_width;
+    const double eps = 1e-12;
+    double sign      = 1.0;
 
+    // ==== geometry ====
+    double rc   = sqrt(xc*xc + yc*yc);
+    double rinv = 1.0 / (rc + eps);
 
-        if (rc > onset_radius)
-        {
-            double v_kep = sqrt(central_mass / rc);
-            // double v_kep2 = central_mass / rc;
-            // double v_sub  = sqrt(v_kep2 - pressure_p * target_pressure / target_surface_density);
-            if (buffer->is_retrograde)
-                v_kep = -v_kep;
-            
-            // Target values
-            double pressure         = target_pressure * pow(rc / onset_radius, pressure_p);
-            double surface_density  = target_surface_density  * pow(rc / onset_radius, surface_density_p);
-            double px               = surface_density * (-yc / rc) * v_kep;
-            double py               = surface_density * (+xc / rc) * v_kep;
-            double energy           = 0.5 * (px * px + py * py) / surface_density + pressure / (gamma_law_index - 1.0);
-            double u0[NCONS]        = {surface_density, px, py, energy};
+    double onset_radius = buffer->outer_radius - buffer->onset_width;
+    if (rc <= onset_radius) return;
+    if (buffer->is_retrograde) sign = -1.0;
 
-            double omega_outer      = sqrt(central_mass * pow(onset_radius, -3.0));
-            
-            // Smooth exponential ramp instead of linear to avoid sharp boundary effects
-            double xi               = (rc - onset_radius) / (outer_radius - onset_radius);  // xi in [0, 1]
-            double buffer_rate      = driving_rate * omega_outer * (exp(2.0*xi) - 1.0) / (exp(2.0) - 1.0);
+    // ==== buffer ramp ====
+    double x = (rc - onset_radius) / buffer->onset_width;
+    if (x <= 0.0) return;
+    if (x > 1.0) x = 1.0;
 
-            for (int q = 0; q < NCONS; ++q)
-            {
-                cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
-            }
-        }
-    }
+    double lambda = pow(x*x*(3.0 - 2.0*x), 2.0);
+    double frac   = buffer->driving_rate * lambda * dt;
+
+    if (frac <= 0.0) return;
+
+    // ==== current state ====
+    double Sigma0 = cons[0];
+    double px     = cons[1];
+    double py     = cons[2];
+    double E      = cons[3];
+
+    double pr0    = ( xc*px + yc*py ) * rinv;
+    double pphi0  = (-yc*px + xc*py ) * rinv;
+
+    // kinetic energy BEFORE buffer changes
+    double ke0    = 0.5 * (pr0*pr0 + pphi0*pphi0) / (Sigma0 + eps);
+
+    // work variables
+    double Sigma  = Sigma0;
+    double pr     = pr0;
+    double pphi   = pphi0;
+
+    double vr     = pr   / (Sigma + eps);
+    double vphi   = pphi / (Sigma + eps);
+
+    // ==== relax (Sigma, vr, vphi) ====
+    double Sigma_t = buffer->surface_density_onset * pow(rc/onset_radius, buffer->surface_density_powerlaw);
+    double P_t     = buffer->pressure_onset        * pow(rc/onset_radius, buffer->pressure_powerlaw);
+
+    Sigma         += (Sigma_t - Sigma) * frac;
+
+    double vphi2_t = buffer->central_mass * rinv + buffer->pressure_powerlaw * P_t / (Sigma_t + eps);
+    vphi2_t        = max2(vphi2_t, 0.0);
+    double vphi_t  = sign * sqrt(vphi2_t);
+
+    vphi += (vphi_t - vphi) * frac;
+    pphi  = vphi * Sigma;
+
+    double vr_t = 0.0;
+    vr += (vr_t - vr) * frac;
+    pr  = vr * Sigma;
+
+    // kinetic energy AFTER buffer changes
+    double ke1 = 0.5 * (pr*pr + pphi*pphi) / (Sigma + eps);
+
+    // IMPORTANT: keep internal energy unchanged during momentum damping
+    E += (ke1 - ke0);
+
+    // ==== relax entropy ====
+    double P   = (E - ke1) * (gamma_law_index - 1.0);
+    P          = max2(P, eps);
+
+    double K   = P   / pow(Sigma,   gamma_law_index);
+    double K_t = P_t / pow(Sigma_t, gamma_law_index);
+
+    double frac_K = 0.1 * frac;      // keep this weak
+    K += (K_t - K) * frac_K;
+
+    P = K * pow(Sigma, gamma_law_index);
+    double eint = P / (gamma_law_index - 1.0);
+    E = eint + ke1;
+
+    // ==== back to Cartesian ====
+    cons[0] = Sigma;
+    cons[1] = ( pr * xc - pphi * yc ) * rinv;
+    cons[2] = ( pr * yc + pphi * xc ) * rinv;
+    cons[3] = E;
 }
+
+
+
+// PRIVATE void buffer_source_term(
+//     struct KeplerianBuffer *buffer,
+//     double xc,
+//     double yc,
+//     double dt,
+//     double *cons,              // [Sigma, px, py, E]
+//     double gamma_law_index
+// )
+// {
+//     if (!buffer->is_enabled) return;
+
+//     const double eps = 1e-12;
+//     double sign      = 1.0;
+
+//     // ==== geometry ====
+//     double rc   = sqrt(xc*xc + yc*yc);
+//     double rinv = 1.0 / (rc + eps);
+
+//     double onset_radius = buffer->outer_radius - buffer->onset_width;
+//     if (rc <= onset_radius) return;
+//     if (buffer->is_retrograde) sign = -1.0;
+
+//     // ==== buffer ramp ====
+//     double x = (rc - onset_radius) / buffer->onset_width;
+//     if (x <= 0.0) return;
+//     if (x > 1.0) x = 1.0;
+
+//     double lambda = pow(x*x*(3.0 - 2.0*x), 2.0);
+//     //double sigma  = buffer->driving_rate * lambda;
+//     //double frac   = 1.0 - exp(-sigma * dt);
+//     double frac   = buffer->driving_rate * lambda * dt;
+
+//     if (frac <= 0.0) return;
+
+//     // ==== current state ====
+//     double Sigma = cons[0];
+//     double px    = cons[1];
+//     double py    = cons[2];
+//     double E     = cons[3];
+
+//     double pr    = ( xc*px + yc*py ) * rinv;
+//     double pphi = (-yc*px + xc*py ) * rinv;
+
+//     double vr    = pr / (Sigma + eps);
+//     double vphi  = pphi / (Sigma + eps);
+
+//     // ==== target profiles ====
+//     double Sigma_t = buffer->surface_density_onset * pow(rc/onset_radius, buffer->surface_density_powerlaw);
+//     double P_t     = buffer->pressure_onset        * pow(rc/onset_radius, buffer->pressure_powerlaw);
+
+//     // ==== relax (Sigma, vr, vphi) ====
+//     Sigma         += (Sigma_t - Sigma) * frac;
+    
+//     double vphi2_t = buffer->central_mass * rinv + buffer->pressure_powerlaw * P_t / (Sigma_t + eps);
+//     vphi2_t        = max2(vphi2_t, 0.0);
+//     double vphi_t  = sign * sqrt(vphi2_t);
+//     vphi          += (vphi_t - vphi) * frac;
+//     pphi           = vphi * Sigma;
+
+//     double vr_t    = 0.0;
+//     vr            += (vr_t - vr) * frac;
+//     pr             = vr * Sigma;
+
+
+//     // ==== relax entropy ====
+//     double ke     = 0.5 * (pr*pr + pphi*pphi) / (Sigma + eps);
+//     double P      = (E - ke) * (gamma_law_index - 1.0);
+//     P             = max2(P, eps);
+//     double K      = P   / pow(Sigma,   gamma_law_index); // entropy
+//     double K_t    = P_t / pow(Sigma_t, gamma_law_index); // target entropy
+//     double frac_K = 0.1 * frac;                          // weaker damping
+//     K            += (K_t - K) * frac_K;
+//     P             = K * pow(Sigma, gamma_law_index);
+//     double eint   = P / (gamma_law_index - 1.0);
+//     E             = eint + ke;
+
+//     // ==== back to Cartesian ====
+//     cons[0] = Sigma;
+//     cons[1] = ( pr * xc - pphi * yc ) * rinv;
+//     cons[2] = ( pr * yc + pphi * xc ) * rinv;
+//     cons[3] = E;
+// }
+
+
 
 PRIVATE void shear_strain(
     const double *gx,
@@ -415,7 +546,7 @@ PRIVATE void primitive_to_flux(
     double *flux,
     int direction)
 {
-    double vn = primitive_to_velocity(prim, direction);
+    double vn       = primitive_to_velocity(prim, direction);
     double pressure = prim[3];
 
     flux[0] = vn * cons[0];
@@ -493,6 +624,7 @@ PUBLIC void cbdgam_2d_advance_rk(
     double buffer_driving_rate,
     double buffer_outer_radius,
     double buffer_onset_width,
+    double buffer_Mdot_inf,
     int buffer_is_enabled,
     int retrograde,
     double x1, // point mass 1
@@ -523,15 +655,17 @@ PUBLIC void cbdgam_2d_advance_rk(
     double pressure_floor,
     int constant_softening)
 {
+
     struct KeplerianBuffer buffer = {
         buffer_surface_density_onset,
-        buffer_pressure_onset,
         surface_density_powerlaw,
+        buffer_pressure_onset,
         pressure_powerlaw,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
+        buffer_Mdot_inf,
         buffer_is_enabled,
         retrograde
     };
@@ -711,7 +845,6 @@ PUBLIC void cbdgam_2d_advance_rk(
         }
 
         primitive_to_conserved(pcc, ucc, gamma_law_index);
-        buffer_source_term(&buffer, xc, yc, dt, ucc, gamma_law_index);
         point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc, constant_softening, gamma_law_index);
         cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc, gamma_law_index);
 
@@ -721,6 +854,7 @@ PUBLIC void cbdgam_2d_advance_rk(
             ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
         }
 
+        buffer_source_term(&buffer, xc, yc, dt, ucc, gamma_law_index);
         double *pout = &primitive_wr[ncc];
         conserved_to_primitive(ucc, pout, &mass_list, xc, yc, velocity_ceiling, density_floor, pressure_floor, gamma_law_index);
     }
@@ -747,19 +881,21 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     double buffer_driving_rate           = p[10];
     double buffer_outer_radius           = p[11];
     double buffer_onset_width            = p[12];
-    int buffer_is_enabled                = (int)p[13];
-    int retro                            = (int)p[14];
+    double buffer_Mdot_inf               = p[13];
+    int buffer_is_enabled                = (int)p[14];
+    int retro                            = (int)p[15];
 
 
     struct KeplerianBuffer buffer = {
         buffer_surface_density_onset,
-        buffer_pressure_onset,
         surface_density_powerlaw,
+        buffer_pressure_onset,
         pressure_powerlaw,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
+        buffer_Mdot_inf,
         buffer_is_enabled,
         retro
     };

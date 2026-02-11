@@ -3,7 +3,9 @@ Library functions and command-line access to the simulation driver.
 """
 
 import os, pickle, pathlib
+import numpy as np
 from typing import NamedTuple, Dict
+import bisect
 from logging import getLogger
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup_base import SetupBase, SetupError
@@ -13,6 +15,7 @@ from sailfish.solvers import (
     register_solver_extension,
     make_solver,
 )
+
 
 logger = getLogger(__name__)
 user_build_config = dict()
@@ -76,7 +79,7 @@ def update_dict_where_none(new_dict, old_dict, frozen=[]):
             if new_val is None:
                 new_dict[key] = old_val
             elif key in frozen and new_val != old_val:
-                raise ConfigurationError(f"{key} cannot be changed")
+                raise ConfigurationError(f"{key} cannot be changed. Old value was {old_val}, new value is {new_val}")
 
 
 def update_where_none(new, old, frozen=[]):
@@ -88,6 +91,75 @@ def update_where_none(new, old, frozen=[]):
     old_dict = old._asdict()
     update_dict_where_none(new_dict, old_dict, frozen)
     return type(new)(**new_dict)
+
+
+def BufferTarget(r, FJ0, Mdot, setup):
+    """
+    Target densities and pressures given a constant angular momentum flux FJ0.
+    We assume steady state with Mdot constant accretion (see Rafikov 2013)
+    """
+    GM    = setup.GM
+    alpha = setup.SS73.alpha
+    gamma = setup.gamma_law_index
+    sigma = setup.SS73.sigmab_code
+    mp    = setup.SS73.mp_code
+    kb    = setup.SS73.kb_code
+    kappa = setup.SS73.kappa_code
+
+
+    Omega = np.sqrt(GM / r / r / r)
+    l     = Omega * r * r
+    
+    if setup.physics['retrograde']:
+        FJ    = np.abs(-Mdot * l + FJ0)  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
+    else:
+        FJ    = np.abs( Mdot * l + FJ0)  
+
+    TargetPressure = FJ / (3 * np.pi * alpha * gamma * r**2)
+    TargetDensity5 = 32 * np.pi * sigma * r**2 * mp**4 * TargetPressure**4 / (9 * Omega * kappa * kb**4 * FJ)
+
+    return TargetPressure, TargetDensity5**0.2
+
+
+def DetermineBufferSolution(solver, timeseries):    
+    t = solver.time / solver.setup.reference_time_scale
+    
+    if (not solver.live_buffer) or (t < solver.t_viscous_a):
+        # solver.FJ0 = 0.0
+        return 
+
+    
+    # Continue updating buffer throughout simulation using running average
+    # Compute running average over the last live_buffer_cadence orbits
+    # Optimization: only process recent data instead of entire timeseries
+    cutoff_time     = t - solver.live_buffer_cadence
+    ReversedTimes   = []
+    ReversedTorques = []
+    #torque_sum  = 0.0
+    #count       = 0
+
+    # Walk backward from most recent data
+    for entry in reversed(timeseries):
+        entry_time = entry[0]
+        if entry_time < cutoff_time:
+            break  # Stop when we're outside the averaging window
+        torque_sum = entry[14] + entry[15]  # Sum binary torques
+        ReversedTimes.append(entry_time)
+        ReversedTorques.append(torque_sum)
+        #count += 1
+    
+    if len(ReversedTimes) > 0:  # Ensure we have data points in the window
+        MeanTorque = np.trapezoid(np.array(ReversedTorques), np.array(ReversedTimes), axis=0) / solver.live_buffer_cadence
+        
+        # Update buffer targets with the running average
+        TargetPressure, TargetDensity        = BufferTarget(r=solver.buffer_onset_radius, FJ0=MeanTorque, Mdot=solver.Mdot_inf, setup=solver.setup)
+        for patch in solver.patches:
+            patch.buffer_surface_density_onset  = TargetDensity
+            patch.buffer_surface_pressure_onset = TargetPressure
+
+    return MeanTorque
+
+
 
 
 # The functions below were written to allow state to be written in terms of
@@ -170,7 +242,7 @@ def write_checkpoint(number, outdir, state):
         model_parameters=state.setup.model_parameter_dict(),
         setup_name=state.setup.dash_case_class_name(),
         mesh=state.mesh,
-        **state.setup.checkpoint_diagnostics(state.solver.time),
+        **state.setup.checkpoint_diagnostics(state.solver),
     )
 
     with open(filename, "wb") as chkpt:
@@ -209,6 +281,7 @@ def newest_chkpt_in_directory(directory_name):
     raise ConfigurationError("the specified directory did not have a usable checkpoint")
 
 
+
 def append_timeseries(state):
     """
     Append to the driver state timeseries for post-processing.
@@ -223,6 +296,10 @@ def append_timeseries(state):
         logger.warning(
             "timeseries event ignored because solver does not provide reductions"
         )
+
+    MeanTorque = DetermineBufferSolution(state.solver, state.timeseries)
+    # Add this to timeseries?
+    
 
 
 class DriverArgs(NamedTuple):
@@ -447,6 +524,10 @@ def simulate(driver):
         num_patches=driver.num_patches or 1,
         mode=mode,
     )
+
+    if driver.chkpt_file:
+        MeanTorque = DetermineBufferSolution(solver, chkpt['timeseries'])
+        logger.info("Reattributed constant angular momentum flux to the solver. Buffer target values will be updated accordingly")
 
     if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
         raise ConfigurationError(

@@ -30,10 +30,6 @@ except Exception:
         return N0 + frac * (N1 - N0)
 
 
-# @fuse()
-# def interpolate_band(N0, N1, frac):
-#     return N0 + frac * (N1 - N0)
-
 
 logger = getLogger(__name__)
 
@@ -61,6 +57,9 @@ def initial_condition(setup, mesh, time):
 
     return primitive
 
+def ViscousTime(r, Mach_a, alpha):
+    t_nu = (5/12) * (Mach_a**2 / alpha) * r**1.6 # here r is in units of a
+    return t_nu
 
 class Patch:
     """
@@ -77,8 +76,9 @@ class Patch:
         physics,
         options,
         buffer_outer_radius,
+        Mdot_inf,
         buffer_surface_density_onset,
-        buffer_surface_pressure_onset,
+        buffer_pressure_onset,
         surface_density_powerlaw,
         pressure_powerlaw,
         lib,
@@ -97,12 +97,14 @@ class Patch:
         self.options                       = options
         self.xl, self.yl                   = mesh.vertex_coordinates(i0, 0)
         self.xr, self.yr                   = mesh.vertex_coordinates(i1, nj)
+        self.retrograde                    = physics.retrograde
         self.buffer_outer_radius           = buffer_outer_radius
         self.buffer_surface_density_onset  = buffer_surface_density_onset
-        self.buffer_surface_pressure_onset = buffer_surface_pressure_onset
+        self.buffer_pressure_onset         = buffer_pressure_onset
         self.surface_density_powerlaw      = surface_density_powerlaw
         self.pressure_powerlaw             = pressure_powerlaw
-        self.retrograde                    = physics.retrograde
+        self.Mdot_inf                      = Mdot_inf
+        #self.FJ0                           = FJ0
 
         # option to vary the cooling coefficient dynamically
         def dynamic_cooling(_self):
@@ -153,14 +155,7 @@ class Patch:
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
-        m1, m2 = self.physics.point_masses(self.time)
-        #m1, m2 = self.physics.point_masses(
-        #    self.time_new, 
-        #    self.time_old, 
-        #    (xold, yold, zold), 
-        #    (pxold, pyold, pzold)
-        #    ) 
-        
+        m1, m2 = self.physics.point_masses(self.time)        
 
         with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
@@ -194,8 +189,8 @@ class Patch:
                 int(self.physics.constant_softening),
                 self.physics.gamma_law_index,
             )
-            return cons_rate[ng:-ng, ng:-ng]
-        
+            return cons_rate[ng:-ng, ng:-ng]        
+
 
     def buffer_source_term(self):
         """
@@ -203,8 +198,8 @@ class Patch:
         Return an array of the rates of conserved quantities, resulting from
         the application of the buffer source terms near the outer boundary
         """
-        ng = 2
-        m1, m2 = self.physics.point_masses(self.time)
+        ng                  = 2
+        m1, m2              = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
 
         with self.execution_context:
@@ -222,13 +217,15 @@ class Patch:
                 self.xl, self.xr, self.yl, self.yr,
                 self.physics.gamma_law_index,
                 self.buffer_surface_density_onset,
-                self.buffer_surface_pressure_onset,
+                self.buffer_pressure_onset,
                 self.surface_density_powerlaw,
                 self.pressure_powerlaw,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
+                self.Mdot_inf,
+                #self.FJ0,
                 float(int(self.physics.buffer_is_enabled)),
                 float(int(self.retrograde)),
             ], dtype=self.xp.float64))
@@ -236,7 +233,7 @@ class Patch:
             self.lib.cbdgam_2d_buffer_source_term[self.shape](
                 params,
                 conserved1,
-                cons_rate,
+                cons_rate
             )
 
         return cons_rate[ng:-ng, ng:-ng]
@@ -284,23 +281,6 @@ class Patch:
         m1, m2              =  self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
 
-        # Here we should measure the binary torque over the previous ~ 50 orbits and 
-        # use that to set F_J,0. We need to do this measurement before the outer domain
-        # is viscously relaxed, otherwise the torque measurement will be contaminated by
-        # the buffer torque. Then, we wait until the outer domain is viscously relaxed, and
-        # we set the buffer target accordingly, using Rafikov's steady-state solution.
-        # Or maybe not the steady-state since we will never really be at Mdot_inf  at the
-        # outer buffer.....
-
-        # (1) Measure viscous rate at domain edge.
-        # t_visc = 0.1 * (buffer_outer_radius**2) / physics.viscosity_coefficient # 0.1 for safety
-        # (2) Ensure that viscous rate at cavity is satisfied
-        # (3) Measure total binary torque
-        # (4) Set F_J,0 = total binary torque + viscous rate at cavity
-        # (5) Save this value.
-        # (6) Continue to measure F_J,0 until viscous rate reaches buffer radius.
-        # (7) Set buffer target profile using this best guess F_J,0 value.
-
         with self.execution_context:
             self.lib.cbdgam_2d_advance_rk[self.shape](
                 self.xl,
@@ -312,13 +292,15 @@ class Patch:
                 self.primitive2,
                 self.physics.gamma_law_index,
                 self.buffer_surface_density_onset,
-                self.buffer_surface_pressure_onset,
+                self.buffer_pressure_onset,
                 self.surface_density_powerlaw,
                 self.pressure_powerlaw,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
+                self.Mdot_inf,
+                #self.FJ0,
                 int(self.physics.buffer_is_enabled),
                 int(self.retrograde),
                 m1.position_x,
@@ -347,7 +329,7 @@ class Patch:
                 self.options.mach_ceiling,
                 self.options.density_floor,
                 self.options.pressure_floor,
-                int(self.physics.constant_softening),
+                int(self.physics.constant_softening)
             )
 
             import numpy as np
@@ -425,37 +407,45 @@ class Solver(SolverBase):
         logger.info(f"mesh is {mesh}")
         logger.info(f"boundary condition is outflow")
 
-        self.mesh = mesh
-        self.setup = setup
-        self.num_guard = ng
-        self.num_cons = nq
-        self.xp = xp
-        self.patches = []
-        ni, nj = mesh.shape
-        self.domain_radius = self.mesh.x1
-        #self.buffer_onset_width = 0.1
+        self.mesh                  = mesh
+        self.setup                 = setup
+        self.num_guard             = ng
+        self.num_cons              = nq
+        self.xp                    = xp
+        self.patches               = []
+        ni, nj                     = mesh.shape
+        self.domain_radius         = self.mesh.x1
+        self.Mdot_inf              = self.setup.SS73.Mdot_inf
+        self.buffer_onset_radius   = self.domain_radius - physics.buffer_onset_width
+        self.live_buffer           = self.setup.live_buffer
+        self.live_buffer_cadence   = self.setup.live_buffer_cadence
+        self.t_viscous_a           = 0.5 * ViscousTime(r=1, Mach_a=self.physics['mach_number'], alpha=self.physics['alpha'])                        # viscous time near cavity
+        
+        # self.buffer_surface_density_onset  = None
+        # self.buffer_pressure_onset         = None
 
+        logger.info(f"Begin computing the binary torques at {self.t_viscous_a:.2f} orbital periods")
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
         else:
             primitive = solution
 
         if physics.buffer_is_enabled:
-            buffer_prim                   = [0.0] * 4
-            buffer_outer_radius           = mesh.x1  # this assumes the mesh is a centered squared
-            buffer_onset_radius           = buffer_outer_radius - physics.buffer_onset_width
+            buffer_prim                        = [0.0] * 4
+            buffer_outer_radius                = mesh.x1  # this assumes the mesh is a centered squared
+            buffer_onset_radius                = buffer_outer_radius - physics.buffer_onset_width
             setup.primitive(time, [buffer_onset_radius, 0.0], buffer_prim)
-            buffer_surface_density_onset  = buffer_prim[0]
-            buffer_surface_pressure_onset = buffer_prim[3]
-            surface_density_powerlaw      = setup.surface_density_powerlaw
-            pressure_powerlaw             = setup.pressure_powerlaw
-
+            surface_density_powerlaw           = setup.surface_density_powerlaw
+            pressure_powerlaw                  = setup.pressure_powerlaw
+            # These values are only at initialization and can be overwritten in driver.append_timeseries
+            buffer_surface_density_onset       = buffer_prim[0]
+            buffer_pressure_onset              = buffer_prim[3]
         else:
-            buffer_outer_radius           = 0.0
-            buffer_surface_density_onset  = 0.0
-            buffer_surface_pressure_onset = 0.0
-            surface_density_powerlaw      = 0.0
-            pressure_powerlaw             = 0.0
+            buffer_outer_radius                = 0.0
+            buffer_surface_density_onset       = 0.0
+            buffer_pressure_onset              = 0.0
+            surface_density_powerlaw           = 0.0
+            pressure_powerlaw                  = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
             prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
@@ -468,8 +458,9 @@ class Solver(SolverBase):
                 physics,
                 options,
                 buffer_outer_radius,
+                self.Mdot_inf,
                 buffer_surface_density_onset,
-                buffer_surface_pressure_onset,
+                buffer_pressure_onset,
                 surface_density_powerlaw,
                 pressure_powerlaw,
                 lib,
@@ -477,6 +468,7 @@ class Solver(SolverBase):
                 execution_context(mode, device_id=n % num_devices(mode)),
             )
             self.patches.append(patch)
+
 
 
     @property
@@ -590,11 +582,13 @@ class Solver(SolverBase):
 
             return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(Teff*mask)
 
+
     def reductions(self):
         """
         Generate runtime reductions on the solution data for time series.
         Fully GPU-parallelized version with all diagnostics preserved.
         """
+
         xp = self.xp
         da = self.mesh.dx * self.mesh.dy
         ng = self.num_guard
@@ -674,12 +668,31 @@ class Solver(SolverBase):
 
             # generalise this to mass 0, 1 and 2? ie. outer buffer and two inner buffers?
             if quantity == "buffer_torque":
-                fx = get_field(patch, 1, cut, mass=0, gravity=False, accretion=False, buffer=True)
-                fy = get_field(patch, 2, cut, mass=0, gravity=False, accretion=False, buffer=True)
+                fx = get_field(patch, 1, cut=(self.buffer_onset_radius, self.domain_radius), mass=0, gravity=False, accretion=False, buffer=True)
+                fy = get_field(patch, 2, cut=(self.buffer_onset_radius, self.domain_radius), mass=0, gravity=False, accretion=False, buffer=True)
                 return x * fy - y * fx
 
+            if quantity == "buffer_torque_dynamical":
+                # Buffer torque excluding angular momentum advection from mass source
+                fx   = get_field(patch, 1, cut=(self.buffer_onset_radius, self.domain_radius), mass=0, gravity=False, accretion=False, buffer=True)
+                fy   = get_field(patch, 2, cut=(self.buffer_onset_radius, self.domain_radius), mass=0, gravity=False, accretion=False, buffer=True)
+                mdot = get_field(patch, 0, cut=(self.buffer_onset_radius, self.domain_radius), mass=0, gravity=False, accretion=False, buffer=True)
+                
+                # Angular momentum per unit mass at each location
+                GM         = 1.0
+                omega      = self.xp.sqrt(GM / (r + 1e-12)**3)
+                l_specific = r * r * omega
+                
+                # Subtract angular momentum carried by mass source
+                # For retrograde: omega and velocities are negative
+                sign         = -1.0 if patch.physics.retrograde else 1.0
+                fx_corrected = fx - sign * mdot * (-y / (r**2 + 1e-12)) * l_specific
+                fy_corrected = fy - sign * mdot * (+x / (r**2 + 1e-12)) * l_specific
+                
+                return x * fy_corrected - y * fx_corrected
+
             if quantity == "buffer_mass_rate":
-                return get_field(patch, 0, cut, mass=0, gravity=False,  accretion=False, buffer=True)
+                return get_field(patch, 0, cut=(self.buffer_onset_radius, self.domain_radius), mass=0, gravity=False,  accretion=False, buffer=True)
 
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
@@ -822,6 +835,7 @@ class Solver(SolverBase):
     def advance_rk(self, rk_param, dt):
         self.set_bc("primitive1")
         for patch in self.patches:
+            # advance timestep
             patch.advance_rk(rk_param, dt)
 
 
