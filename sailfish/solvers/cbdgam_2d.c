@@ -263,6 +263,7 @@ PRIVATE void buffer_source_term(
 
     const double eps = 1e-12;
     double sign      = 1.0;
+    if (buffer->is_retrograde) sign = -1.0;
 
     // ==== geometry ====
     double rc   = sqrt(xc*xc + yc*yc);
@@ -270,7 +271,7 @@ PRIVATE void buffer_source_term(
 
     double onset_radius = buffer->outer_radius - buffer->onset_width;
     if (rc <= onset_radius) return;
-    if (buffer->is_retrograde) sign = -1.0;
+    
 
     // ==== buffer ramp ====
     double x = (rc - onset_radius) / buffer->onset_width;
@@ -291,10 +292,10 @@ PRIVATE void buffer_source_term(
     double pr0    = ( xc*px + yc*py ) * rinv;
     double pphi0  = (-yc*px + xc*py ) * rinv;
 
-    // kinetic energy BEFORE buffer changes
+    // kinetic energy before buffer changes
     double ke0    = 0.5 * (pr0*pr0 + pphi0*pphi0) / (Sigma0 + eps);
 
-    // work variables
+    // initialise variables
     double Sigma  = Sigma0;
     double pr     = pr0;
     double pphi   = pphi0;
@@ -315,15 +316,16 @@ PRIVATE void buffer_source_term(
     vphi += (vphi_t - vphi) * frac;
     pphi  = vphi * Sigma;
 
-    double vr_t = 0.0;
+    double vr_t = -buffer->Mdot_inf / (2.0 * 3.1415926 * rc * Sigma + eps);
+    //double vr_t = 0.0;
     vr += (vr_t - vr) * frac;
     pr  = vr * Sigma;
 
-    // kinetic energy AFTER buffer changes
+    // kinetic energy after buffer changes
     double ke1 = 0.5 * (pr*pr + pphi*pphi) / (Sigma + eps);
 
-    // IMPORTANT: keep internal energy unchanged during momentum damping
-    E += (ke1 - ke0);
+    // keep internal energy unchanged during momentum damping
+    E         += (ke1 - ke0);
 
     // ==== relax entropy ====
     double P   = (E - ke1) * (gamma_law_index - 1.0);
@@ -332,12 +334,12 @@ PRIVATE void buffer_source_term(
     double K   = P   / pow(Sigma,   gamma_law_index);
     double K_t = P_t / pow(Sigma_t, gamma_law_index);
 
-    double frac_K = 0.1 * frac;      // keep this weak
-    K += (K_t - K) * frac_K;
+    double frac_K = 0.1 * frac;      // weaker dampinf for entropy
+    K            += (K_t - K) * frac_K;
 
-    P = K * pow(Sigma, gamma_law_index);
-    double eint = P / (gamma_law_index - 1.0);
-    E = eint + ke1;
+    P             = K * pow(Sigma, gamma_law_index);
+    double eint   = P / (gamma_law_index - 1.0);
+    E             = eint + ke1;
 
     // ==== back to Cartesian ====
     cons[0] = Sigma;
