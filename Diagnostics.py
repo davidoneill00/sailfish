@@ -1,3 +1,4 @@
+#from ideas import solver
 import numpy as np 
 import pickle as pk
 import matplotlib.pyplot as plt 
@@ -19,6 +20,27 @@ text_width   = 6.8
 column_width = 3.3
 configure_matplotlib()
 
+def ComputeBinnedMeans(times, field, Averaging_Window):
+    
+    # Create bins
+    num_bins  = int(np.ceil((times[-1] - times[0]) / Averaging_Window))
+    bin_edges = np.linspace(times[0], times[-1], num_bins + 1)
+    
+    # Compute statistics for each bin
+    bin_means   = np.zeros(num_bins)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    
+    for i in range(num_bins):
+        bin_mask = (times >= bin_edges[i]) & (times < bin_edges[i + 1])
+        bin_data = field[bin_mask]
+        
+        if len(bin_data) > 0:
+            bin_means[i] = np.mean(bin_data)
+        else:
+            bin_means[i] = np.nan
+    
+    return bin_centers, bin_means
+
 class DavidTimeseries:
     def __init__(self, Checkpoint):
         timeseries_data  = Checkpoint['timeseries']
@@ -26,7 +48,7 @@ class DavidTimeseries:
         self.currenttime = Checkpoint["time"] / 2 / np.pi 
         self.modelparams = Checkpoint['model_parameters'] 
         self.SS73        = Checkpoint['SS73']
-        self.dt_cadence  = Checkpoint['driver'].events['timeseries'].interval
+        #self.dt_cadence  = Checkpoint['driver'].events['timeseries'].interval
 
         max_length       = max(len(arr) for arr in timeseries_data)
         ts               = np.array([np.pad(arr, (0, max_length - len(arr)), 'constant') for arr in timeseries_data])
@@ -56,14 +78,15 @@ class DavidTimeseries:
             self.power_a2        = np.array([s[19] for s in ts])
             self.jdisk           = np.array([s[20] for s in ts])
             self.Max_temp        = np.array([s[21] for s in ts])
-            self.torque_b        = np.array([s[22] for s in ts])
             
             try:
+                self.torque_b        = np.array([s[22] for s in ts])
                 self.torque_b_dyn    = np.array([s[23] for s in ts])
                 self.inflow_b        = np.array([s[24] for s in ts])
             except IndexError:
-                self.inflow_b        = np.array([s[23] for s in ts])
-
+                #self.inflow_b        = np.array([s[23] for s in ts])
+                pass
+            
     @property
     def power_g(self):
         return self.power_g1 + self.power_g2
@@ -178,17 +201,14 @@ if __name__ == '__main__':
     nu_a                = SS73.alpha * cs_a**2
     M_dot_0             = SS73.Mdot_inf
     Final_Orbits        = ts.time[ts.time>(ts.currenttime-args.Number_of_Orbits)]
-    bin_size            = int(np.round(args.Number_of_Averages/ts.dt_cadence)) # average every "A" orbits
 
     # ======= Plotting Blocks ========
     if args.Accretion:
         Accretion_1   = ts.mdot1[-len(Final_Orbits):] / M_dot_0
         Accretion_2   = ts.mdot2[-len(Final_Orbits):] / M_dot_0
-        Inflow_buff   = ts.inflow_b[-len(Final_Orbits):] / M_dot_0
+        #Inflow_buff   = ts.inflow_b[-len(Final_Orbits):] / M_dot_0
         AccretionRate = Accretion_1 + Accretion_2
-        AccretionBins = AccretionRate[:len(AccretionRate) // bin_size * bin_size]
-        MeanAccretion = AccretionBins.reshape(-1, bin_size).mean(axis=1)
-        Inflow        = ts.buffer_inflow[-len(Final_Orbits):] / M_dot_0
+        #Inflow        = ts.buffer_inflow[-len(Final_Orbits):] / M_dot_0
         cmap          = plt.cm.hot
         n_lines       = 3
         signal        = AccretionRate - np.mean(AccretionRate)
@@ -203,25 +223,24 @@ if __name__ == '__main__':
         ax0 = fig.add_subplot(gs[0])
         ax1 = fig.add_subplot(gs[1])
 
-        ax0.plot(Final_Orbits, -AccretionRate, label='$\dot{M}_\mathrm{t}$'   , linewidth = 2, c = cmap(0/n_lines))
-        ax0.plot(Final_Orbits, -Accretion_1  , label=r'$\dot{M}_1$', linewidth = 1.2, c = cmap(0.8/n_lines) )
-        ax0.plot(Final_Orbits, -Accretion_2  , label=r'$\dot{M}_2$', linewidth = 1.2, c = cmap(1.6/n_lines)  )
-        #if Final_Orbits[-1] > args.Number_of_Averages:
-        #    ax0.plot(Final_Orbits[bin_size//2::bin_size], -MeanAccretion, label='Binned Means', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
-        ax0.plot(Final_Orbits, Inflow_buff, label=r'$\dot{M}_\mathrm{buffer}$', linewidth = 1.2, c = cmap(2.4/n_lines), linestyle='dashed')
+        ax0.plot(Final_Orbits, -AccretionRate, label='$\dot{M}_\mathrm{t}$'      , linewidth = 1.0, c = cmap(0/n_lines)  )
+        ax0.plot(Final_Orbits, -Accretion_2  , label=r'$\dot{M}_2$'              , linewidth = 1.0, c = cmap(1.9/n_lines))
+        ax0.plot(Final_Orbits, -Accretion_1  , label=r'$\dot{M}_1$'              , linewidth = 1.0, c = cmap(0.7/n_lines), alpha = 0.7)
+        #ax0.plot(Final_Orbits,  Inflow_buff  , label=r'$\dot{M}_\mathrm{buffer}$', linewidth = 1.2, c = cmap(2.4/n_lines), linestyle='dashed')
+        ax0.plot(*ComputeBinnedMeans(Final_Orbits, -AccretionRate, args.Number_of_Averages), label='Binned Means', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         ax0.set_title(r'Accretion Timeseries')
         ax0.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.0))
-        ax0.set_ylim([-2, 2])
+        #ax0.set_ylim([0, 100])
 
         ax1.yaxis.tick_right()
         ax1.yaxis.set_label_position("right")
         ax1.spines["right"].set_visible(True)
         ax1.spines["left"].set_visible(False)
-        ax1.plot(freq, power/np.max(power), c='black', linewidth = 0.1)
+        ax1.plot(freq, power/np.max(power), c='black', linewidth = 0.8)
         ax1.set_xscale('log')
-        ax1.set_xlabel(r'$f\ \mathrm{[\Omega]}$')   # or just f
+        ax1.set_xlabel(r'$f\ \mathrm{[\Omega]}$')
         ax1.set_ylabel('Power')
         ax1.set_title('Accretion Periodogram')
         ax1.set_ylabel('Power')
@@ -254,24 +273,19 @@ if __name__ == '__main__':
         L            = (m1*m2 / M) * np.sqrt(G * M * a * (1 - e**2))
         adot         = - a * Energydot / Energy + 2 * a * Mdot / M  # Fix for q, eta =/= 1 !!!
         edot         = (1 - e**2) / (2*e) * (5 * Mdot / M - Energydot / Energy - 2 * Ldot / L)  # Fix for q, eta =/= 1 !!!
-        adotBins     = adot[:len(adot) // bin_size * bin_size]
-        edotBins     = edot[:len(edot) // bin_size * bin_size]
-        Mean_adot    = adotBins.reshape(-1, bin_size).mean(axis=1)
-        Mean_edot    = edotBins.reshape(-1, bin_size).mean(axis=1)
         savename     = 'OrbitalEvolution'
 
+
         fig, ax = plt.subplots(figsize=[text_width, column_width])
-        plt.plot(Final_Orbits, adot, c = 'darkblue'    , label = r'$\dot{a}/a$', linewidth = 0.3)
-        plt.plot(Final_Orbits, edot, c = 'darkred'     , label = r'$\dot{e}$', linewidth = 0.3)
-        if Final_Orbits[-1] > args.Number_of_Averages:
-            print(Final_Orbits[-1])
-            ax.text(0.5, 0.75, r'$~\frac{1}{a}\frac{da}{d(\Omega t)} = %g,~~\frac{de}{d(\Omega t)} = %g~$'% (np.round(np.mean(Mean_adot), 2), np.round(np.mean(Mean_edot), 2)), transform=ax.transAxes, ha='center', va='center', bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
-            plt.plot(Final_Orbits[bin_size//2::bin_size], Mean_adot, linewidth = 1, label = 'Mean ', c = 'black')
-            plt.plot(Final_Orbits[bin_size//2::bin_size], Mean_edot, linewidth = 1,                  c = 'black')
+        plt.plot(Final_Orbits, adot, c = 'darkblue'    , label = r'$\dot{a}/a$', linewidth = 0.1)
+        plt.plot(Final_Orbits, edot, c = 'darkred'     , label = r'$\dot{e}$', linewidth = 0.1)
+        plt.plot(*ComputeBinnedMeans(Final_Orbits, adot, args.Number_of_Averages), linewidth = 1, label = 'Mean ', c = 'black')
+        plt.plot(*ComputeBinnedMeans(Final_Orbits, edot, args.Number_of_Averages), linewidth = 1,                  c = 'black')
         plt.xlabel('Time [P]')
         plt.ylim([-100,100])
         plt.ylabel(r'$\dot{a}/a, \dot{e} \left[\Omega\right]$')
         plt.legend(loc = 'upper right')
+        ax.text(0.5, 0.75, r'$~\frac{1}{a}\frac{da}{d(\Omega t)} = %g,~~\frac{de}{d(\Omega t)} = %g~$'% (np.round(np.mean(ComputeBinnedMeans(Final_Orbits, adot, args.Number_of_Averages)[1]), 2), np.round(np.mean(ComputeBinnedMeans(Final_Orbits, edot, args.Number_of_Averages)[1]), 2)), transform=ax.transAxes, ha='center', va='center', bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
         
         if args.Outputs is None:
             plt.show()
@@ -285,33 +299,21 @@ if __name__ == '__main__':
 
 
     if args.Buffer_Torque:
-        Buffer_Torque      = ts.torque_b[-len(Final_Orbits):] / M_dot_0
-        Buffer_TorqueBins  = Buffer_Torque[:len(Buffer_Torque) // bin_size * bin_size]
-        Mean_BufferTorque  = Buffer_TorqueBins.reshape(-1, bin_size).mean(axis=1)
-        Binary_Torque      = ts.torque_a[-len(Final_Orbits):] / M_dot_0 + ts.torque_g[-len(Final_Orbits):] / M_dot_0
-        Binary_Torque_Bins = Binary_Torque[:len(Binary_Torque) // bin_size * bin_size]
-        Mean_BinaryTorque  = Binary_Torque_Bins.reshape(-1, bin_size).mean(axis=1)
-        savename           = "BufferTorque"
-
-        DynamicalTorque    = ts.torque_b_dyn[-len(Final_Orbits):] / M_dot_0
-
-        #upper_lim = np.min([np.max(np.nan_to_num(Buffer_Torque))*1.1, 10])
-        #lower_lim = np.max([np.min(np.nan_to_num(Buffer_Torque))*1.1,-10])
-        upper_lim =  4.0
-        lower_lim = -4.0 
+        Buffer_Torque        = ts.torque_b[-len(Final_Orbits):] / M_dot_0
+        Binary_Torque        = ts.torque_a[-len(Final_Orbits):] / M_dot_0 + ts.torque_g[-len(Final_Orbits):] / M_dot_0
+        savename             = "BufferTorque"
+        DynamicalTorque      = ts.torque_b_dyn[-len(Final_Orbits):] / M_dot_0
 
         fig, ax = plt.subplots(figsize=[text_width, 0.5*text_width])
-        plt.plot(Final_Orbits, Buffer_Torque  , c = 'blue', label = 'Buffer Torque'   , linewidth = 0.3)
-        plt.plot(Final_Orbits, DynamicalTorque, c = 'red' , label = 'Dynamical Torque', linewidth = 0.3)
-        plt.plot(Final_Orbits[bin_size//2::bin_size], Mean_BinaryTorque, c = 'black', label = 'Binary Torque', linewidth = 0.5)
-        #plt.plot(Final_Orbits[bin_size//2::bin_size], Mean_BufferTorque + Mean_BinaryTorque, c = 'green', label = 'Buffer + Binary ', linewidth = 1   )
+        plt.plot(Final_Orbits, Buffer_Torque  , c = 'blue', label = 'Buffer Torque'     , linewidth = 0.8)
+        plt.plot(Final_Orbits, DynamicalTorque, c = 'red' , label = 'Dynamical Torque'  , linewidth = 0.8)
+        plt.plot(*ComputeBinnedMeans(Final_Orbits, Buffer_Torque, args.Number_of_Averages), c = 'blue', label = 'Mean Buffer Torque', linewidth = 0.5)
         plt.axhline(y=0, c = 'black', linestyle='dashed')
-        plt.axhline(y = 5**0.5, c = 'purple', linestyle='dashed', linewidth=0.5, label=r'$l_\mathrm{onset}$')
+        plt.axhline(y=np.mean(Binary_Torque), c = 'black', linewidth = 1.0, label = 'Mean Binary Torque', linestyle='dashdot')
         plt.xlabel('Time [P]')
-        plt.ylim([lower_lim, upper_lim])
+        #plt.ylim([-4.0, 4.0])
         plt.ylabel(r'$\tau_\mathrm{b}/\dot{M}_0$')
-        plt.legend(loc = 'upper right')
-
+        plt.legend(loc = 'best')
 
         if args.Outputs is None:
             plt.show()
@@ -347,35 +349,46 @@ if __name__ == '__main__':
         
         
         fig = plt.figure(figsize=(1.2 * text_width, 1.2 * 0.25*text_width))
-        gs  = fig.add_gridspec(1, 2, width_ratios=[1, 0.33], hspace=0., wspace=0.)
+        gs  = fig.add_gridspec(1, 2, width_ratios=[1, 0.5], hspace=0., wspace=0.0)
         ax0 = fig.add_subplot(gs[0])
-        ax1 = fig.add_subplot(gs[1])
+        periodogram_grid = gs[1].subgridspec(3, 1, hspace=0.00)
 
-        ax0.plot(Final_Orbits, ts.infared[-len(Final_Orbits):]   , c = 'red'   , label = 'infared luminosity')
-        ax0.plot(Final_Orbits, ts.optical[-len(Final_Orbits):]   , c = 'blue'  , label = 'optical luminosity')
-        ax0.plot(Final_Orbits, ts.uv[-len(Final_Orbits):]        , c = 'purple', label = 'uv', linewidth = 0.4)
-        #ax0.plot(Final_Orbits, ts.xray[-len(Final_Orbits):]      , c = 'green' , label = 'xray') 
-        #ax0.plot(Final_Orbits, ts.bolometric[-len(Final_Orbits):], c = 'black' , label = 'bolometric luminosity')
+        ax0.plot(Final_Orbits, ts.infared[-len(Final_Orbits):]   , c = 'red'       , label = 'Infared', linewidth = 0.8)
+        ax0.plot(Final_Orbits, ts.optical[-len(Final_Orbits):]   , c = 'blue'      , label = 'Optical', linewidth = 0.8)
+        ax0.plot(Final_Orbits, ts.uv[-len(Final_Orbits):]        , c = 'tab:purple', label = 'UV'     , linewidth = 0.8)
         ax0.set_xlabel('Time [P]')
         ax0.set_title('Emission Timeseries')
         ax0.set_yscale('log')
-        ax0.set_ylim([1e42, 1e49])
-        ax0.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.0))
+        ax0.legend(ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.0))
 
-        ax1.yaxis.tick_right()
-        ax1.yaxis.set_label_position("right")
-        ax1.spines["right"].set_visible(True)
-        ax1.spines["left"].set_visible(False)
-        ax1.plot(freq, Infared_power/np.max(Infared_power), c='red')
-        ax1.plot(freq, Optical_power/np.max(Optical_power), c='blue')
-        ax1.plot(freq, UV_power/np.max(UV_power)          , c='purple')
-        #ax1.plot(freq, XRay_power/np.max(XRay_power), c='green')
-        ax1.set_xscale('log')
-        ax1.set_ylim([0, 1.1])
-        ax1.set_xlabel(r'$f\ \mathrm{[\Omega]}$')   # or just f
-        ax1.set_ylabel('Power')
-        ax1.set_title('Emission Periodogram')
-        ax1.set_ylabel('Power')
+        band_periodograms = [
+            ('Infrared', Infared_power, 'red'),
+            ('Optical',  Optical_power, 'blue'),
+            ('UV',       UV_power,     'tab:purple'),
+        ]
+        period_axes = []
+        for idx, (label, power_arr, color) in enumerate(band_periodograms):
+            sharex = period_axes[0] if period_axes else None
+            ax_band = fig.add_subplot(periodogram_grid[idx, 0], sharex=sharex)
+            norm = np.max(power_arr)
+            normalized_power = power_arr / norm if norm > 0 else power_arr
+            ax_band.plot(freq, normalized_power, c=color)
+            ax_band.set_ylim([0, 1.1])
+            ax_band.set_xscale('log')
+            ax_band.set_ylabel(f'{label}')
+            ax_band.yaxis.tick_right()
+            ax_band.yaxis.set_label_position("right")
+            ax_band.spines["right"].set_visible(True)
+            ax_band.spines["left"].set_visible(False)
+            if idx < len(band_periodograms) - 1:
+                ax_band.set_xticklabels([])
+            period_axes.append(ax_band)
+        period_axes[-1].set_xlabel(r'$f\ \mathrm{[\Omega]}$')
+        period_axes[0].set_title('Emission Periodograms (Normalised)')
+        period_axes[0].axvline(x=0.5, color='gray', linestyle=':', linewidth = 0.75)
+        period_axes[1].axvline(x=0.5, color='gray', linestyle=':', linewidth = 0.75)
+        period_axes[2].axvline(x=0.5, color='gray', linestyle=':', linewidth = 0.75)
+        
         
         if args.Outputs is None:
             plt.show()
@@ -478,8 +491,6 @@ if __name__ == '__main__':
         Torque_g      = ts.torque_a[-len(Final_Orbits):] #/ M_dot_0
         Torque_a      = ts.torque_g[-len(Final_Orbits):] #/ M_dot_0
         Torque        = Torque_g + Torque_a
-        TorqueBins    = Torque[:len(Torque) // bin_size * bin_size]
-        MeanTorque    = TorqueBins.reshape(-1, bin_size).mean(axis=1)
         signal        = Torque - np.mean(Torque)
         freq          = np.logspace(-1, 1, 1000)      # cycles / orbit
         omega         = 2 * np.pi * freq              # rad / orbit
@@ -495,9 +506,7 @@ if __name__ == '__main__':
         ax0.plot(Final_Orbits, -Torque  , label='$\mathcal{T}$'   , linewidth = 0.4, c = 'royalblue')
         ax0.plot(Final_Orbits, -Torque_g, label=r'Grav', linewidth = 0.2, c = 'blue')
         ax0.plot(Final_Orbits, -Torque_a, label=r'Acc' , linewidth = 0.2, c = 'silver')
-        if Final_Orbits[-1] > 100:
-            print(Final_Orbits[-1])
-            ax0.plot(Final_Orbits[bin_size//2::bin_size], -MeanTorque, label='Binned Means', linewidth = 0.2, c = 'black', linestyle='dashed')
+        ax0.plot(*ComputeBinnedMeans(Final_Orbits, Torque, args.Number_of_Averages), c = 'royalblue', label = 'Mean Torque', linewidth = 0.5, linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\mathcal{T}$')
         ax0.set_title(r'Torque Timeseries')

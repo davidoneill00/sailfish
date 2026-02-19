@@ -894,16 +894,16 @@ def main_cbdgam_2d():
         fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0)
         
         # ======= Useful checkpoint data ========
-        CurrentTime    = chkpt["time"]/ 2 / np.pi
-        mesh           = chkpt["mesh"]
-        prim           = chkpt["solution"]
-        SS73           = chkpt["SS73"]
-        gamma          = chkpt['model_parameters']['gamma_law_index']
-        Floor_Depth    = chkpt['model_parameters']['OpticalDepthFloor']
-        ni, nj         = mesh.shape
-        x              = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
-        y              = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
-        X, Y           = np.meshgrid(x, y, indexing="xy")
+        CurrentTime     = chkpt["time"]/ 2 / np.pi
+        mesh            = chkpt["mesh"]
+        prim            = chkpt["solution"]
+        SS73            = chkpt["SS73"]
+        gamma           = chkpt['model_parameters']['gamma_law_index']
+        Floor_Depth     = chkpt['model_parameters']['OpticalDepthFloor']
+        ni, nj          = mesh.shape
+        x               = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
+        y               = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
+        X, Y            = np.meshgrid(x, y, indexing="xy")
         
         # ======== Calculate desired field ========
         Mdrop           = (SS73.Mdrop if args.remap else 1.0)
@@ -1104,7 +1104,7 @@ def main_cbdgam_2d():
             x_bound, y_bound = x[mask_x], y[mask_y]
 
         if args.vmap:
-            VectorN  = 40
+            VectorN  = 30
             Vx_bound = Vx[mask_y][:, mask_x]
             Vy_bound = Vy[mask_y][:, mask_x]
             stride_x = max(1, len(x_bound) // VectorN) # downsample safely
@@ -1114,12 +1114,13 @@ def main_cbdgam_2d():
             plt.quiver(
                 Xv, Yv,
                 Vx_bound[::stride_y, ::stride_x], Vy_bound[::stride_y, ::stride_x],
-                width=0.002, angles='xy', scale_units='xy', scale=5,
+                width=0.002, angles='xy', scale_units='xy', scale=15,
                 color='darkgrey', headwidth=4
             )
 
-        buffer = Circle((0.0 , 0.0)  , mesh.x1 - chkpt['model_parameters']['buffer_onset_width']  , color='black', fill=False, alpha=1.0, linewidth = 0.1)        # Radius of the circle
-        ax.add_patch(buffer)
+        #buffer = Circle((0.0 , 0.0)  , mesh.x1 - chkpt['model_parameters']['buffer_onset_width']  , color='black', fill=False, alpha=1.0, linewidth = 0.1)        # Radius of the circle
+        #ax.add_patch(buffer)
+
         if args.plot_sink:
             primary, secondary = chkpt['point_masses']
             Primary            = PointMass(primary.mass  , primary.position_x  , primary.position_y  , primary.velocity_x  , primary.velocity_y)
@@ -1163,8 +1164,6 @@ def main_cbdgam_2d():
     if args.SED:
         E_low, E_high            = 1e-1 * cgs['ev'], 5e6 * cgs['ev']
         E_array                  = np.logspace(np.log10(E_low/(1000*cgs['ev'])), np.log10(E_high/(1000*cgs['ev'])), 100)
-        #freq_low, freq_high      = E_low / cgs['h'], E_high / cgs['h']
-        #freq_space               = np.logspace(np.log10(freq_low), np.log10(freq_high), len(E_array))
         freq_space               = E_array * 1000 * cgs['ev'] / cgs['h']
         Masked_Cell_Temperatures = np.where(mask_values, Teff, 1.0)  # Mask optically thin cells (set to 1K to avoid numerical issues)
         Cell_Spectra             = np.array([PlanckSpectrum(freq, Masked_Cell_Temperatures) for freq in freq_space]) # Note: This can be large if remap is False!
@@ -1216,7 +1215,6 @@ def main_cbdgam_2d():
         plt.savefig(Savename, dpi=400, bbox_inches='tight')
 
     if args.MinidiskProfile:
-        # Include spectra with mask of eccentricity <1 
         RMinidisk          = 0.3
         primary, secondary = chkpt['point_masses']
         SinkRadius         = (primary.sink_radius     , secondary.sink_radius)
@@ -1253,10 +1251,10 @@ def main_cbdgam_2d():
         SecondaryMiniDisk = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanW': [], 'MinW': [], 'MaxW': [], 'MeanM': [], 'MinM': [], 'MaxM': []}
 
         for i in range(len(RadialBins)-1):
-            primary_mask   = (RadialBins[i] < primary_radius) & (primary_radius < RadialBins[i+1])
-            secondary_mask = (RadialBins[i] < secondary_radius) & (secondary_radius < RadialBins[i+1])
-            primary_N      = np.sum(primary_mask)
-            secondary_N    = np.sum(secondary_mask)
+            primary_mask           = (RadialBins[i] < primary_radius) & (primary_radius < RadialBins[i+1])
+            secondary_mask         = (RadialBins[i] < secondary_radius) & (secondary_radius < RadialBins[i+1])
+            primary_N              = np.sum(primary_mask)
+            secondary_N            = np.sum(secondary_mask)
 
             primary_speed_mask     = primary_speed[primary_mask]
             secondary_speed_mask   = secondary_speed[secondary_mask]
@@ -1299,8 +1297,8 @@ def main_cbdgam_2d():
         PrimaryRadius   = RadialBins[1:] / SinkRadius[0]
         SecondaryRadius = RadialBins[1:] / SinkRadius[1]
 
-        fig = plt.figure(figsize=(1.0 * text_width, 1.0 * text_width))
-        gs  = fig.add_gridspec(5, 2, height_ratios=[1, 0.2, 0.6, 0.6, 0.6], hspace=0.15, wspace=0.1)
+        fig = plt.figure(figsize=(0.8 * text_width, 1.2 * text_width))
+        gs  = fig.add_gridspec(5, 2, height_ratios=[1.0, 0.25, 0.6, 0.6, 0.6], hspace=0.0, wspace=0.0)
         ax0 = fig.add_subplot(gs[0, 0])
         ax1 = fig.add_subplot(gs[0, 1])
         ax_ = fig.add_subplot(gs[1, :])
@@ -1311,58 +1309,61 @@ def main_cbdgam_2d():
         ax0.set_title('Primary Minidisk')
         ax0.set_xlim([0, PrimaryRadius[-1]])
         ax0.set_ylim([0, vlim])
-        ax0.plot(PrimaryRadius, PrimaryMiniDisk['MeanV']  , label = 'Primary Mean'  , c = 'red')
-        ax0.fill_between(PrimaryRadius, PrimaryMiniDisk['MinV'], PrimaryMiniDisk['MaxV'], color='red', alpha=0.3, label = 'Primary Range')
-        ax0.plot(PrimaryRadius, [np.sqrt(primary.mass/r) for r in RadialBins[1:]], linestyle='dashed', c = 'black', label = 'Keplerian Profile')
+        ax0.plot(PrimaryRadius, PrimaryMiniDisk['MeanV'], c = 'red')
+        ax0.fill_between(PrimaryRadius, PrimaryMiniDisk['MinV'], PrimaryMiniDisk['MaxV'], color='red', alpha=0.3)
+        ax0.plot(PrimaryRadius, [r * np.sqrt(primary.mass/((r**2+SoftRadius[0]**2)**1.5)) for r in RadialBins[1:]], linestyle='dashed', c = 'black', label = 'Softened Profile')
+        ax0.legend(loc='upper right')
         ax0.set_xlabel(r'Distance $[r_\mathrm{sink}]$')#; ax0.set_xscale('log')
-        ax0.set_ylabel(r'Velocity $[a_0\Omega_0]$')#; ax0.set_yscale('log')
-        ax0.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black', label = 'Softening Radius')
+        ax0.set_ylabel(r'Velocity $[a_0\Omega_0]$')   #; ax0.set_yscale('log')
+        ax0.set_xticks([0, 2, 4, 6, 8])
+        #ax0.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black', label = 'Softening Radius')
         
 
         ax1.set_title('Secondary Minidisk')
         ax1.set_xlim([0, SecondaryRadius[-1]])
         ax1.set_ylim([0, vlim])
-        ax1.plot(SecondaryRadius, SecondaryMiniDisk['MeanV'], label='Secondary Mean', c = 'blue'  )
-        ax1.fill_between(SecondaryRadius, SecondaryMiniDisk['MinV'], SecondaryMiniDisk['MaxV'], color='blue', alpha=0.3, label = 'Secondary Range')
-        ax1.plot(SecondaryRadius, [np.sqrt(secondary.mass/r) for r in RadialBins[1:]], linestyle='dashed', c = 'black', label = 'Keplerian Profile')
-        ax1.tick_params(axis='y', colors='white')#; ax1.set_yscale('log')
-        ax1.set_xlabel(r'Distance $[r_\mathrm{sink}]$')#; ax1.set_xscale('log')
-        ax1.axvline(x = SoftRadius[1]/SinkRadius[1], linestyle='dotted', c = 'black', label = 'Softening Radius')
+        ax1.plot(SecondaryRadius, SecondaryMiniDisk['MeanV'], c = 'blue'  )
+        ax1.fill_between(SecondaryRadius, SecondaryMiniDisk['MinV'], SecondaryMiniDisk['MaxV'], color='blue', alpha=0.3)
+        ax1.plot(SecondaryRadius, [r * np.sqrt(secondary.mass/((r**2+SoftRadius[1]**2)**1.5)) for r in RadialBins[1:]], linestyle='dashed', c = 'black', label = 'Softened Profile')
+        ax1.legend(loc='upper right')
+        #ax1.tick_params(axis='y', colors='white')
+        ax1.set_yticks([])
+        ax1.set_xlabel(r'Distance $[r_\mathrm{sink}]$')
+        ax1.set_xticks([0, 2, 4, 6, 8])
+        
 
         ax_.axis('off')
 
         ax2.plot(PrimaryRadius  , PrimaryMiniDisk['MeanE']  , color='red' , alpha=0.8, label = 'Primary Mean')
         ax2.plot(SecondaryRadius, SecondaryMiniDisk['MeanE'], color='blue', alpha=0.8, label = 'Secondary Mean')
-        ax2.fill_between(PrimaryRadius  , PrimaryMiniDisk['MinE']  , PrimaryMiniDisk['MaxE']  , color='red', alpha=0.1, label = 'Min/Max')
-        ax2.fill_between(SecondaryRadius, SecondaryMiniDisk['MinE'], SecondaryMiniDisk['MaxE'], color='blue', alpha=0.1, label = 'Min/Max')
+        ax2.fill_between(PrimaryRadius  , PrimaryMiniDisk['MinE']  , PrimaryMiniDisk['MaxE']  , color='red', alpha=0.1, label = 'Primary Range')
+        ax2.fill_between(SecondaryRadius, SecondaryMiniDisk['MinE'], SecondaryMiniDisk['MaxE'], color='blue', alpha=0.1, label = 'Secondary Range')
         ax2.set_xlim([0, SecondaryRadius[-1]])
-        ax2.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black', label = 'Softening Radius')
         ax2.set_xticks([])
         ax2.set_ylim([0,1])
+        ax2.set_yticks([0.0, 0.5, 1.0])
         ax2.set_ylabel(r'Eccentricity')
 
         SS73_coeff   = PrimaryMiniDisk['MeanD'][Nbins//2]/PrimaryRadius[Nbins//2]**(-3/5)
-        SS73_profile = [SS73_coeff * r**(-3./5.) * (1-r**(-0.5))**(-3/5) if r > 1 else 1e-10 for r in PrimaryRadius]
         ax3.plot(PrimaryRadius  , PrimaryMiniDisk['MeanD']  , color='red' , alpha=0.8)
         ax3.plot(SecondaryRadius, SecondaryMiniDisk['MeanD'], color='blue', alpha=0.8)
-        ax3.plot(PrimaryRadius  , SS73_profile              , color='peru', linestyle='dashed', label = r'$r^{-3/5}$')
         ax3.fill_between(PrimaryRadius  , PrimaryMiniDisk['MinD']  , PrimaryMiniDisk['MaxD']  , color='red', alpha=0.1)
         ax3.fill_between(SecondaryRadius, SecondaryMiniDisk['MinD'], SecondaryMiniDisk['MaxD'], color='blue', alpha=0.1)
-        ax3.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black')
         ax3.set_xlim([0, SecondaryRadius[-1]]); ax3.set_xticks([])
-        ax3.set_ylim([dlim*1e-4,dlim]); 
+        ax3.set_ylim([dlim*2e-4,dlim]); 
         ax3.set_yscale('log')
         ax3.set_ylabel(r'$\langle\Sigma\rangle_\phi$')
-        ax3.legend(loc='upper right')
+        #ax3.legend(loc='upper right')
 
         ax4.plot(PrimaryRadius          , PrimaryMiniDisk['MeanM']  , color='red' , alpha=0.8)
         ax4.plot(SecondaryRadius        , SecondaryMiniDisk['MeanM'], color='blue' , alpha=0.8)
         ax4.fill_between(PrimaryRadius  , PrimaryMiniDisk['MinM']  , PrimaryMiniDisk['MaxM']  , color='red', alpha=0.1)
         ax4.fill_between(SecondaryRadius, SecondaryMiniDisk['MinM'], SecondaryMiniDisk['MaxM'], color='blue', alpha=0.1)
-        ax4.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black') 
+        #ax4.axvline(x = SoftRadius[0]/SinkRadius[0], linestyle='dotted', c = 'black') 
         ax4.set_xlim([0, SecondaryRadius[-1]]); ax4.set_xlabel(r'Distance $[r_\mathrm{sink}]$')
         ax4.set_ylabel(r'$v/c_\mathrm{s}$')
-        ax4.set_yscale('log')
+        ax4.set_ylim([0, 79])
+        #ax4.set_yscale('log')
 
 
         
@@ -1371,13 +1372,13 @@ def main_cbdgam_2d():
         handles = []
         labels  = []
 
-        for ax in [ax0, ax1]:
+        for ax in [ax2]:
             h, l = ax.get_legend_handles_labels()
             for hi, li in zip(h, l):
                 if li not in labels:   # avoid duplicates
                     handles.append(hi)
                     labels.append(li)
-        fig.legend(handles, labels, loc='lower center', ncol=3, bbox_to_anchor=(0.5, -0.06))
+        fig.legend(handles, labels, loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.02))
         plt.savefig(f"MinidiskProfiles{chkpt['time'] / 2 / np.pi:.2f}.png", dpi=400, bbox_inches='tight')
 
     if args.axisymmetry:
@@ -1401,8 +1402,8 @@ def main_cbdgam_2d():
         DiskStats          = {'MeanV': [], 'MinV': [], 'MaxV': [], 'MeanE': [], 'MinE': [], 'MaxE': [], 'MeanD': [], 'MinD': [], 'MaxD': [], 'MeanM': [], 'MinM': [], 'MaxM': []}
 
         for i in range(len(RadialBins)-1):
-            mask   = (RadialBins[i] < radius) & (radius < RadialBins[i+1])
-            N      = np.sum(mask)
+            mask           = (RadialBins[i] < radius) & (radius < RadialBins[i+1])
+            N              = np.sum(mask)
 
             speed_mask     = speed[mask]
             e_mask         = e[mask]
@@ -1540,22 +1541,22 @@ def main_cbdgam_2d():
         G_flat = G.ravel()
 
         r_min, r_max = 1.0, np.max(r_flat)/np.sqrt(2)
-        n_bins       = min(100, mesh.shape[0] // 4)
-        r_bins       = np.linspace(r_min, r_max, n_bins)
+        n_bins  = min(100, mesh.shape[0] // 4)
+        r_bins  = np.linspace(r_min, r_max, n_bins)
 
-        mdot_ring    = np.full(n_bins-1, np.nan)
-        r_centers    = 0.5*(r_bins[:-1] + r_bins[1:])
+        mdot_ring = np.full(n_bins-1, np.nan)
+        r_centers = 0.5*(r_bins[:-1] + r_bins[1:])
 
         for k in range(n_bins-1):
             r0, r1 = r_bins[k], r_bins[k+1]
             mask = (r_flat >= r0) & (r_flat < r1)
             if mask.any():
                 dr = (r1 - r0)
-                mdot_ring[k] = (G_flat[mask] * r_flat[mask]).sum() * dA / dr  # ≈ ∮ Σ v_r r dφ
-        mdot_ring_norm = mdot_ring / SS73.Mdot_inf
+                mdot_ring[k] = -(G_flat[mask].sum() * dA) / dr  # ≈ - (1/dr) ∫_annulus Σ v_r dA
 
-        title     = 'Mass Inflow Rate'
-        savename  = 'MdotMap'
+        mdot_ring_norm = mdot_ring / SS73.Mdot_inf
+        title          = 'Mass Inflow Rate'
+        savename       = 'MdotMap'
 
         # ======== Plotting ========
         fig = plt.figure(figsize=(1.0 * text_width, 1.0 * text_width))
@@ -1581,12 +1582,7 @@ def main_cbdgam_2d():
         ax0.tick_params(axis='x')
         ax0.tick_params(axis='y')
         ax0.set_aspect("equal")
-        ax0.set_ylabel(r'$y/a$')
-        buffer_ring  = Circle((0.0, 0.0)  , 4.5, color='black', fill=False, alpha=1, linewidth = 0.5)        # Radius of the circle
-        ax0.add_patch(buffer_ring)
-        #ax0.set_xlim([4.45, 4.55])
-        #ax0.set_ylim([-0.05, 0.05])
-        
+        ax0.set_ylabel(r'$y/a$')        
         ax0.set_title(title + r' at time $t = $ %g $\mathrm{[2\pi\Omega_0^{-1}]}$'%(np.round(chkpt["time"]/2/np.pi,3)))
 
 
@@ -1601,9 +1597,10 @@ def main_cbdgam_2d():
         ax1.set_xlabel(r'Radius $r/a$')
         ax1.set_ylabel(r'$\dot{M}$')
         ax1.legend(loc='best', fontsize=7)
+        ax1.set_yticks([-2, -1, 0, 1, 2])
         ax1.grid(True, alpha=0.3)
         ax1.set_position([0.1975, 0.0505, 0.578, 0.25])  # [left, bottom, width, height]
-        ax1.set_ylim([-1,1])
+        ax1.set_ylim([-3,3])
         
         # Save combined figure
         if args.Outputs is None:
@@ -1638,12 +1635,12 @@ def main_cbdgam_2d():
         
         # old_event = chkpt['event_states']['checkpoint']
         # from sailfish.event import RecurringEvent
-        # print(old_event.number)
-        # new_event = old_event._replace(number=15)
+        # # print(old_event.number)
+        # new_event = old_event._replace(number=1)
         # chkpt['event_states']['checkpoint'] = new_event
         
         
-        # with open('/lustre/astro/davidon/Storage/sailfish/Gamma-Law/Retrograde/Mach10/Buffer_Test/LiveBuffer_ON/chkpt.0014.pk', "wb") as checkpoint:
+        # with open('/lustre/astro/davidon/Storage/sailfish/Gamma-Law/Retrograde/Mach10/TorqueFree/Fixed_e/e_09/StartupMovie/chkpt.0001.pk', "wb") as checkpoint:
         #     pk.dump(chkpt, checkpoint)
 
 
