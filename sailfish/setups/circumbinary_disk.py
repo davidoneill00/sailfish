@@ -641,8 +641,10 @@ class CoolBinary(SetupBase):
     mach_number_a         = param(10, "Disk Mach number") 
     target_accretion_rate = param(1., "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
     OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
-    Cooling_N             = param(1e6, "N samples of temperatures in tabulated emission", mutable=True) 
-    
+    Cooling_N             = param(1e7, "N samples of temperatures in tabulated emission", mutable=True) 
+    Cooling_logspace      = param(True, "Whether to space the temperature samples logarithmically", mutable=True)
+    cavity_radius         = param(1.5, "Initialised radius in units of the binary separation; only affects q>0")
+
     # binary parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
     init_eccentricity     = param(0.0 , "orbital eccentricity at start of sweep")
@@ -693,7 +695,12 @@ class CoolBinary(SetupBase):
     
     @property
     def Temperature(self):
-        return np.logspace(0,10,int(self.Cooling_N))
+        if self.Cooling_logspace:
+            return np.logspace(2,8,int(self.Cooling_N))
+        else:
+            return np.linspace(1e2,1e8,int(self.Cooling_N))
+    
+
     
     @property   
     def EmissionTable(self):
@@ -722,7 +729,7 @@ class CoolBinary(SetupBase):
         v_phi        = sqrt(self.GM / r_softened)  #* sqrt(1.0 - (3.0 * self.softening_length * self.softening_length) / (r_softened * r_softened))
         
         if not self.single_point_mass:
-            cavity_radius = 1.5
+            cavity_radius = self.cavity_radius
         else:
             cavity_radius = 0.2
         
