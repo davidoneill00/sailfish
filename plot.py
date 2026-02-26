@@ -904,19 +904,40 @@ def main_cbdgam_2d():
         x               = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
         y               = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])
         X, Y            = np.meshgrid(x, y, indexing="xy")
+
+        # ======== Calculate point masses properties ========
+        primary, secondary = chkpt['point_masses']
+        xprim, yprim       = primary.position_x  , primary.position_y
+        xsec, ysec         = secondary.position_x, secondary.position_y
+        R_1, R_2           = np.sqrt((X-xprim)**2 + (Y-yprim)**2), np.sqrt((X-xsec)**2  + (Y-ysec)**2)
         
         # ======== Calculate desired field ========
         Mdrop           = (SS73.Mdrop if args.remap else 1.0)
         Sigma           = fields["sigma"](prim).T * Mdrop**(3./5.)
         Pressure        = fields["pre"](prim).T   * Mdrop
-        cs              = (gamma * Pressure / Sigma)**0.5
-        Vx, Vy          = chkpt['solution'][:, :, 1].T, chkpt['solution'][:, :, 2].T
-        optical_depth   = (Sigma * SS73.kappa_code)
-        mask_values     = (optical_depth > Floor_Depth)
         Midplane_T      = ((Pressure / Sigma) * (SS73.mp_code / SS73.kb_code))
-        Teff            = EffectiveTemperature(optical_depth, Midplane_T) 
+        cs              = (gamma * Pressure / Sigma)**0.5
+        omega           = np.sqrt(primary.mass / (R_1**3 + 1e-12) + secondary.mass / (R_2**3 + 1e-12))
+        H               = cs / omega
+        rho             = Sigma / (2 * H)
+        Vx, Vy          = chkpt['solution'][:, :, 1].T, chkpt['solution'][:, :, 2].T
+        
+        # ======== Calculate effective optical depth and mask ========
+        Z               = 1.0
+        gaunt_r         = 1.0
+        alpha_ff        = SS73.ff_opacity_code * Midplane_T**(-7/2) * Z**2 * rho**2 * gaunt_r 
+        tau_ff          = alpha_ff * H 
+        tau_es          = Sigma    * SS73.kappa_code
+        tau_effective   = np.sqrt(tau_ff * (tau_ff + tau_es))
+        mask_values     = (tau_effective > Floor_Depth)
+        
+        Teff            = EffectiveTemperature(tau_es + tau_ff, Midplane_T)  # total optical depth for Rosseland approx.
         r_g             = cgs['G'] * chkpt['model_parameters']['central_mass_msun'] * cgs['msun'] / cgs['c'] / cgs['c']
         length_scale_pc = r_g * chkpt['model_parameters']['init_separation_rg'] / cgs['pc']
+
+
+        
+    
 
         def SaveBinStats(dictname, keys, args):
             for (key, arg) in zip(keys, args):
@@ -961,23 +982,16 @@ def main_cbdgam_2d():
                 ColourbarLabel = r'$T^4$'
 
         elif args.field == 'tau':
-            f             = optical_depth
-            title         = 'Optical Depth'
-            savename      = 'TauMap'
-            cmap          = 'cividis'
+            f                  = tau_effective
+            title              = 'Effective Optical Depth'
+            savename           = 'TauMap'
+            cmap               = 'cividis'
             if args.log:
-                ColourbarLabel = r'$\log_{10}\tau$'
+                ColourbarLabel = r'$\log_{10}\tau_\mathrm{eff}$'
             else:
-                ColourbarLabel = r'$\tau$'
+                ColourbarLabel = r'$\tau_\mathrm{eff}$'
 
         elif args.field == 'viscosity':
-            primary, secondary = chkpt['point_masses']
-            xprim, yprim       = primary.position_x  , primary.position_y
-            xsec, ysec         = secondary.position_x, secondary.position_y
-            R_1, R_2           = np.sqrt((X-xprim)**2 + (Y-yprim)**2), np.sqrt((X-xsec)**2  + (Y-ysec)**2)
-            omega              = np.sqrt(primary.mass / (R_1**3 + 1e-12) + secondary.mass / (R_2**3 + 1e-12))
-            cs                 = (gamma * Pressure / Sigma)**0.5
-            H                  = cs / omega
             nu                 = chkpt['model_parameters']['alpha'] * cs * H
             f                  = nu
             title              = 'Viscosity'
@@ -1023,9 +1037,6 @@ def main_cbdgam_2d():
             cmap   = 'magma'
             
             # ===== Calculate orbital velocity ========
-            primary, secondary = chkpt['point_masses']
-            xprim, yprim       = primary.position_x  , primary.position_y
-            xsec, ysec         = secondary.position_x, secondary.position_y
             speed              = np.sqrt(Vx**2 + Vy**2)
             f                  = (speed / cs)
             title              = 'Mach Number'
@@ -1087,6 +1098,7 @@ def main_cbdgam_2d():
             cmap=cmap,
             extent=extent,
         )
+
         cbar = fig.colorbar(cm, ax=ax, shrink=0.805, aspect=20, pad=0.05)
         cbar.ax.set_title(ColourbarLabel, pad=6)          # puts text above the bar
         ax.tick_params(axis='x')
@@ -1118,8 +1130,6 @@ def main_cbdgam_2d():
                 color='darkgrey', headwidth=4
             )
 
-        #buffer = Circle((0.0 , 0.0)  , mesh.x1 - chkpt['model_parameters']['buffer_onset_width']  , color='black', fill=False, alpha=1.0, linewidth = 0.1)        # Radius of the circle
-        #ax.add_patch(buffer)
 
         if args.plot_sink:
             primary, secondary = chkpt['point_masses']

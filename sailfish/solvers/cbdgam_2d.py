@@ -511,15 +511,28 @@ class Solver(SolverBase):
             
 
             # ============ We need to do remapping for diagnostics ============
-            Mdrop         = self.setup.SS73.Mdrop
-            Sigma         = patch.primitive[:, :, 0] * Mdrop**(3./5.)
-            Pressure      = patch.primitive[:, :, 3] * Mdrop
+            Mdrop           = self.setup.SS73.Mdrop
+            Sigma           = patch.primitive[:, :, 0] * Mdrop**(3./5.)
+            Pressure        = patch.primitive[:, :, 3] * Mdrop
             
-            Precomputed_T        = self.setup.Temperature
-            T                    = self.xp.maximum((Pressure / Sigma) * (self.setup.SS73.mp_code / self.setup.SS73.kb_code), Precomputed_T[0])
-            optical_depth        = Sigma * self.setup.SS73.kappa_code
-            Teff                 = EffectiveTemperature(optical_depth, T)
-            BolometricLuminosity = 2 * cgs['sigmab'] * Teff ** 4
+            Precomputed_T   = self.setup.Temperature
+            T               = self.xp.maximum((Pressure / Sigma) * (self.setup.SS73.mp_code / self.setup.SS73.kb_code), Precomputed_T[0])
+            R_1, R_2        = np.sqrt((X-m1.position_x)**2 + (Y-m1.position_y)**2), np.sqrt((X-m2.position_x)**2  + (Y-m2.position_y)**2)
+            cs              = (gamma * Pressure / Sigma)**0.5
+            omega           = np.sqrt(m1.mass / (R_1**3 + 1e-12) + m2.mass / (R_2**3 + 1e-12))
+            H               = cs / omega
+            rho             = Sigma / (2 * H)
+
+            # ============ absorption, scattering and effective optical depths ============
+            Z                    = 1.0
+            gaunt_r              = 1.0
+            alpha_ff             = self.setup.SS73.ff_opacity_code * T **(-7/2) * Z**2 * rho**2 * gaunt_r 
+            tau_ff               = alpha_ff * H 
+            tau_es               = Sigma    * self.setup.SS73.kappa_code
+            tau_effective        = np.sqrt(tau_ff * (tau_ff + tau_es))
+            tau                  = tau_es + tau_ff
+            Teff                 = EffectiveTemperature(tau, T)
+            BolometricLuminosity = 2 * cgs['sigmab'] * Teff ** 4 # report emission in cgs
 
             if not patch.options.sink_emission:
                 x_, y_  = patch.cell_center_coordinate_arrays
@@ -533,7 +546,7 @@ class Solver(SolverBase):
                 r1_mask = 1
                 r2_mask = 1
 
-            transparent_mask = (optical_depth >= self.setup.OpticalDepthFloor)
+            transparent_mask = (tau_effective >= self.setup.OpticalDepthFloor)
             mask             = r1_mask * r2_mask * transparent_mask
             
             # numpy arrays arrays, keep them on the CPU

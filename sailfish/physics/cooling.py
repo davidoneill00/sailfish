@@ -24,7 +24,8 @@ cgs = dict(
 		c2h3 = 2.61463e-58,
 		h_over_kb = 4.79921e-11,
 		year=31556952,
-		ev = 1.60218e-12
+		ev = 1.60218e-12,
+		q_e = 4.80320425e-10,
 	)
 
 logger = getLogger(__name__)
@@ -155,8 +156,28 @@ class ShakuraSunyaevDisk(NamedTuple):
 		Hs    = cs /Omega
 		return r / Hs
 
+	def Effective_optical_depth(self, r:float) -> float:
+		H     = r * self._length / self.mach_profile(r)  # in cgs 
+		Sigma = self.surface_density_profile(r)  * (self._mass / self._length**2)       
+		Press = self.surface_pressure_profile(r) * (self._mass / self._time**2)	
+		T     = (Press / Sigma) * (cgs['mp'] / cgs['kb'])
+		rho   = Sigma / H
+
+		# page 163 Radiative Processes in Astrophysics, Rybicki & Lightman (1986)
+		ne                 = rho / cgs['mp']
+		ni                 = ne
+		Z                  = 1.0
+		gaunt_r            = 1.0
+		alpha_ff           = 1.7e-25 * T**(-7/2) * Z**2 * ne * ni * gaunt_r  # cgs units
+		tau_ff             = alpha_ff * H
+		tau_es             = cgs['kappa'] * Sigma
+
+		return np.sqrt(tau_ff * (tau_ff + tau_es))
+
+
+
 	def optical_depth(self, r:float) -> float:
-		return cgs['kappa'] * self._surface_density * r**(-3./5.)
+		return cgs['kappa'] * self.surface_density_profile(r) * (self._mass / self._length**2)
 
 	# -------------------------------------------------------------------------
 	@property
@@ -227,6 +248,15 @@ class ShakuraSunyaevDisk(NamedTuple):
 	@property
 	def kappa_code(self):
 		return cgs['kappa'] / (self._length**2 / self._mass)
+
+	@property
+	def ff_opacity_code(self):
+		# page 163 Radiative Processes in Astrophysics, Rybicki & Lightman (1986)
+		# (1) convert number density to mass density by dividing prefactor by cgs['mp']^2 
+		# (2) convert from cgs to code units by multiplying by (SS73._mass^2 / SS73._length^5)
+		prefactor          = 1.7e-25 / cgs['mp'] / cgs['mp']
+		prefactor_code     = prefactor * (self._mass**2 / self._length**5)
+		return prefactor_code
 
 	@property   
 	def Length_Scale_CGS(self): # physical units (not code units)
@@ -306,12 +336,11 @@ if __name__ == '__main__':
         	mach_number_a     = 10,
         	alpha             = 0.1,
 			gamma             = 5./3.,
-			target_accretion_rate=10.0,
+			target_accretion_rate=0.1,
         )
 	print("fedd : ", ss._eddington_fraction)
 	mp_code = cgs['mp'] /  ss._mass
 	kb_code = cgs['kb'] / (ss._mass * ss._length**2 / ss._time**2)
-	print('Ratio in code units is', mp_code / kb_code)
 
 
 	fcavity = 0.0001 + 0.9999 * np.exp(-((1.0 / r) ** 30))
@@ -345,3 +374,4 @@ if __name__ == '__main__':
 	plt.plot(r, 2 * np.pi * ss.Mdot(r), c='C0')
 	plt.ylim([-0.5,0.5])
 	plt.savefig('mdot_profile.png')
+
