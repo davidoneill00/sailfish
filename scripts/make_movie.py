@@ -31,18 +31,26 @@ def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
                 name,
                 #"-f", str('pressure'),
                 "-l",           
-                "--radius", str(4),
+                #"--radius", str(4),
                 #"--vmap",
-                "--vmin", str(-3.0),
-                "--vmax", str( 0.0),
+                "--vmin", str(-5.0),
+                "--vmax", str(-3.0),
                 "-o", "output-figures/",
                 #"--remap", str(True)
             ]
 
             subprocess.run(plot_args, check=True)
 
-    # After all images are saved, rename them sequentially
-    ordered_frames = sorted(Path("output-figures").glob("DensityMap-*.png"))
+    # After all images are saved, rename them sequentially with correct numeric ordering
+    import re
+    def extract_num(fname):
+        match = re.search(r"DensityMap-(\d+)\.png", fname.name)
+        return int(match.group(1)) if match else -1
+
+    ordered_frames = sorted(
+        Path("output-figures").glob("DensityMap-*.png"),
+        key=extract_num
+    )
     if not ordered_frames:
         raise FileNotFoundError("No frames were generated. Did you run with --quick_plotting?")
 

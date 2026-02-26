@@ -335,7 +335,7 @@ if __name__ == '__main__':
         Optical_signal = Optical - np.mean(Optical)
         UV_signal      = UV      - np.mean(UV)
         XRay_signal    = XRay    - np.mean(XRay)
-        freq           = np.logspace(-1, 1, 1000)      # cycles / orbit
+        freq           = np.logspace(-2, 1, 1000)      # cycles / orbit
         omega          = 2 * np.pi * freq              # rad / orbit
         Infared_power  = lombscargle(Final_Orbits, Infared_signal, omega)
         Optical_power  = lombscargle(Final_Orbits, Optical_signal, omega)
