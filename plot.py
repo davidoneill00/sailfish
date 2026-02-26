@@ -925,7 +925,7 @@ def main_cbdgam_2d():
         # ======== Calculate effective optical depth and mask ========
         Z               = 1.0
         gaunt_r         = 1.0
-        alpha_ff        = SS73.ff_opacity_code * Midplane_T**(-7/2) * Z**2 * rho**2 * gaunt_r 
+        alpha_ff        = SS73.ff_absorption_code * Midplane_T**(-7/2) * Z**2 * rho**2 * gaunt_r 
         tau_ff          = alpha_ff * H 
         tau_es          = Sigma    * SS73.kappa_code
         tau_effective   = np.sqrt(tau_ff * (tau_ff + tau_es))
@@ -981,15 +981,35 @@ def main_cbdgam_2d():
             else:
                 ColourbarLabel = r'$T^4$'
 
-        elif args.field == 'tau':
+        elif args.field == 'tau_eff':
             f                  = tau_effective
             title              = 'Effective Optical Depth'
-            savename           = 'TauMap'
+            savename           = 'EffectiveTauMap'
             cmap               = 'cividis'
             if args.log:
                 ColourbarLabel = r'$\log_{10}\tau_\mathrm{eff}$'
             else:
                 ColourbarLabel = r'$\tau_\mathrm{eff}$'
+        
+        elif args.field == 'tau_ff':
+            f                  = tau_ff
+            title              = 'Free-Free Absorption Optical Depth'
+            savename           = 'FreeFreeTauMap'
+            cmap               = 'cividis'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\tau_\mathrm{ff}$'
+            else:
+                ColourbarLabel = r'$\tau_\mathrm{ff}$'
+
+        elif args.field == 'tau_es':
+            f                  = tau_es
+            title              = 'Electron Scattering Optical Depth'
+            savename           = 'ElectronScatteringTauMap'
+            cmap               = 'cividis'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\tau_\mathrm{es}$'
+            else:
+                ColourbarLabel = r'$\tau_\mathrm{es}$'
 
         elif args.field == 'viscosity':
             nu                 = chkpt['model_parameters']['alpha'] * cs * H

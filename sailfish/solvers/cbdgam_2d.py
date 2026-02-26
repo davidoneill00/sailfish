@@ -46,7 +46,6 @@ def initial_condition(setup, mesh, time):
     """
     Generate a 2D array of primitive data from a mesh and a setup.
     """
-    import numpy as np
 
     ni, nj = mesh.shape
     primitive = np.zeros([ni, nj, 4])
@@ -409,7 +408,7 @@ class Solver(SolverBase):
 
         self.mesh                  = mesh
         self.setup                 = setup
-        self.num_guard             = ng
+        self.ng                    = ng
         self.num_cons              = nq
         self.xp                    = xp
         self.patches               = []
@@ -419,8 +418,12 @@ class Solver(SolverBase):
         self.buffer_onset_radius   = self.domain_radius - physics.buffer_onset_width
         self.live_buffer           = self.setup.live_buffer
         self.live_buffer_cadence   = self.setup.live_buffer_cadence
-        self.t_viscous_a           = 0.5 * ViscousTime(r=1, Mach_a=self.physics['mach_number'], alpha=self.physics['alpha'])                        # viscous time near cavity
+        self.t_viscous_a           = 0.5 * ViscousTime(r=1, Mach_a=self.physics['mach_number'], alpha=self.physics['alpha'])  # viscous time near cavity
         
+        x                          = self.xp.array([self.mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
+        y                          = self.xp.array([self.mesh.cell_coordinates(0, j)[1] for j in range(nj)])
+        self.X, self.Y             = self.xp.meshgrid(x, y, indexing="xy")
+
         # self.buffer_surface_density_onset  = None
         # self.buffer_pressure_onset         = None
 
@@ -474,7 +477,7 @@ class Solver(SolverBase):
     @property
     def solution(self):
         return concat_on_host(
-            [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
+            [p.primitive for p in self.patches], (self.ng, self.ng)
         )
 
     @property
@@ -501,7 +504,7 @@ class Solver(SolverBase):
 
     def Band_Luminosity(self, patch):
         with patch.execution_context:
-            #dev_id = int(patch.execution_context.id)
+            ng     = self.ng
             dev_id = int(getattr(patch.execution_context, "id", 0))
             if not hasattr(self, "_EmissionTable_cache"):
                 self._EmissionTable_cache = {}
@@ -512,42 +515,39 @@ class Solver(SolverBase):
 
             # ============ We need to do remapping for diagnostics ============
             Mdrop           = self.setup.SS73.Mdrop
-            Sigma           = patch.primitive[:, :, 0] * Mdrop**(3./5.)
-            Pressure        = patch.primitive[:, :, 3] * Mdrop
-            
+            Sigma           = patch.primitive[ng:-ng, ng:-ng, 0] * Mdrop**(3./5.)
+            Pressure        = patch.primitive[ng:-ng, ng:-ng, 3] * Mdrop          
             Precomputed_T   = self.setup.Temperature
             T               = self.xp.maximum((Pressure / Sigma) * (self.setup.SS73.mp_code / self.setup.SS73.kb_code), Precomputed_T[0])
-            R_1, R_2        = np.sqrt((X-m1.position_x)**2 + (Y-m1.position_y)**2), np.sqrt((X-m2.position_x)**2  + (Y-m2.position_y)**2)
-            cs              = (gamma * Pressure / Sigma)**0.5
-            omega           = np.sqrt(m1.mass / (R_1**3 + 1e-12) + m2.mass / (R_2**3 + 1e-12))
+            m1, m2          = patch.physics.point_masses(patch.time)
+            R_1, R_2        = self.xp.sqrt((self.X-m1.position_x)**2 + (self.Y-m1.position_y)**2), self.xp.sqrt((self.X-m2.position_x)**2  + (self.Y-m2.position_y)**2)
+            cs              = (patch.physics.gamma_law_index * Pressure / Sigma)**0.5
+            omega           = self.xp.sqrt(m1.mass / (R_1**3 + 1e-12) + m2.mass / (R_2**3 + 1e-12))
             H               = cs / omega
             rho             = Sigma / (2 * H)
 
             # ============ absorption, scattering and effective optical depths ============
             Z                    = 1.0
             gaunt_r              = 1.0
-            alpha_ff             = self.setup.SS73.ff_opacity_code * T **(-7/2) * Z**2 * rho**2 * gaunt_r 
+            alpha_ff             = self.setup.SS73.ff_absorption_code * T **(-7/2) * Z**2 * rho**2 * gaunt_r 
             tau_ff               = alpha_ff * H 
             tau_es               = Sigma    * self.setup.SS73.kappa_code
-            tau_effective        = np.sqrt(tau_ff * (tau_ff + tau_es))
+            tau_effective        = self.xp.sqrt(tau_ff * (tau_ff + tau_es))
             tau                  = tau_es + tau_ff
             Teff                 = EffectiveTemperature(tau, T)
             BolometricLuminosity = 2 * cgs['sigmab'] * Teff ** 4 # report emission in cgs
 
             if not patch.options.sink_emission:
-                x_, y_  = patch.cell_center_coordinate_arrays
-                x       = self.xp.pad(x_[:, 0], pad_width=2, mode="edge")
-                y       = self.xp.pad(y_[0, :], pad_width=2, mode="edge")
-                X, Y    = self.xp.meshgrid(x, y, indexing='ij')
-                m1, m2  = patch.physics.point_masses(patch.time)
-                r1_mask = ((X-m1.position_x)**2 + (Y-m1.position_y)**2) > m1.sink_radius**2
-                r2_mask = ((X-m2.position_x)**2 + (Y-m2.position_y)**2) > m2.sink_radius**2
+                r1_mask = ((self.X-m1.position_x)**2 + (self.Y-m1.position_y)**2) > m1.sink_radius**2
+                r2_mask = ((self.X-m2.position_x)**2 + (self.Y-m2.position_y)**2) > m2.sink_radius**2
             else:
                 r1_mask = 1
                 r2_mask = 1
 
-            transparent_mask = (tau_effective >= self.setup.OpticalDepthFloor)
-            mask             = r1_mask * r2_mask * transparent_mask
+            tau_mask    = (tau_effective >= self.setup.OpticalDepthFloor)
+            floor_mask  = (Sigma >= patch.options.density_floor * Mdrop**(3./5.)) & (Pressure >= patch.options.pressure_floor * Mdrop)
+            mask        = r1_mask & r2_mask & tau_mask & floor_mask
+            #mask        = mask.astype(float)
             
             # numpy arrays arrays, keep them on the CPU
             dlogT            = np.diff(np.log10(Precomputed_T))[0]
@@ -593,7 +593,7 @@ class Solver(SolverBase):
             Interpolated_Xray    *= (mask * self.setup.SS73.Length_Scale_CGS**2)
             BolometricLuminosity *= (mask * self.setup.SS73.Length_Scale_CGS**2)
 
-            return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~transparent_mask), self.xp.max(Teff*mask)
+            return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~mask), self.xp.max(Teff*mask)
 
 
     def reductions(self):
@@ -604,7 +604,7 @@ class Solver(SolverBase):
 
         xp = self.xp
         da = self.mesh.dx * self.mesh.dy
-        ng = self.num_guard
+        ng = self.ng
         diagnostics = self._physics.diagnostics
         gpu_results = []
 
@@ -854,7 +854,7 @@ class Solver(SolverBase):
 
 
     def set_bc(self, array):
-        ng = self.num_guard
+        ng = self.ng
         num_patches = len(self.patches)
         for i0 in range(num_patches):
             il = (i0 + num_patches - 1) % num_patches
@@ -867,7 +867,7 @@ class Solver(SolverBase):
 
     def set_bc_patch(self, pl, pc, pr, patch_index):
         ni, nj = self.mesh.shape
-        ng = self.num_guard
+        ng = self.ng
 
         with self.patches[patch_index].execution_context:
             xp = self.xp
