@@ -250,7 +250,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		return cgs['kappa'] / (self._length**2 / self._mass)
 
 	@property
-	def ff_opacity_code(self):
+	def ff_absorption_code(self):
 		# page 163 Radiative Processes in Astrophysics, Rybicki & Lightman (1986)
 		# (1) convert number density to mass density by dividing prefactor by cgs['mp']^2 
 		# (2) convert from cgs to code units by multiplying by (SS73._mass^2 / SS73._length^5)
