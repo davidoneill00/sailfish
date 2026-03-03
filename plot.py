@@ -1011,6 +1011,17 @@ def main_cbdgam_2d():
             else:
                 ColourbarLabel = r'$\tau_\mathrm{es}$'
 
+
+        elif args.field == 'tau_ratio':
+            f                  = (tau_ff / tau_es) * mask_values
+            title              = 'Ratio of tau_ff to tau_es'
+            savename           = 'TauRatioMap'
+            cmap               = 'cividis'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\tau_\mathrm{es}$'
+            else:
+                ColourbarLabel = r'$\tau_\mathrm{es}$' 
+
         elif args.field == 'viscosity':
             nu                 = chkpt['model_parameters']['alpha'] * cs * H
             f                  = nu
