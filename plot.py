@@ -935,7 +935,6 @@ def main_cbdgam_2d():
         r_g             = cgs['G'] * chkpt['model_parameters']['central_mass_msun'] * cgs['msun'] / cgs['c'] / cgs['c']
         length_scale_pc = r_g * chkpt['model_parameters']['init_separation_rg'] / cgs['pc']
 
-
         
     
 
@@ -1018,9 +1017,9 @@ def main_cbdgam_2d():
             savename           = 'TauRatioMap'
             cmap               = 'cividis'
             if args.log:
-                ColourbarLabel = r'$\log_{10}\tau_\mathrm{es}$'
+                ColourbarLabel = r'$\log_{10}(\tau_\mathrm{ff}/\tau_\mathrm{es})$'
             else:
-                ColourbarLabel = r'$\tau_\mathrm{es}$' 
+                ColourbarLabel = r'$\tau_\mathrm{ff}/\tau_\mathrm{es}$' 
 
         elif args.field == 'viscosity':
             nu                 = chkpt['model_parameters']['alpha'] * cs * H

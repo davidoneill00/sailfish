@@ -325,6 +325,49 @@ def PlanckSpectrum(nu, T):
     B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2) / np.expm1(cgs['h'] * nu / (cgs['kb'] * T))
     return np.pi * B_nu
 
+def TransitionRadii(m, alpha, mdot, a): # m in units of Msun, mdot in units of mdot_Edd and a in units of Rgrav
+    # (1) Radiation pressure -> Gas pressure transition
+    
+    C           = 150 * (alpha * m)**(2/21) * mdot**(16/21)
+    x           = C                                          # initial guess
+    f_x         = x / (1-x**(-0.5))**(16/21) - C
+    iteration   = 0
+    vals        = []
+    while np.abs(f_x)>1e-12 and iteration<10:
+        derivative   = ((1 - x**(-0.5)) - 8 / 21 / x**(0.5)) / (1-x**(-0.5))**(37/21)
+        x1           = x  - (f_x / derivative)
+        f_x1         = x1 / (1-x1**(-0.5))**(16/21) - C
+        x            = np.copy(x1)
+        f_x          = np.copy(f_x1)
+        iteration   += 1
+        vals.append(f_x)
+
+    print('===== Radiation -> Gas Pressure =====')
+    print('Transition in Rgrav.........',x * 3)
+    print('Ratio to semimajor axis.....', x * 3 / a)
+    print('Approximate Error...........', f_x)
+
+    # (2) Electron scattering -> Free free absorption transition
+    C           = 6.3e3 * mdot**(2/3)
+    x           = C                                       # initial guess
+    f_x         = x / (1-x**(-0.5))**(2/3) - C
+    iteration   = 0
+    vals        = []
+    while np.abs(f_x)>1e-12 and iteration<10:
+        derivative   = ((1 - x**(-0.5)) - 1 / 3 / x**(0.5)) / (1-x**(-0.5))**(5/3) 
+        x1           = x  - (f_x / derivative)
+        f_x1         = x1 / (1-x1**(-0.5))**(2/3) - C
+        x            = np.copy(x1)
+        f_x          = np.copy(f_x1)
+        iteration   += 1
+        vals.append(f_x)
+
+    print('===== es -> ff opacity transition =====')
+    print('Transition in Rgrav.........',x * 3)
+    print('Ratio to semimajor axis.....', x * 3 / a)
+    print('Approximate Error...........', f_x)
+
+
 if __name__ == '__main__':
 	import numpy as np
 	import matplotlib.pyplot as plt

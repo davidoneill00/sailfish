@@ -639,7 +639,7 @@ class CoolBinary(SetupBase):
     # Cooling 
     central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
     mach_number_a         = param(10, "Disk Mach number") 
-    target_accretion_rate = param(1., "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
+    target_accretion_rate = param(0.1, "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
     OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
     Cooling_N             = param(1e7, "N samples of temperatures in tabulated emission", mutable=True) 
     Cooling_logspace      = param(True, "Whether to space the temperature samples logarithmically", mutable=True)
