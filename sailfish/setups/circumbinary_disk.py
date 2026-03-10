@@ -647,14 +647,14 @@ class CoolBinary(SetupBase):
 
     # binary parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
-    init_eccentricity     = param(0.0 , "orbital eccentricity at start of sweep")
-    final_eccentricity    = param(0.0 , "orbital eccentricity at end of sweep"  )
+    init_eccentricity     = param(0.0 , "orbital eccentricity at start of sweep", mutable=True)
+    final_eccentricity    = param(0.0 , "orbital eccentricity at end of sweep", mutable=True)
     init_mass_ratio       = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
     final_mass_ratio      = param(1.0 , "component mass ratio at end of sweep")
     init_mach_number      = param(10.0, "orbital Mach number (isothermal) at start of sweep")
     final_mach_number     = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
-    sweep_start_time      = param(1e4 , "orbit where parameter sweeping begins")
-    sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ")
+    sweep_start_time      = param(1e4 , "orbit where parameter sweeping begins", mutable=True)
+    sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ", mutable=True)
     sweep_logspace        = param(False, "perform the sweep in logspace")
 
     

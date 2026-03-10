@@ -515,12 +515,14 @@ class Solver(SolverBase):
 
             # ============ We need to do remapping for diagnostics ============
             Mdrop           = self.setup.SS73.Mdrop
-            Sigma           = patch.primitive[ng:-ng, ng:-ng, 0] * Mdrop**(3./5.)
+            Sigma           = self.xp.maximum(patch.primitive[ng:-ng, ng:-ng, 0] * Mdrop**(3./5.), 1e-30)
             Pressure        = patch.primitive[ng:-ng, ng:-ng, 3] * Mdrop          
             Precomputed_T   = self.setup.Temperature
             T               = self.xp.maximum((Pressure / Sigma) * (self.setup.SS73.mp_code / self.setup.SS73.kb_code), Precomputed_T[0])
             m1, m2          = patch.physics.point_masses(patch.time)
-            R_1, R_2        = self.xp.sqrt((self.X-m1.position_x)**2 + (self.Y-m1.position_y)**2), self.xp.sqrt((self.X-m2.position_x)**2  + (self.Y-m2.position_y)**2)
+            X               = patch.coordinate_array_x
+            Y               = patch.coordinate_array_y
+            R_1, R_2        = self.xp.sqrt((X-m1.position_x)**2 + (Y-m1.position_y)**2), self.xp.sqrt((X-m2.position_x)**2  + (Y-m2.position_y)**2)
             cs              = (patch.physics.gamma_law_index * Pressure / Sigma)**0.5
             omega           = self.xp.sqrt(m1.mass / (R_1**3 + 1e-12) + m2.mass / (R_2**3 + 1e-12))
             H               = cs / omega
@@ -538,8 +540,8 @@ class Solver(SolverBase):
             BolometricLuminosity = 2 * cgs['sigmab'] * Teff ** 4 # report emission in cgs
 
             if not patch.options.sink_emission:
-                r1_mask = ((self.X-m1.position_x)**2 + (self.Y-m1.position_y)**2) > m1.sink_radius**2
-                r2_mask = ((self.X-m2.position_x)**2 + (self.Y-m2.position_y)**2) > m2.sink_radius**2
+                r1_mask = ((X-m1.position_x)**2 + (Y-m1.position_y)**2) > m1.sink_radius**2
+                r2_mask = ((X-m2.position_x)**2 + (Y-m2.position_y)**2) > m2.sink_radius**2
             else:
                 r1_mask = 1
                 r2_mask = 1
@@ -549,29 +551,13 @@ class Solver(SolverBase):
             mask        = r1_mask & r2_mask & tau_mask & floor_mask
             #mask        = mask.astype(float)
             
-            # numpy arrays arrays, keep them on the CPU
-            dlogT            = np.diff(np.log10(Precomputed_T))[0]
-            Teff_clamped     = self.xp.maximum(Teff, Precomputed_T[0])
-            interpolate_cpu  = np.log10(to_host(Teff_clamped) / Precomputed_T[0]) / dlogT
-            interpolate      = self.xp.array(interpolate_cpu)
-            N0               = self.xp.floor(interpolate).astype(int)
-            Bracket_N0_N1    = interpolate - N0
+            dlogT         = float(np.diff(np.log10(Precomputed_T))[0])
+            T0            = float(Precomputed_T[0])
+            Teff_clamped  = self.xp.maximum(Teff, T0)
+            interpolate   = self.xp.log10(Teff_clamped / T0) / dlogT
+            N0            = self.xp.floor(interpolate).astype(int)
+            Bracket_N0_N1 = interpolate - N0
             
-            if float(self.xp.min(Sigma)) < 1e-30:
-                logger.error(
-                    f"Lightcurve reduction failed at time={self.time:0.4f} — "
-                    f"zero surface density detected in patch {self.patches.index(patch)}"
-                )
-                return (
-                    self.xp.zeros_like(Sigma), 
-                    self.xp.zeros_like(Sigma), 
-                    self.xp.zeros_like(Sigma), 
-                    self.xp.zeros_like(Sigma), 
-                    self.xp.zeros_like(Sigma), 
-                    self.xp.zeros_like(Sigma), 
-                    0.0
-                )
-
             EmissionTable = self._EmissionTable_cache[dev_id]
             Optical_N0    = self.xp.take(EmissionTable[0],N0, axis=0)
             Optical_N1    = self.xp.take(EmissionTable[0],N0+1,axis=0)
@@ -614,6 +600,8 @@ class Solver(SolverBase):
                 return xp.array(x)
             return xp.asarray(x)
         
+
+        patch_idx = {p: i for i, p in enumerate(self.patches)}
 
         udots_cache = {}
         def get_udots(which_mass, term):
@@ -724,7 +712,7 @@ class Solver(SolverBase):
                 return get_field(patch, 3, cut, mass="both", gravity=False, accretion=True, buffer=False)
 
             q = quantity
-            i = self.patches.index(patch)
+            i = patch_idx[patch]
 
             if accretion:
                 udots1 = get_udots(1, "acc")
@@ -763,14 +751,10 @@ class Solver(SolverBase):
 
             # --- Floor diagnostics ---
             elif q == "density_floor":
-                vals = [to_gpu_array(self.detect_density_floor(p)) for p in self.patches]
-                gpu_sum = xp.sum(xp.stack(vals))
-                gpu_results.append(gpu_sum)
+                gpu_results.append(xp.array(sum(self.detect_density_floor(p) for p in self.patches)))
                 continue
             elif q == "pressure_floor":
-                vals = [to_gpu_array(self.detect_pressure_floor(p)) for p in self.patches]
-                gpu_sum = xp.sum(xp.stack(vals))
-                gpu_results.append(gpu_sum)
+                gpu_results.append(xp.array(sum(self.detect_pressure_floor(p) for p in self.patches)))
                 continue
 
             # --- Radiative luminosities ---
