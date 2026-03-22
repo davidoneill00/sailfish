@@ -651,8 +651,6 @@ class CoolBinary(SetupBase):
     final_eccentricity    = param(0.0 , "orbital eccentricity at end of sweep", mutable=True)
     init_mass_ratio       = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
     final_mass_ratio      = param(1.0 , "component mass ratio at end of sweep")
-    init_mach_number      = param(10.0, "orbital Mach number (isothermal) at start of sweep")
-    final_mach_number     = param(10.0, "orbital Mach number (isothermal) at end of sweep"  )
     sweep_start_time      = param(1e4 , "orbit where parameter sweeping begins", mutable=True)
     sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ", mutable=True)
     sweep_logspace        = param(False, "perform the sweep in logspace")
@@ -699,7 +697,6 @@ class CoolBinary(SetupBase):
             return np.logspace(2,8,int(self.Cooling_N))
         else:
             return np.linspace(1e2,1e8,int(self.Cooling_N))
-    
 
     
     @property   
@@ -848,19 +845,6 @@ class CoolBinary(SetupBase):
         qstart = q0 if (not self.sweep_logspace) else log10(q0)
         qfinal = q1 if (not self.sweep_logspace) else log10(q1)
         return (qfinal - qstart) / self.sweep_time
-
-    @property
-    def sweep_rate_mach(self):
-        ma0 = self.init_mach_number
-        ma1 = self.final_mach_number
-        mastart = ma0 if (not self.sweep_logspace) else log10(ma0)
-        mafinal = ma1 if (not self.sweep_logspace) else log10(ma1)
-        return (mafinal - mastart) / self.sweep_time
-
-    def mach_number(self, time):
-        start = self.sweep_start_time * self.reference_time_scale
-        sflag = (time >= start)
-        return self.init_mach_number + self.sweep_rate_mach * (time - start) * sflag
 
     def orbital_elements(self, time):
         start = self.sweep_start_time * self.reference_time_scale

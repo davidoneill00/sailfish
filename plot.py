@@ -935,8 +935,6 @@ def main_cbdgam_2d():
         r_g             = cgs['G'] * chkpt['model_parameters']['central_mass_msun'] * cgs['msun'] / cgs['c'] / cgs['c']
         length_scale_pc = r_g * chkpt['model_parameters']['init_separation_rg'] / cgs['pc']
 
-        
-    
 
         def SaveBinStats(dictname, keys, args):
             for (key, arg) in zip(keys, args):
@@ -1655,23 +1653,44 @@ def main_cbdgam_2d():
 
 
     if args.print_model_parameters:
-        print('Iteration Number.........',chkpt['iteration'])
-        print('Timestep_dt..............',chkpt['timestep_dt'])
-        print('cfl_number...............',chkpt['cfl_number'])
-        print('Solver options...........',chkpt['solver_options'])
-        print('Event states.............',chkpt['event_states'])
+        width = 52
 
-        print('----------------Driver--------------------')
-        print(chkpt['driver'])
-        print('-------------Model Parameters-------------')
-        print(chkpt["model_parameters"])
-        print('-------------SS73 class-------------')
-        print(chkpt["SS73"])
-        print('---------------Point Masses---------------')
-        print(chkpt["point_masses"])
-        print('-------------Timestep dt-------------------')
-        print(chkpt['timestep_dt'])
-        print('--------------------------------')
+        def print_dict(d, indent=2):
+            max_key = max((len(str(k)) for k in d), default=0)
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    print(f"{' ' * indent}{str(k):<{max_key}}  :")
+                    print_dict(v, indent=indent + 4)
+                else:
+                    print(f"{' ' * indent}{str(k):<{max_key}}  :  {v}")
+
+        def section(title, data):
+            print(f"\n{'─' * width}")
+            print(f"  {title}")
+            print(f"{'─' * width}")
+            if hasattr(data, '_asdict'):
+                data = data._asdict()
+            if isinstance(data, dict):
+                print_dict(data)
+            elif isinstance(data, (list, tuple)) and all(hasattr(item, '_asdict') for item in data):
+                for i, item in enumerate(data):
+                    print(f"  [{i}]")
+                    print_dict(item._asdict(), indent=6)
+            else:
+                print(f"  {data}")
+
+        driver = chkpt['driver']
+        if hasattr(driver, '_asdict'):
+            driver = driver._asdict()
+        section("Driver", {k: v for k, v in driver.items() if k not in ('model_parameters', 'solver_options', 'events')})
+        section("Model Parameters", driver.get('model_parameters', chkpt.get("model_parameters", {})))
+        section("Solver Options",   driver.get('solver_options', {}))
+        section("Events",           driver.get('events', {}))
+        section("SS73 Class",       chkpt["SS73"])
+        section("Point Masses",     chkpt["point_masses"])
+        print(f"{'─' * width}\n")
+
+
         
         # old_event = chkpt['event_states']['checkpoint']
         # from sailfish.event import RecurringEvent
