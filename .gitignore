@@ -2,6 +2,7 @@
 *.png
 *.pdf
 *.mp4
+myenv_h100/
 __pycache__
 /doc/source/_autosummary
 /doc/build
