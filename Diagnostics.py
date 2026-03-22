@@ -20,26 +20,70 @@ text_width   = 6.8
 column_width = 3.3
 configure_matplotlib()
 
+def solve_newton_rapheson(f, g, x: float) -> float:
+    n = 0
+    while abs(f(x)) > 1e-15:
+        x -= f(x) / g(x)
+        n += 1
+        if n > 10:
+            raise ValueError("solve_newton_rapheson: no solution")
+    return x
+
+def eccentric_anomaly(time_since_periapse, e, a, M):
+    """
+    Compute the eccentric anomaly from the time since any periapse.
+    """
+    omega = (1.0 * M / a / a / a)**0.5
+    P = 2.0 * np.pi / omega
+    t = time_since_periapse - P * np.floor(time_since_periapse / P)
+    n = omega * t                        # n := mean anomaly M
+    f = lambda k: k - e * np.sin(k) - n  # k := eccentric anomaly E
+    g = lambda k: 1.0 - e * np.cos(k)
+    return solve_newton_rapheson(f, g, n)
+
 def ComputeBinnedMeans(times, field, Averaging_Window):
-    
+
     # Create bins
     num_bins  = int(np.ceil((times[-1] - times[0]) / Averaging_Window))
     bin_edges = np.linspace(times[0], times[-1], num_bins + 1)
-    
+
     # Compute statistics for each bin
     bin_means   = np.zeros(num_bins)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    
+
     for i in range(num_bins):
         bin_mask = (times >= bin_edges[i]) & (times < bin_edges[i + 1])
         bin_data = field[bin_mask]
-        
+
         if len(bin_data) > 0:
             bin_means[i] = np.mean(bin_data)
         else:
             bin_means[i] = np.nan
-    
+
     return bin_centers, bin_means
+
+def ComputeBinnedStats(times, field, Averaging_Window):
+    """Return bin centers, means, and 1-sigma standard deviations."""
+    num_bins    = int(np.ceil((times[-1] - times[0]) / Averaging_Window))
+    bin_edges   = np.linspace(times[0], times[-1], num_bins + 1)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bin_means   = np.zeros(num_bins)
+    bin_stds    = np.zeros(num_bins)
+
+    for i in range(num_bins):
+        bin_mask = (times >= bin_edges[i]) & (times < bin_edges[i + 1])
+        bin_data = field[bin_mask]
+        if len(bin_data) > 1:
+            bin_means[i] = np.mean(bin_data)
+            bin_stds[i]  = np.std(bin_data)
+        elif len(bin_data) == 1:
+            bin_means[i] = bin_data[0]
+            bin_stds[i]  = np.nan
+        else:
+            bin_means[i] = np.nan
+            bin_stds[i]  = np.nan
+
+    return bin_centers, bin_means, bin_stds
 
 class DavidTimeseries:
     def __init__(self, Checkpoint):
@@ -182,6 +226,12 @@ if __name__ == '__main__':
         help="whether to plot the binary's torque timeseries",
     )
     parser.add_argument(
+        "--Sweep",
+        "-s",
+        action='store_true',
+        help="whether to plot the binary's torque timeseries",
+    )
+    parser.add_argument(
         "--Max_temperature",
         "-MT",
         action='store_true',
@@ -212,11 +262,13 @@ if __name__ == '__main__':
         cmap          = plt.cm.hot
         n_lines       = 3
         signal        = AccretionRate - np.mean(AccretionRate)
-        freq          = np.logspace(-1, 1, 1000)      # cycles / orbit
+        freq          = np.logspace(-2, 1, 1000)      # cycles / orbit
         omega         = 2 * np.pi * freq              # rad / orbit
         power         = lombscargle(Final_Orbits, signal, omega)
         power        /= np.var(signal)
         savename      = "Accretion"
+
+        print('Mean accretion rate over window:', np.mean(AccretionRate))
         
         fig = plt.figure(figsize=(1.2 * text_width, 1.2 * 0.25*text_width))
         gs  = fig.add_gridspec(1, 2, width_ratios=[1, 0.33], hspace=0., wspace=0.)
@@ -326,6 +378,199 @@ if __name__ == '__main__':
 
 
 
+
+
+
+
+
+    if args.Sweep:
+        m1, m2       = primary.mass, secondary.mass
+        M, G         = m1 + m2, 1.0
+        q            = m2 / m1                                            # mass ratio
+        mu           = m1 * m2 / M                                        # reduced mass
+        Torque       = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
+        Power        = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
+        Accretion_1  = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
+        Accretion_2  = -(np.array(ts.mdot2[-len(Final_Orbits):])) / 
+        Mdot         = Accretion_1 + Accretion_2                          # total mass accretion rate
+        a            = np.array(ts.semimajor_axis[-len(Final_Orbits):])   # = a_rel (relative orbit semi-major axis)
+        e            = np.array(ts.eccentricity[-len(Final_Orbits):])
+        E_Anomaly    = np.array([eccentric_anomaly(2*np.pi*Final_Orbits[ind], e[ind], a[ind], M) for ind in range(len(Final_Orbits))])
+        cosE         = np.cos(E_Anomaly)
+        ecosE        = e * cosE
+        r_binary     = a * (1 - ecosE)                                    # binary separation
+        
+        E            = - G * M * mu / (2*a)
+        L            = mu * np.sqrt(G * M * a * (1 - e**2))
+        mudot        = Mdot * mu / M + (1 - q) * (Accretion_2 - q * Accretion_1) * mu / q / M
+        v2           = G * M * (2 / r_binary - 1 / a)
+        Edot         = -0.5*mudot*v2 - G*M*mudot/r_binary - G*Mdot*mu / r_binary + Power
+        Ldot         = Torque 
+        adot         = Mdot / M + mudot / mu - Edot / E
+        edot         = ((1-e**2) / (2 *e)) * (2*Mdot/M + 3*mudot/mu - 2*Ldot/L - Edot/E)
+        savename     = 'Sweep'
+
+        
+        _blue   = '#2166AC'   # ColorBrewer RdBu deep blue
+        _red    = '#B2182B'   # ColorBrewer RdBu deep crimson
+
+        ea, ma, _ = ComputeBinnedStats(e, adot, 0.01)
+        ee, me, _ = ComputeBinnedStats(e, edot, 0.01)
+
+
+        fig, ax = plt.subplots(figsize=[text_width, column_width])
+        ax.plot(ea, ma, linewidth=1.8, linestyle='solid', color=_blue, label=r'$\dot{a}/a$', zorder=3)
+        ax.plot(ee, me, linewidth=1.8, linestyle='solid', color=_red,  label=r'$\dot{e}$',   zorder=3)
+        ax.autoscale()
+        _ylo, _yhi = ax.get_ylim()
+
+        #ax.axhspan(0,    _yhi, color='#D1E5F0', alpha=0.3, linewidth=0, zorder=0)
+        #ax.axhspan(_ylo, 0,    color='#FDDBC7', alpha=0.3, linewidth=0, zorder=0)
+        ax.set_ylim(_ylo, _yhi)   
+        ax.axhline(y=0, color='0.5', linewidth=0.8, linestyle='--', zorder=2)
+
+        ax.set_xlim(0.0, 1.0)
+        ax.set_xlabel('Orbital Eccentricity $e$')
+        ax.set_ylabel(r'$\dot{a}/a,\ \dot{e}\ [\Omega_0]$')
+        ax.set_title(r'Mach 10, $n = 2500$', fontsize=8)
+        ax.legend(loc='upper right', frameon=True, framealpha=0.9, edgecolor='none')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.tick_params(which='both', top=False, right=False)
+        ax.minorticks_on()
+        ax.tick_params(which='minor', length=2.5, direction='in')
+        fig.tight_layout()
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+
+
+        # --- EM panels: L(e) line (left) + 2D LS spectrogram P(e, f) (right) ---
+        _bands = [
+            (ts.infared[-len(Final_Orbits):],  r'$L_\mathrm{IR}$',  r'$L_\mathrm{IR}\ /\ \dot{M}_0$',  '#D95F02', 'Oranges'),
+            (ts.optical[-len(Final_Orbits):],  r'$L_\mathrm{opt}$', r'$L_\mathrm{opt}\ /\ \dot{M}_0$', '#1B7837', 'Greens' ),
+            (ts.uv[-len(Final_Orbits):],       r'$L_\mathrm{UV}$',  r'$L_\mathrm{UV}\ /\ \dot{M}_0$',  '#762A83', 'Purples'),
+        ]
+
+        # eccentricity bins for the 2D spectrogram — one per 0.01 in e
+        _n_e      = 100
+        _e_edges  = np.linspace(0.0, 1.0, _n_e + 1)
+        _e_ctrs   = 0.5 * (_e_edges[:-1] + _e_edges[1:])
+        _freq_2d  = np.logspace(-1, 1, 100)           # cycles / orbit, 0.1 – 10
+        _omega_2d = 2.0 * np.pi * _freq_2d
+        _min_samp = 5                                 # min points per bin for reliable LS
+
+        # pre-compute L(e) stats and per-bin periodograms for each band
+        _band_stats = []
+        for lum_raw, band_label, ylabel, color, cmap in _bands:
+            lum        = lum_raw / M_dot_0
+            ec, lm, ls = ComputeBinnedStats(e, lum, 0.01)
+            power_2d   = np.full((_n_e, len(_freq_2d)), np.nan)
+
+            for j in range(_n_e):
+                mask = (e >= _e_edges[j]) & (e < _e_edges[j + 1])
+                if mask.sum() >= _min_samp:
+                    t_bin   = Final_Orbits[mask]
+                    sig_bin = lum_raw[mask] - np.mean(lum_raw[mask])
+                    var_bin = np.var(sig_bin)
+                    if var_bin > 0:
+                        p          = lombscargle(t_bin, sig_bin, _omega_2d)
+                        p         /= var_bin          # normalised LS
+                        p         /= np.nanmax(p)     # row-normalise → [0, 1]
+                        power_2d[j] = p
+
+            _band_stats.append((ec, lm, ls, power_2d, band_label, ylabel, color, cmap))
+
+        fig2 = plt.figure(figsize=[text_width, text_width * 0.75])
+        gs   = fig2.add_gridspec(3, 2, width_ratios=[1.0, 1.0],
+                                 hspace=0.12, wspace=0.08,
+                                 left=0.10, right=0.92, top=0.93, bottom=0.10)
+
+        ax_lum_ref = None
+        ax_per_ref = None
+        last_im    = None
+
+        for i, (ec, lm, ls, power_2d, band_label, ylabel, color, cmap) in enumerate(_band_stats):
+
+            ax_lum = fig2.add_subplot(gs[i, 0], sharex=ax_lum_ref)
+            ax_per = fig2.add_subplot(gs[i, 1], sharex=ax_per_ref)
+            if ax_lum_ref is None:
+                ax_lum_ref = ax_lum
+            if ax_per_ref is None:
+                ax_per_ref = ax_per
+
+            # left: mean luminosity ± 1σ vs eccentricity
+            ax_lum.fill_between(ec, lm - ls, lm + ls,
+                                 color=color, alpha=0.2, linewidth=0, zorder=1)
+            ax_lum.plot(ec, lm, linewidth=1.8, color=color, label=band_label, zorder=3)
+            ax_lum.set_yscale('log')
+            ax_lum.set_ylabel(ylabel, fontsize=7)
+            ax_lum.set_xlim(0.0, 1.0)
+            ax_lum.legend(loc='upper right', frameon=True, framealpha=0.9, edgecolor='none')
+            ax_lum.spines['top'].set_visible(False)
+            ax_lum.spines['right'].set_visible(False)
+            ax_lum.tick_params(which='both', top=False, right=False)
+            ax_lum.minorticks_on()
+            ax_lum.tick_params(which='minor', length=2.5, direction='in')
+            # if _e_star is not None:
+            #     ax_lum.axvline(_e_star, color='0.4', linewidth=0.9, linestyle=':', zorder=2)
+            if i < 2:
+                ax_lum.tick_params(labelbottom=False)
+
+            # right: 2D LS spectrogram — P(e, f) as pcolormesh
+            from matplotlib.colors import PowerNorm
+            im = ax_per.pcolormesh(_e_ctrs, _freq_2d, power_2d.T,
+                                   cmap=cmap, shading='auto', rasterized=True,
+                                   norm=PowerNorm(gamma=0.4, vmin=0.0, vmax=1.0))
+            last_im = im
+            ax_per.set_yscale('log')
+            ax_per.set_ylim(_freq_2d[0], _freq_2d[-1])
+            ax_per.set_xlim(0.0, 1.0)
+            #ax_per.axhline(1.0, color='white', linewidth=0.8, linestyle='--', zorder=3)  # Ω₀
+            #ax_per.axhline(2.0, color='white', linewidth=0.6, linestyle=':',  zorder=3)  # 2Ω₀
+            # if _e_star is not None:
+            #     ax_per.axvline(_e_star, color='white', linewidth=0.9, linestyle=':', zorder=3)
+            ax_per.set_ylabel(r'Frequency $[\Omega_0]$', fontsize=7)
+            ax_per.yaxis.set_label_position('right')
+            ax_per.yaxis.tick_right()
+            ax_per.tick_params(which='both', top=False, left=False)
+            ax_per.minorticks_on()
+            ax_per.tick_params(which='minor', length=2.5, direction='in')
+
+            if i == 0:
+                ax_lum.set_title('Averaged Band Luminosities', fontsize=7)
+                ax_per.set_title('Band Periodograms (Normalised to Unity)', fontsize=7)
+
+            if i == 2:
+                ax_lum.set_xlabel(r'Orbital Eccentricity $e$', fontsize=7)
+                ax_per.set_xlabel(r'Orbital Eccentricity $e$', fontsize=7)
+            else:
+                ax_lum.tick_params(labelbottom=False)
+                ax_per.tick_params(labelbottom=False)
+        savename2 = 'Sweep-EM'
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname2 = os.path.join(args.Outputs, f"{savename2}-{int(ts.currenttime * 100):05d}.png")
+            fig2.savefig(pngname2, dpi=400, bbox_inches='tight')
+        else:
+            pngname2 = args.Outputs + savename2 + f"-{int(ts.currenttime * 100):05d}.png"
+            fig2.savefig(pngname2, dpi=400, bbox_inches='tight')
+
+
+
+
+
+
+
     if args.Lightcurves:
         Infared        = ts.infared[-len(Final_Orbits):]
         Optical        = ts.optical[-len(Final_Orbits):]
@@ -335,7 +580,7 @@ if __name__ == '__main__':
         Optical_signal = Optical - np.mean(Optical)
         UV_signal      = UV      - np.mean(UV)
         XRay_signal    = XRay    - np.mean(XRay)
-        freq           = np.logspace(-2, 1, 1000)      # cycles / orbit
+        freq           = np.logspace(-1, 1, 1000)      # cycles / orbit
         omega          = 2 * np.pi * freq              # rad / orbit
         Infared_power  = lombscargle(Final_Orbits, Infared_signal, omega)
         Optical_power  = lombscargle(Final_Orbits, Optical_signal, omega)
