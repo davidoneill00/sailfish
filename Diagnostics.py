@@ -309,22 +309,30 @@ if __name__ == '__main__':
 
 
     if args.OrbitalEvolution:
-        Total_Torque = -np.array(ts.torque_g[-len(Final_Orbits):]) / M_dot_0 + np.array(ts.torque_a[-len(Final_Orbits):]) / M_dot_0
-        Total_Power  = -np.array(ts.power_g[-len(Final_Orbits):] )/ M_dot_0  + np.array(ts.power_a[-len(Final_Orbits):] )/ M_dot_0 
-        Accretion_1  = -np.array(ts.mdot1[-len(Final_Orbits):] / M_dot_0)
-        Accretion_2  = -np.array(ts.mdot2[-len(Final_Orbits):] / M_dot_0)
-        a            = np.array(ts.semimajor_axis[-len(Final_Orbits):])
-        e            = np.array(ts.eccentricity[-len(Final_Orbits):])
-        Energydot    = Total_Power                    # total orbital energy change rate
-        Ldot         = Total_Torque                   # total orbital angular momentum change rate
-        Mdot         = Accretion_1 + Accretion_2      # total mass accretion rate
         m1, m2       = primary.mass, secondary.mass
-        M, G         = m1 + m2 , 1.0
-
-        Energy       = - G * M**2  / (8 * a)          # total orbital energy
-        L            = (m1*m2 / M) * np.sqrt(G * M * a * (1 - e**2))
-        adot         = - a * Energydot / Energy + 2 * a * Mdot / M  # Fix for q, eta =/= 1 !!!
-        edot         = (1 - e**2) / (2*e) * (5 * Mdot / M - Energydot / Energy - 2 * Ldot / L)  # Fix for q, eta =/= 1 !!!
+        M, G         = m1 + m2, 1.0
+        q            = m2 / m1                                            # mass ratio
+        mu           = m1 * m2 / M                                        # reduced mass
+        Torque       = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
+        Power        = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
+        Accretion_1  = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
+        Accretion_2  = -(np.array(ts.mdot2[-len(Final_Orbits):])) / M_dot_0
+        Mdot         = Accretion_1 + Accretion_2                          # total mass accretion rate
+        a            = np.array(ts.semimajor_axis[-len(Final_Orbits):])   # = a_rel (relative orbit semi-major axis)
+        e            = np.array(ts.eccentricity[-len(Final_Orbits):])
+        E_Anomaly    = np.array([eccentric_anomaly(2*np.pi*Final_Orbits[ind], e[ind], a[ind], M) for ind in range(len(Final_Orbits))])
+        cosE         = np.cos(E_Anomaly)
+        ecosE        = e * cosE
+        r_binary     = a * (1 - ecosE)                                    # binary separation
+        
+        E            = - G * M * mu / (2*a)
+        L            = mu * np.sqrt(G * M * a * (1 - e**2))
+        mudot        = Mdot * mu / M + (1 - q) * (Accretion_2 - q * Accretion_1) * mu / q / M
+        v2           = G * M * (2 / r_binary - 1 / a)
+        Edot         = -0.5*mudot*v2 - G*M*mudot/r_binary - G*Mdot*mu / r_binary + Power
+        Ldot         = Torque 
+        adot         = Mdot / M + mudot / mu - Edot / E
+        edot         = ((1-e**2) / (2 *e)) * (2*Mdot/M + 3*mudot/mu - 2*Ldot/L - Edot/E)
         savename     = 'OrbitalEvolution'
 
 
@@ -391,7 +399,7 @@ if __name__ == '__main__':
         Torque       = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
         Power        = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
         Accretion_1  = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
-        Accretion_2  = -(np.array(ts.mdot2[-len(Final_Orbits):])) / 
+        Accretion_2  = -(np.array(ts.mdot2[-len(Final_Orbits):])) / M_dot_0
         Mdot         = Accretion_1 + Accretion_2                          # total mass accretion rate
         a            = np.array(ts.semimajor_axis[-len(Final_Orbits):])   # = a_rel (relative orbit semi-major axis)
         e            = np.array(ts.eccentricity[-len(Final_Orbits):])
