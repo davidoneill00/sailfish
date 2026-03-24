@@ -617,7 +617,7 @@ class CoolBinary(SetupBase):
 
     eos                   = param("gamma-law", "EOS type: either isothermal or gamma-law")
     domain_radius         = param(10.0, "half side length of the square computational domain")
-    mass_ratio            = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
+    #mass_ratio            = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
     sink_rate             = param(1.0, "component sink rate", mutable=True)
     sink_radius           = param(0.03, "component sink radius", mutable=True)
     softening_length      = param(0.03, "gravitational softening length", mutable=True)
@@ -630,8 +630,8 @@ class CoolBinary(SetupBase):
     which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
 
     # buffer 
-    live_buffer           = param(False, "whether to set the buffer targets by the binary torque")
-    live_buffer_cadence   = param(50.0, "binned intervals of binary torque for computing target values")
+    live_buffer           = param(False, "whether to set the buffer targets by the binary torque", mutable=True)
+    live_buffer_cadence   = param(50.0, "binned intervals of binary torque for computing target values", mutable=True)
     buffer_driving_rate   = param(100.0, "rate at which the buffer drives the solution towards target values", mutable=True)
     buffer_onset_width    = param(0.2, "buffer ramp distance", mutable=True)
     buffer_is_enabled     = param(True, "whether the buffer zone is enabled", mutable=True)
@@ -643,17 +643,17 @@ class CoolBinary(SetupBase):
     OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
     Cooling_N             = param(1e7, "N samples of temperatures in tabulated emission", mutable=True) 
     Cooling_logspace      = param(True, "Whether to space the temperature samples logarithmically", mutable=True)
-    cavity_radius         = param(1.5, "Initialised radius in units of the binary separation; only affects q>0")
+    cavity_radius         = param(1.5, "Initialised radius in units of the binary separation; only affects q>0", mutable=True)
 
     # binary parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
     init_eccentricity     = param(0.0 , "orbital eccentricity at start of sweep", mutable=True)
     final_eccentricity    = param(0.0 , "orbital eccentricity at end of sweep", mutable=True)
-    init_mass_ratio       = param(1.0 , "component mass ratio m2 / m1 <= 1 at start")
-    final_mass_ratio      = param(1.0 , "component mass ratio at end of sweep")
+    init_mass_ratio       = param(1.0 , "component mass ratio m2 / m1 <= 1 at start", mutable=True)
+    final_mass_ratio      = param(1.0 , "component mass ratio at end of sweep", mutable=True)
     sweep_start_time      = param(1e4 , "orbit where parameter sweeping begins", mutable=True)
-    sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends; sets drive.end_time default, but these can differ", mutable=True)
-    sweep_logspace        = param(False, "perform the sweep in logspace")
+    sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends", mutable=True)
+    sweep_logspace        = param(False, "perform the sweep in logspace", mutable=True)
 
     
     a0 = 1.0
@@ -661,7 +661,7 @@ class CoolBinary(SetupBase):
 
     @property
     def single_point_mass(self):
-        if self.mass_ratio < 1e-10:
+        if self.final_mass_ratio < 1e-10:
             return True
         else:
             return False
@@ -834,16 +834,16 @@ class CoolBinary(SetupBase):
     def sweep_rate_e(self):
         e0 = self.init_eccentricity  if (self.init_eccentricity  > 0.0) else 1e-10
         e1 = self.final_eccentricity if (self.final_eccentricity > 0.0) else 1e-10
-        estart = e0 if (not self.sweep_logspace) else log10(e0)
-        efinal = e1 if (not self.sweep_logspace) else log10(e1)
+        estart = e0 if (not self.sweep_logspace) else np.log10(e0)
+        efinal = e1 if (not self.sweep_logspace) else np.log10(e1)
         return (efinal - estart) / self.sweep_time
 
     @property
     def sweep_rate_q(self):
         q0 = self.init_mass_ratio
         q1 = self.final_mass_ratio
-        qstart = q0 if (not self.sweep_logspace) else log10(q0)
-        qfinal = q1 if (not self.sweep_logspace) else log10(q1)
+        qstart = q0 if (not self.sweep_logspace) else np.log10(q0)
+        qfinal = q1 if (not self.sweep_logspace) else np.log10(q1)
         return (qfinal - qstart) / self.sweep_time
 
     def orbital_elements(self, time):
@@ -856,8 +856,8 @@ class CoolBinary(SetupBase):
         e  = e0 + self.sweep_rate_e * delta
         q  = q0 + self.sweep_rate_q * delta
         if self.sweep_logspace:
-            loge = log10(e0) + self.sweep_rate_e * delta
-            logq = log10(q0) + self.sweep_rate_q * delta
+            loge = np.log10(e0) + self.sweep_rate_e * delta
+            logq = np.log10(q0) + self.sweep_rate_q * delta
             e = 10**loge
             q = 10**logq
         if q > self.final_mass_ratio:
@@ -881,11 +881,13 @@ class CoolBinary(SetupBase):
                     sink_radius=self.sink_radius,
                     **m)
         else:
-            m1, m2 = self.orbital_elements(time).orbital_state(time)
+            OrbitalElements = self.orbital_elements(time)
+            q               = OrbitalElements.mass_ratio
+            m1, m2          = OrbitalElements.orbital_state(time)
             return (
-                PointMass(
-                    softening_length=self.softening_length,
-                    sink_model=SinkModel[self.sink_model.upper()],
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
                 **m1._asdict(),
@@ -893,7 +895,7 @@ class CoolBinary(SetupBase):
             PointMass(
                 softening_length=self.softening_length,
                 sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
+                sink_rate=self.sink_rate * q,
                 sink_radius=self.sink_radius,
                 **m2._asdict(),
             ),
