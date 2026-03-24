@@ -232,10 +232,22 @@ if __name__ == '__main__':
         help="whether to plot the binary's torque timeseries",
     )
     parser.add_argument(
+        "--Preferential_Accretion",
+        "-pe",
+        action='store_true',
+        help="whether to plot the binary's preferential accretion timeseries",
+    )
+    parser.add_argument(
         "--Max_temperature",
         "-MT",
         action='store_true',
         help="whether to plot the maximum temperature of the disk",
+    )
+    parser.add_argument(
+        "--StreamEfficiency",
+        "-se",
+        action='store_true',
+        help="whether to plot the stream efficiency of the disk",
     )
     args     = parser.parse_args()
     filename = args.checkpoints[0]
@@ -246,21 +258,71 @@ if __name__ == '__main__':
     SS73                = ts.SS73
     gamma               = ts.modelparams['gamma_law_index']
     alpha               = ts.modelparams["alpha"]
-    primary, secondary  = ts.pointmasses
     cs_a                = (SS73.gamma * (SS73.surface_pressure_profile(r=1) / SS73.surface_density_profile(r=1)))**0.5
     nu_a                = SS73.alpha * cs_a**2
     M_dot_0             = SS73.Mdot_inf
     Final_Orbits        = ts.time[ts.time>(ts.currenttime-args.Number_of_Orbits)]
 
+    if len(ts.pointmasses) == 1:
+        Single              = True
+        primary             = ts.pointmasses[0]
+        m                   = primary.mass
+        Accretion           = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
+
+    elif len(ts.pointmasses) == 2:
+        Single              = False
+        primary, secondary  = ts.pointmasses
+        m1, m2              = primary.mass, secondary.mass
+        M, G                = m1 + m2, 1.0
+        q                   = m2 / m1                                            # mass ratio
+        mu                  = m1 * m2 / M                                        # reduced mass
+        Torque              = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
+        Power               = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
+        Accretion_1         = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
+        Accretion_2         = -(np.array(ts.mdot2[-len(Final_Orbits):])) / M_dot_0
+        Mdot                = Accretion_1 + Accretion_2                          # total mass accretion rate
+        a                   = np.array(ts.semimajor_axis[-len(Final_Orbits):])   # = a_rel (relative orbit semi-major axis)
+        e                   = np.array(ts.eccentricity[-len(Final_Orbits):])
+        E_Anomaly           = np.array([eccentric_anomaly(2*np.pi*Final_Orbits[ind], e[ind], a[ind], M) for ind in range(len(Final_Orbits))])
+        cosE                = np.cos(E_Anomaly)
+        ecosE               = e * cosE
+        r_binary            = a * (1 - ecosE)                                    # binary separation
+        E                   = - G * M * mu / (2*a)
+        L                   = mu * np.sqrt(G * M * a * (1 - e**2))
+        mudot               = Mdot * mu / M + (1 - q) * (Accretion_2 - q * Accretion_1) * mu / q / M
+        v2                  = G * M * (2 / r_binary - 1 / a)
+        Edot                = -0.5*mudot*v2 - G*M*mudot/r_binary - G*Mdot*mu / r_binary + Power
+        Ldot                = Torque 
+        adot                = Mdot / M + mudot / mu - Edot / E
+        edot                = ((1-e**2) / (2*e+1e-5)) * (2*Mdot/M + 3*mudot/mu - 2*Ldot/L - Edot/E)
+
     # ======= Plotting Blocks ========
     if args.Accretion:
-        Accretion_1   = ts.mdot1[-len(Final_Orbits):] / M_dot_0
-        Accretion_2   = ts.mdot2[-len(Final_Orbits):] / M_dot_0
-        #Inflow_buff   = ts.inflow_b[-len(Final_Orbits):] / M_dot_0
-        AccretionRate = Accretion_1 + Accretion_2
-        #Inflow        = ts.buffer_inflow[-len(Final_Orbits):] / M_dot_0
         cmap          = plt.cm.hot
         n_lines       = 3
+
+        if Single:
+            AccretionRate = Accretion
+            fig = plt.figure(figsize=(1.2 * text_width, 1.2 * 0.25*text_width))
+            gs  = fig.add_gridspec(1, 2, width_ratios=[1, 0.33], hspace=0., wspace=0.)
+            ax0 = fig.add_subplot(gs[0])
+            ax1 = fig.add_subplot(gs[1])
+            ax0.plot(Final_Orbits, AccretionRate, label=r'$\dot{M}$', linewidth = 1.0, c = 'tab:blue')
+
+
+        else:
+            AccretionRate = Accretion_1 + Accretion_2
+            fig = plt.figure(figsize=(1.2 * text_width, 1.2 * 0.25*text_width))
+            gs  = fig.add_gridspec(1, 2, width_ratios=[1, 0.33], hspace=0., wspace=0.)
+            ax0 = fig.add_subplot(gs[0])
+            ax1 = fig.add_subplot(gs[1])
+            ax0.plot(Final_Orbits, AccretionRate, label='$\dot{M}_\mathrm{t}$'      , linewidth = 1.0, c = cmap(0/n_lines)  )
+            ax0.plot(Final_Orbits, Accretion_2  , label=r'$\dot{M}_2$'              , linewidth = 1.0, c = cmap(1.9/n_lines))
+            ax0.plot(Final_Orbits, Accretion_1  , label=r'$\dot{M}_1$'              , linewidth = 1.0, c = cmap(0.7/n_lines), alpha = 0.7)
+            #Inflow        = ts.buffer_inflow[-len(Final_Orbits):] / M_dot_0
+            #ax0.plot(Final_Orbits,  Inflow_buff  , label=r'$\dot{M}_\mathrm{buffer}$', linewidth = 1.2, c = cmap(2.4/n_lines), linestyle='dashed')
+        
+
         signal        = AccretionRate - np.mean(AccretionRate)
         freq          = np.logspace(-2, 1, 1000)      # cycles / orbit
         omega         = 2 * np.pi * freq              # rad / orbit
@@ -270,21 +332,11 @@ if __name__ == '__main__':
 
         print('Mean accretion rate over window:', np.mean(AccretionRate))
         
-        fig = plt.figure(figsize=(1.2 * text_width, 1.2 * 0.25*text_width))
-        gs  = fig.add_gridspec(1, 2, width_ratios=[1, 0.33], hspace=0., wspace=0.)
-        ax0 = fig.add_subplot(gs[0])
-        ax1 = fig.add_subplot(gs[1])
-
-        ax0.plot(Final_Orbits, -AccretionRate, label='$\dot{M}_\mathrm{t}$'      , linewidth = 1.0, c = cmap(0/n_lines)  )
-        ax0.plot(Final_Orbits, -Accretion_2  , label=r'$\dot{M}_2$'              , linewidth = 1.0, c = cmap(1.9/n_lines))
-        ax0.plot(Final_Orbits, -Accretion_1  , label=r'$\dot{M}_1$'              , linewidth = 1.0, c = cmap(0.7/n_lines), alpha = 0.7)
-        #ax0.plot(Final_Orbits,  Inflow_buff  , label=r'$\dot{M}_\mathrm{buffer}$', linewidth = 1.2, c = cmap(2.4/n_lines), linestyle='dashed')
-        ax0.plot(*ComputeBinnedMeans(Final_Orbits, -AccretionRate, args.Number_of_Averages), label='Binned Means', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
+        ax0.plot(*ComputeBinnedMeans(Final_Orbits, AccretionRate, args.Number_of_Averages), label='Binned Means', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         ax0.set_title(r'Accretion Timeseries')
         ax0.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.0))
-        #ax0.set_ylim([0, 100])
 
         ax1.yaxis.tick_right()
         ax1.yaxis.set_label_position("right")
@@ -306,37 +358,54 @@ if __name__ == '__main__':
             pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
             fig.savefig(pngname, dpi=400, bbox_inches='tight')
 
+    if args.Preferential_Accretion:
+        Preferential_Accretion = (ts.mdot2 / ts.mdot1)[-len(Final_Orbits):]
+        savename              = "PreferentialAccretion"
+
+        fig, ax = plt.subplots(figsize=[text_width, 0.5*text_width])
+        plt.plot(Final_Orbits, Preferential_Accretion, c = 'tab:orange', label = r'$(\dot{M}_2 / \dot{M}_1)$'     , linewidth = 0.8)
+        #plt.plot(*ComputeBinnedMeans(Final_Orbits, Preferential_Accretion, args.Number_of_Averages), c = 'purple', label = 'Mean Preferential Accretion', linewidth = 0.5)
+        plt.axhline(y=0, c = 'black', linestyle='dashed')
+        plt.xlabel('Time [P]')
+        plt.ylabel(r'$(\dot{M}_2 / \dot{M}_1)$')
+        plt.legend(loc = 'best')
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+    
+    if args.StreamEfficiency:
+        l = Torque / Mdot
+        fig, ax = plt.subplots(figsize=[text_width, 0.5*text_width])
+        #plt.plot(Final_Orbits, l, c = 'tab:orange', label = r'$l$'     , linewidth = 0.8)
+        plt.plot(*ComputeBinnedMeans(Final_Orbits, l, args.Number_of_Averages), c = 'purple', label = 'Mean Stream Efficiency', linewidth = 0.5)
+        plt.axhline(y=0, c = 'black', linestyle='dashed')
+        plt.xlabel('Time [P]')
+        plt.ylabel(r'$l$')
+        plt.legend(loc = 'best')
+        savename = "StreamEfficiency"
+
+        if args.Outputs is None:
+            plt.show()
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(ts.currenttime * 100):05d}.png")
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(ts.currenttime * 100):05d}.png"
+            fig.savefig(pngname, dpi=400, bbox_inches='tight')
+
+
 
 
     if args.OrbitalEvolution:
-        m1, m2       = primary.mass, secondary.mass
-        M, G         = m1 + m2, 1.0
-        q            = m2 / m1                                            # mass ratio
-        mu           = m1 * m2 / M                                        # reduced mass
-        Torque       = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
-        Power        = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
-        Accretion_1  = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
-        Accretion_2  = -(np.array(ts.mdot2[-len(Final_Orbits):])) / M_dot_0
-        Mdot         = Accretion_1 + Accretion_2                          # total mass accretion rate
-        a            = np.array(ts.semimajor_axis[-len(Final_Orbits):])   # = a_rel (relative orbit semi-major axis)
-        e            = np.array(ts.eccentricity[-len(Final_Orbits):])
-        E_Anomaly    = np.array([eccentric_anomaly(2*np.pi*Final_Orbits[ind], e[ind], a[ind], M) for ind in range(len(Final_Orbits))])
-        cosE         = np.cos(E_Anomaly)
-        ecosE        = e * cosE
-        r_binary     = a * (1 - ecosE)                                    # binary separation
-        
-        E            = - G * M * mu / (2*a)
-        L            = mu * np.sqrt(G * M * a * (1 - e**2))
-        mudot        = Mdot * mu / M + (1 - q) * (Accretion_2 - q * Accretion_1) * mu / q / M
-        v2           = G * M * (2 / r_binary - 1 / a)
-        Edot         = -0.5*mudot*v2 - G*M*mudot/r_binary - G*Mdot*mu / r_binary + Power
-        Ldot         = Torque 
-        adot         = Mdot / M + mudot / mu - Edot / E
-        edot         = ((1-e**2) / (2 *e)) * (2*Mdot/M + 3*mudot/mu - 2*Ldot/L - Edot/E)
-        savename     = 'OrbitalEvolution'
-
-
-        fig, ax = plt.subplots(figsize=[text_width, column_width])
+        savename = 'OrbitalEvolution'
+        fig, ax  = plt.subplots(figsize=[text_width, column_width])
         plt.plot(Final_Orbits, adot, c = 'darkblue'    , label = r'$\dot{a}/a$', linewidth = 0.1)
         plt.plot(Final_Orbits, edot, c = 'darkred'     , label = r'$\dot{e}$', linewidth = 0.1)
         plt.plot(*ComputeBinnedMeans(Final_Orbits, adot, args.Number_of_Averages), linewidth = 1, label = 'Mean ', c = 'black')
@@ -392,39 +461,12 @@ if __name__ == '__main__':
 
 
     if args.Sweep:
-        m1, m2       = primary.mass, secondary.mass
-        M, G         = m1 + m2, 1.0
-        q            = m2 / m1                                            # mass ratio
-        mu           = m1 * m2 / M                                        # reduced mass
-        Torque       = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
-        Power        = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
-        Accretion_1  = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
-        Accretion_2  = -(np.array(ts.mdot2[-len(Final_Orbits):])) / M_dot_0
-        Mdot         = Accretion_1 + Accretion_2                          # total mass accretion rate
-        a            = np.array(ts.semimajor_axis[-len(Final_Orbits):])   # = a_rel (relative orbit semi-major axis)
-        e            = np.array(ts.eccentricity[-len(Final_Orbits):])
-        E_Anomaly    = np.array([eccentric_anomaly(2*np.pi*Final_Orbits[ind], e[ind], a[ind], M) for ind in range(len(Final_Orbits))])
-        cosE         = np.cos(E_Anomaly)
-        ecosE        = e * cosE
-        r_binary     = a * (1 - ecosE)                                    # binary separation
-        
-        E            = - G * M * mu / (2*a)
-        L            = mu * np.sqrt(G * M * a * (1 - e**2))
-        mudot        = Mdot * mu / M + (1 - q) * (Accretion_2 - q * Accretion_1) * mu / q / M
-        v2           = G * M * (2 / r_binary - 1 / a)
-        Edot         = -0.5*mudot*v2 - G*M*mudot/r_binary - G*Mdot*mu / r_binary + Power
-        Ldot         = Torque 
-        adot         = Mdot / M + mudot / mu - Edot / E
-        edot         = ((1-e**2) / (2 *e)) * (2*Mdot/M + 3*mudot/mu - 2*Ldot/L - Edot/E)
-        savename     = 'Sweep'
-
-        
-        _blue   = '#2166AC'   # ColorBrewer RdBu deep blue
-        _red    = '#B2182B'   # ColorBrewer RdBu deep crimson
+        savename = 'Sweep'
+        _blue    = '#2166AC'   # ColorBrewer RdBu deep blue
+        _red     = '#B2182B'   # ColorBrewer RdBu deep crimson
 
         ea, ma, _ = ComputeBinnedStats(e, adot, 0.01)
         ee, me, _ = ComputeBinnedStats(e, edot, 0.01)
-
 
         fig, ax = plt.subplots(figsize=[text_width, column_width])
         ax.plot(ea, ma, linewidth=1.8, linestyle='solid', color=_blue, label=r'$\dot{a}/a$', zorder=3)
@@ -432,8 +474,6 @@ if __name__ == '__main__':
         ax.autoscale()
         _ylo, _yhi = ax.get_ylim()
 
-        #ax.axhspan(0,    _yhi, color='#D1E5F0', alpha=0.3, linewidth=0, zorder=0)
-        #ax.axhspan(_ylo, 0,    color='#FDDBC7', alpha=0.3, linewidth=0, zorder=0)
         ax.set_ylim(_ylo, _yhi)   
         ax.axhline(y=0, color='0.5', linewidth=0.8, linestyle='--', zorder=2)
 
@@ -448,6 +488,12 @@ if __name__ == '__main__':
         ax.minorticks_on()
         ax.tick_params(which='minor', length=2.5, direction='in')
         fig.tight_layout()
+
+        ax.scatter(0.0, -10.14, color=_blue, marker='x', s=50, zorder=4)
+        ax.scatter(0.3, -14.22, color=_blue, marker='x', s=50, zorder=4)
+        ax.scatter(0.3,  -3.58, color=_red , marker='x', s=50, zorder=4)
+        ax.scatter(0.6, -21.88, color=_blue, marker='x', s=50, zorder=4)
+        ax.scatter(0.6,  -2.35, color=_red , marker='x', s=50, zorder=4)
 
         if args.Outputs is None:
             plt.show()
@@ -575,10 +621,6 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
     if args.Lightcurves:
         Infared        = ts.infared[-len(Final_Orbits):]
         Optical        = ts.optical[-len(Final_Orbits):]
@@ -599,6 +641,10 @@ if __name__ == '__main__':
         UV_power      /= np.var(UV_signal)
         XRay_power    /= np.var(XRay_signal)
         savename       = "Lightcurves"
+
+        #'#D95F02', 'Oranges'
+        #'#1B7837', 'Greens' 
+        #'#762A83', 'Purples'
         
         
         fig = plt.figure(figsize=(1.2 * text_width, 1.2 * 0.25*text_width))
@@ -606,18 +652,18 @@ if __name__ == '__main__':
         ax0 = fig.add_subplot(gs[0])
         periodogram_grid = gs[1].subgridspec(3, 1, hspace=0.00)
 
-        ax0.plot(Final_Orbits, ts.infared[-len(Final_Orbits):]   , c = 'red'       , label = 'Infared', linewidth = 0.8)
-        ax0.plot(Final_Orbits, ts.optical[-len(Final_Orbits):]   , c = 'blue'      , label = 'Optical', linewidth = 0.8)
-        ax0.plot(Final_Orbits, ts.uv[-len(Final_Orbits):]        , c = 'tab:purple', label = 'UV'     , linewidth = 0.8)
+        ax0.plot(Final_Orbits, ts.infared[-len(Final_Orbits):]   , c = '#D95F02', label = 'Infared', linewidth = 0.8)
+        ax0.plot(Final_Orbits, ts.optical[-len(Final_Orbits):]   , c = '#1B7837', label = 'Optical', linewidth = 0.8)
+        ax0.plot(Final_Orbits, ts.uv[-len(Final_Orbits):]        , c = '#762A83', label = 'UV'     , linewidth = 0.8)
         ax0.set_xlabel('Time [P]')
         ax0.set_title('Emission Timeseries')
         ax0.set_yscale('log')
         ax0.legend(ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.0))
 
         band_periodograms = [
-            ('Infrared', Infared_power, 'red'),
-            ('Optical',  Optical_power, 'blue'),
-            ('UV',       UV_power,     'tab:purple'),
+            ('Infrared', Infared_power, '#D95F02'),
+            ('Optical',  Optical_power, '#1B7837'),
+            ('UV',       UV_power,     '#762A83'),
         ]
         period_axes = []
         for idx, (label, power_arr, color) in enumerate(band_periodograms):
@@ -741,9 +787,6 @@ if __name__ == '__main__':
 
 
     if args.Torque:
-        Torque_g      = ts.torque_a[-len(Final_Orbits):] #/ M_dot_0
-        Torque_a      = ts.torque_g[-len(Final_Orbits):] #/ M_dot_0
-        Torque        = Torque_g + Torque_a
         signal        = Torque - np.mean(Torque)
         freq          = np.logspace(-1, 1, 1000)      # cycles / orbit
         omega         = 2 * np.pi * freq              # rad / orbit
