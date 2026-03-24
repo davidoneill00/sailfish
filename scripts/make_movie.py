@@ -31,10 +31,11 @@ def file_load(indir, movie_outdir, savefigbool, filename, quick_plotting):
                 name,
                 #"-f", str('pressure'),
                 "-l",           
-                #"--radius", str(4),
+                "--radius", str(2),
                 #"--vmap",
-                "--vmin", str(-5.0),
-                "--vmax", str(-3.0),
+                "--plot_sink",
+                "--vmin", str(-3.0),
+                "--vmax", str( 0.0),
                 "-o", "output-figures/",
                 #"--remap", str(True)
             ]
@@ -76,7 +77,7 @@ def make_movie(current_path, movie_outdir, filename):
 
     cmd = [
         "ffmpeg", "-y",
-        "-framerate", "60",
+        "-framerate", "30",
         "-start_number", "0",
         "-i", str(input_pattern),
         # Single filter chain: make dimensions even + slow to 0.5x
