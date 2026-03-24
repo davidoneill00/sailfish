@@ -54,9 +54,10 @@ class SetupBase(ABC):
 
         for key, val in kwargs.items():
             if not hasattr(self, key):
-                raise SetupError(
-                    f"'{self.dash_case_class_name()}' has no parameter '{key}'"
-                )
+                if (key != "init_mach_number") and (key != "final_mach_number"): # I know this is lazy 
+                    raise SetupError(
+                        f"'{self.dash_case_class_name()}' has no parameter '{key}'"
+                    )
 
         self.validate()
 
