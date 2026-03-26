@@ -8,7 +8,7 @@ from typing import NamedTuple, Dict
 import bisect
 from logging import getLogger
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
-from sailfish.setup_base import SetupBase, SetupError, TorquedProfile
+from sailfish.setup_base import SetupBase, SetupError
 from sailfish.solver_base import SolverBase
 from sailfish.solvers import (
     SolverInitializationError,
@@ -92,6 +92,34 @@ def update_where_none(new, old, frozen=[]):
     update_dict_where_none(new_dict, old_dict, frozen)
     return type(new)(**new_dict)
 
+
+def TorquedProfile(r, FJ0, Mdot, setup):
+    """
+    Target densities and pressures given a constant angular momentum flux FJ0.
+    We assume steady state with Mdot constant accretion (see Rafikov 2013)
+    """
+    GM    = setup.GM
+    alpha = setup.SS73.alpha
+    gamma = setup.gamma_law_index
+    sigma = setup.SS73.sigmab_code
+    mp    = setup.SS73.mp_code
+    kb    = setup.SS73.kb_code
+    kappa = setup.SS73.kappa_code
+    
+    Omega = (GM / r / r / r)**0.5
+    l     = Omega * r * r
+    
+    if setup.physics['retrograde']:
+        _FJ   = -Mdot * l + FJ0  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
+    else:
+        _FJ   = Mdot * l + FJ0
+
+    FJ             = (_FJ*_FJ)**0.5
+    pi             = 3.141592653589793
+    TargetPressure = FJ / (3 * pi * alpha * gamma * r**2)
+    TargetDensity5 = 32 * pi * sigma * r**2 * mp**4 * TargetPressure**4 / (9 * Omega * kappa * kb**4 * FJ)
+
+    return TargetPressure, TargetDensity5**0.2
 
 
 def DetermineBufferSolution(solver, timeseries):    

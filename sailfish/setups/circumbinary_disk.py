@@ -11,7 +11,7 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
 )
 from sailfish.physics.kepler import OrbitalElements
-from sailfish.setup_base import SetupBase, SetupError, param, TorquedProfile
+from sailfish.setup_base import SetupBase, SetupError, param
 from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, ShakuraSunyaevDisk
 from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, ShakuraSunyaevDisk
 import numpy as np
@@ -721,18 +721,12 @@ class CoolBinary(SetupBase):
         if self.retrograde == True:
                 sign = -1.
 
-        # Feeding rate at infinity
-        Mdot      = self.SS73.Mdot_inf
-        l0        = self.ell0
-        FJ0       = - Mdot * l0
-        l         = np.sqrt(self.GM * r_softened)
-        if self.retrograde:
-            FJ    = np.abs(-Mdot * l + FJ0)  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
-        else:
-            FJ    = np.abs( Mdot * l + FJ0)  
-        sigma, pressure = TorquedProfile(r_softened, FJ0, Mdot, setup=self)
-        v_phi        = sqrt(self.GM / r_softened) 
+        f        = 1 - sign * self.ell0 / (r_softened)**0.5 
+        sigma    = self.SS73.surface_density_profile(r_softened)  * f ** 0.6
+        pressure = self.SS73.surface_pressure_profile(r_softened) * f
+        v_phi    = sqrt(self.GM / r_softened)  #* sqrt(1.0 - (3.0 * self.softening_length * self.softening_length) / (r_softened * r_softened))
         
+
         if not self.single_point_mass:
             cavity_radius = self.cavity_radius
         else:
