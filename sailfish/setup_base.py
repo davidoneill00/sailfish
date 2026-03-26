@@ -54,7 +54,7 @@ class SetupBase(ABC):
 
         for key, val in kwargs.items():
             if not hasattr(self, key):
-                if (key != "init_mach_number") and (key != "final_mach_number"): # I know this is lazy 
+                if (key != "init_mach_number") and (key != "final_mach_number") and (key != "mass_ratio"): # I know this is lazy 
                     raise SetupError(
                         f"'{self.dash_case_class_name()}' has no parameter '{key}'"
                     )
@@ -288,3 +288,33 @@ class SetupBase(ABC):
             SS73          = self.SS73,
             point_masses  = self.point_masses(solver.time),
             )
+
+
+
+def TorquedProfile(r, FJ0, Mdot, setup):
+    """
+    Utility function for computing corrected disk setup when accounting for binary torque.
+    Target densities and pressures given a constant angular momentum flux FJ0.
+    We assume steady state with Mdot constant accretion (see Rafikov 2013)
+    """
+    GM    = setup.GM
+    alpha = setup.SS73.alpha
+    gamma = setup.gamma_law_index
+    sigma = setup.SS73.sigmab_code
+    mp    = setup.SS73.mp_code
+    kb    = setup.SS73.kb_code
+    kappa = setup.SS73.kappa_code
+
+
+    Omega = np.sqrt(GM / r / r / r)
+    l     = Omega * r * r
+    
+    if setup.physics['retrograde']:
+        FJ    = np.abs(-Mdot * l + FJ0)  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
+    else:
+        FJ    = np.abs( Mdot * l + FJ0)  
+
+    TargetPressure = FJ / (3 * np.pi * alpha * gamma * r**2)
+    TargetDensity5 = 32 * np.pi * sigma * r**2 * mp**4 * TargetPressure**4 / (9 * Omega * kappa * kb**4 * FJ)
+
+    return TargetPressure, TargetDensity5**0.2
