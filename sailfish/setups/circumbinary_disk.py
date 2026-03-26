@@ -11,7 +11,7 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
 )
 from sailfish.physics.kepler import OrbitalElements
-from sailfish.setup_base import SetupBase, SetupError, param
+from sailfish.setup_base import SetupBase, SetupError, param, TorquedProfile
 from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, ShakuraSunyaevDisk
 from sailfish.physics.cooling import OpticalEmission, InfaredEmission, UVEmission, XrayEmission, cgs, ShakuraSunyaevDisk
 import numpy as np
@@ -617,43 +617,43 @@ class CoolBinary(SetupBase):
 
     eos                   = param("gamma-law", "EOS type: either isothermal or gamma-law")
     domain_radius         = param(10.0, "half side length of the square computational domain")
-    #mass_ratio            = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
-    sink_rate             = param(1.0, "component sink rate", mutable=True)
+    sink_rate             = param(1.0 , "component sink rate", mutable=True)
     sink_radius           = param(0.03, "component sink radius", mutable=True)
     softening_length      = param(0.03, "gravitational softening length", mutable=True)
     sink_model            = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
-    alpha                 = param(0.1, "alpha-viscosity parameter (gamma-law)")
-    nu                    = param(0.001, "kinematic viscosity parameter (isothermal)")
+    alpha                 = param(0.1   , "alpha-viscosity parameter (gamma-law)")
+    nu                    = param(0.001 , "kinematic viscosity parameter (isothermal)")
     gamma_law_index       = param(5.0 / 3.0, "adiabatic index (gamma-law)")
-    constant_softening    = param(True, "whether to use constant softening (gamma-law)")
-    retrograde            = param(False, "is disk retrograde?")
+    constant_softening    = param(True  , "whether to use constant softening (gamma-law)")
+    retrograde            = param(False , "is disk retrograde?")
     which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
 
     # buffer 
     live_buffer           = param(False, "whether to set the buffer targets by the binary torque", mutable=True)
-    live_buffer_cadence   = param(50.0, "binned intervals of binary torque for computing target values", mutable=True)
+    live_buffer_cadence   = param(50.0 , "binned intervals of binary torque for computing target values", mutable=True)
     buffer_driving_rate   = param(100.0, "rate at which the buffer drives the solution towards target values", mutable=True)
-    buffer_onset_width    = param(0.2, "buffer ramp distance", mutable=True)
-    buffer_is_enabled     = param(True, "whether the buffer zone is enabled", mutable=True)
+    buffer_onset_width    = param(0.2  , "buffer ramp distance", mutable=True)
+    buffer_is_enabled     = param(True , "whether the buffer zone is enabled", mutable=True)
 
     # Cooling 
-    central_mass_msun     = param(8e6, "Mass of the central object in solar masses")
-    mach_number_a         = param(10, "Disk Mach number") 
-    target_accretion_rate = param(0.1, "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
-    OpticalDepthFloor     = param(1., "Minimum optical depth to measure lightcurves", mutable=True) 
-    Cooling_N             = param(1e7, "N samples of temperatures in tabulated emission", mutable=True) 
+    central_mass_msun     = param(8e6 , "Mass of the central object in solar masses")
+    mach_number_a         = param(10  , "Disk Mach number") 
+    target_accretion_rate = param(0.1 , "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
+    OpticalDepthFloor     = param(1.0 , "Minimum optical depth to measure lightcurves", mutable=True) 
+    Cooling_N             = param(1e7 , "N samples of temperatures in tabulated emission", mutable=True) 
     Cooling_logspace      = param(True, "Whether to space the temperature samples logarithmically", mutable=True)
-    cavity_radius         = param(1.5, "Initialised radius in units of the binary separation; only affects q>0", mutable=True)
+    cavity_radius         = param(1.5 , "Initialised radius in units of the binary separation; only affects q>0", mutable=True)
 
     # binary parameters
     init_separation_rg    = param(100.0, "initial semi-major axis in grav-radii")
-    init_eccentricity     = param(0.0 , "orbital eccentricity at start of sweep", mutable=True)
-    final_eccentricity    = param(0.0 , "orbital eccentricity at end of sweep", mutable=True)
-    init_mass_ratio       = param(1.0 , "component mass ratio m2 / m1 <= 1 at start", mutable=True)
-    final_mass_ratio      = param(1.0 , "component mass ratio at end of sweep", mutable=True)
-    sweep_start_time      = param(1e4 , "orbit where parameter sweeping begins", mutable=True)
-    sweep_end_time        = param(1e5 , "orbit where parameter sweeping ends", mutable=True)
+    init_eccentricity     = param(0.0  , "orbital eccentricity at start of sweep", mutable=True)
+    final_eccentricity    = param(0.0  , "orbital eccentricity at end of sweep", mutable=True)
+    init_mass_ratio       = param(1.0  , "component mass ratio m2 / m1 <= 1 at start", mutable=True)
+    final_mass_ratio      = param(1.0  , "component mass ratio at end of sweep", mutable=True)
+    sweep_start_time      = param(1e4  , "orbit where parameter sweeping begins", mutable=True)
+    sweep_end_time        = param(1e5  , "orbit where parameter sweeping ends", mutable=True)
     sweep_logspace        = param(False, "perform the sweep in logspace", mutable=True)
+    ell0                  = param(0.0  , "Setup guess for binary torque parameter", mutable=True)
 
     
     a0 = 1.0
@@ -721,9 +721,17 @@ class CoolBinary(SetupBase):
         if self.retrograde == True:
                 sign = -1.
 
-        sigma        = self.SS73.surface_density_profile(r_softened)
-        pressure     = self.SS73.surface_pressure_profile(r_softened)
-        v_phi        = sqrt(self.GM / r_softened)  #* sqrt(1.0 - (3.0 * self.softening_length * self.softening_length) / (r_softened * r_softened))
+        # Feeding rate at infinity
+        Mdot      = self.SS73.Mdot_inf
+        l0        = self.ell0
+        FJ0       = - Mdot * l0
+        l         = np.sqrt(self.GM * r_softened)
+        if self.retrograde:
+            FJ    = np.abs(-Mdot * l + FJ0)  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
+        else:
+            FJ    = np.abs( Mdot * l + FJ0)  
+        sigma, pressure = TorquedProfile(r_softened, FJ0, Mdot, setup=self)
+        v_phi        = sqrt(self.GM / r_softened) 
         
         if not self.single_point_mass:
             cavity_radius = self.cavity_radius
@@ -739,7 +747,7 @@ class CoolBinary(SetupBase):
 
     @property
     def surface_density_powerlaw(self):
-        return -0.75  # SS73 value
+        return -0.6  # SS73 value
     
     @property
     def pressure_powerlaw(self):

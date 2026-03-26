@@ -626,7 +626,7 @@ class Solver(SolverBase):
         m2 = kepler.PointMass(m2.mass, m2.position_x, m2.position_y, m2.velocity_x, m2.velocity_y)
         orbital_state = kepler.OrbitalState(primary=m1, secondary=m2)
 
-        # Utility for hydrodynamic quantities
+        # Utility for hydrodynamic quantities 
         def get_field(patch, quantity, cut, mass, gravity=False, accretion=False, buffer=False):
             x, y, r = patch.coordinate_array_x, patch.coordinate_array_y, patch.r
 

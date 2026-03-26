@@ -8,7 +8,7 @@ from typing import NamedTuple, Dict
 import bisect
 from logging import getLogger
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
-from sailfish.setup_base import SetupBase, SetupError
+from sailfish.setup_base import SetupBase, SetupError, TorquedProfile
 from sailfish.solver_base import SolverBase
 from sailfish.solvers import (
     SolverInitializationError,
@@ -93,33 +93,6 @@ def update_where_none(new, old, frozen=[]):
     return type(new)(**new_dict)
 
 
-def BufferTarget(r, FJ0, Mdot, setup):
-    """
-    Target densities and pressures given a constant angular momentum flux FJ0.
-    We assume steady state with Mdot constant accretion (see Rafikov 2013)
-    """
-    GM    = setup.GM
-    alpha = setup.SS73.alpha
-    gamma = setup.gamma_law_index
-    sigma = setup.SS73.sigmab_code
-    mp    = setup.SS73.mp_code
-    kb    = setup.SS73.kb_code
-    kappa = setup.SS73.kappa_code
-
-
-    Omega = np.sqrt(GM / r / r / r)
-    l     = Omega * r * r
-    
-    if setup.physics['retrograde']:
-        FJ    = np.abs(-Mdot * l + FJ0)  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
-    else:
-        FJ    = np.abs( Mdot * l + FJ0)  
-
-    TargetPressure = FJ / (3 * np.pi * alpha * gamma * r**2)
-    TargetDensity5 = 32 * np.pi * sigma * r**2 * mp**4 * TargetPressure**4 / (9 * Omega * kappa * kb**4 * FJ)
-
-    return TargetPressure, TargetDensity5**0.2
-
 
 def DetermineBufferSolution(solver, timeseries):    
     t = solver.time / solver.setup.reference_time_scale
@@ -135,8 +108,6 @@ def DetermineBufferSolution(solver, timeseries):
     cutoff_time     = t - solver.live_buffer_cadence
     ReversedTimes   = []
     ReversedTorques = []
-    #torque_sum  = 0.0
-    #count       = 0
 
     # Walk backward from most recent data
     for entry in reversed(timeseries):
@@ -152,7 +123,7 @@ def DetermineBufferSolution(solver, timeseries):
         MeanTorque = np.trapezoid(np.array(ReversedTorques), np.array(ReversedTimes), axis=0) / solver.live_buffer_cadence
         
         # Update buffer targets with the running average
-        TargetPressure, TargetDensity        = BufferTarget(r=solver.buffer_onset_radius, FJ0=MeanTorque, Mdot=solver.Mdot_inf, setup=solver.setup)
+        TargetPressure, TargetDensity           = TorquedProfile(r=solver.buffer_onset_radius, FJ0=MeanTorque, Mdot=solver.Mdot_inf, setup=solver.setup)
         for patch in solver.patches:
             patch.buffer_surface_density_onset  = TargetDensity
             patch.buffer_surface_pressure_onset = TargetPressure
