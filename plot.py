@@ -713,7 +713,7 @@ def main_cbdiso_2d():
             x = x1 + 0.3 * np.cos(t)
             y = y1 + 0.3 * np.sin(t)
             a = 1.0
-            q = chkpt["model_parameters"]["mass_ratio"]
+            q = chkpt["point_masses"][0].mass / chkpt["point_masses"][1].mass
             # Eq. 1 in Franchini & Martin (2019; https://arxiv.org/pdf/1908.02776.pdf)
             r_res = 3 ** (-2 / 3) * (1 + q) ** (-1 / 3) * a
             ax.plot(x, y, ls="--", lw=0.75, c="w", alpha=1.0)
@@ -1102,7 +1102,7 @@ def main_cbdgam_2d():
             
         elif args.field == 'Sigma':
             f        = Sigma
-            title    = 'Surface Density'
+            title    = 'Surface Density, e = %g'%(np.round(chkpt['timeseries'][-1][2], 2))
             savename = 'DensityMap'
             cmap     = 'magma'
             if args.log:
@@ -1164,12 +1164,14 @@ def main_cbdgam_2d():
             Primary            = PointMass(primary.mass  , primary.position_x  , primary.position_y  , primary.velocity_x  , primary.velocity_y)
             Secondary          = PointMass(secondary.mass, secondary.position_x, secondary.position_y, secondary.velocity_x, secondary.velocity_y)
 
-            ax.scatter(primary.position_x  , primary.position_y  , marker = '+', s = 40, c = 'white', label = 'Point Masses')
-            ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 40, c = 'white')
+            q = secondary.mass/ primary.mass
+
+            ax.scatter(primary.position_x  , primary.position_y  , marker = '+', s = 20, c = 'white', label = 'Point Masses')
+            ax.scatter(secondary.position_x, secondary.position_y, marker = '+', s = 20, c = 'white')
             primarycenter   = (primary.position_x, primary.position_y)
             secondarycenter = (secondary.position_x, secondary.position_y)
-            primarysink     = Circle(primarycenter  , primary.sink_radius  , color='grey', fill=True, alpha=0.8)        # Radius of the circle
-            secondarysink   = Circle(secondarycenter, secondary.sink_radius, color='grey', fill=True, alpha=0.8)       # Radius of the circle
+            primarysink     = Circle(primarycenter  , primary.sink_radius    , color='grey', fill=True, alpha=0.8)       # Radius of the circle
+            secondarysink   = Circle(secondarycenter, q*secondary.sink_radius, color='grey', fill=True, alpha=0.8)       # Radius of the circle
             ax.add_patch(primarysink)
             ax.add_patch(secondarysink)
 
@@ -1183,10 +1185,10 @@ def main_cbdgam_2d():
             
             eccentr      = chkpt['timeseries'][-1][ 2] 
             semimaj      = chkpt['timeseries'][-1][ 1] 
-            mass_ratio   = chkpt['model_parameters']['mass_ratio']
+            mass_ratio   = chkpt["point_masses"][0].mass / chkpt["point_masses"][1].mass
             Orbital_Path = np.array([Position(t, semimaj, eccentr, mass_ratio) for t in np.linspace(0,2*np.pi,1000)])
-            plt.plot(Orbital_Path[:,0,0], Orbital_Path[:,0,1], linestyle = 'dashed', c = 'gray')
-            plt.plot(-Orbital_Path[:,1,0], Orbital_Path[:,1,1], linestyle = 'dashed', c = 'gray')
+            plt.plot( Orbital_Path[:,0,0], Orbital_Path[:,0,1], linestyle = 'dotted', c = 'black', linewidth = 1.0)
+            plt.plot(-Orbital_Path[:,1,0], Orbital_Path[:,1,1], linestyle = 'dotted', c = 'black', linewidth = 1.0)
 
 
         if args.Outputs is None:
