@@ -291,6 +291,7 @@ class SetupBase(ABC):
 
 
 
+
 def TorquedProfile(r, FJ0, Mdot, setup):
     """
     Utility function for computing corrected disk setup when accounting for binary torque.
@@ -304,8 +305,7 @@ def TorquedProfile(r, FJ0, Mdot, setup):
     mp    = setup.SS73.mp_code
     kb    = setup.SS73.kb_code
     kappa = setup.SS73.kappa_code
-
-
+    
     Omega = (GM / r / r / r)**0.5
     l     = Omega * r * r
     

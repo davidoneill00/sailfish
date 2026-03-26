@@ -717,27 +717,17 @@ class CoolBinary(SetupBase):
         phi_hat_x  = -y / max(r, 1e-12)
         phi_hat_y  = +x / max(r, 1e-12)
 
-        sign = 1.0
         if self.retrograde == True:
-                sign = -1.
+            sign = -1.0
+        else:
+            sign = 1.0
 
-        # Feeding rate at infinity
-        Mdot      = self.SS73.Mdot_inf
-        l0        = self.ell0
-        FJ0       = - Mdot * l0
-        l         = np.sqrt(self.GM * r_softened)
-        if self.retrograde:
-            FJ    = np.abs(-Mdot * l + FJ0)  # specific angular momentum is negative for retrograde disk, so flip the sign of Mdot * l relative to FJ0
-        else:
-            FJ    = np.abs( Mdot * l + FJ0)  
+        Mdot            = self.SS73.Mdot_inf     # Feeding rate at infinity
+        FJ0             = - Mdot * self.ell0
         sigma, pressure = TorquedProfile(r_softened, FJ0, Mdot, setup=self)
-        v_phi        = sqrt(self.GM / r_softened) 
-        
-        if not self.single_point_mass:
-            cavity_radius = self.cavity_radius
-        else:
-            cavity_radius = 0.2
-        
+        v_phi           = sqrt(self.GM / r_softened) 
+        cavity_radius   = self.cavity_radius
+
         primitive[0] = sigma    * (0.0001 + 0.9999 * exp(-((cavity_radius / r_softened) ** 30)))
         primitive[1] = sign     * v_phi * phi_hat_x
         primitive[2] = sign     * v_phi * phi_hat_y
