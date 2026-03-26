@@ -381,14 +381,16 @@ if __name__ == '__main__':
 
     
     if args.StreamEfficiency:
-        l = Torque / Mdot
+        sign = 2 * (0.5 - chkpt['model_parameters']['retrograde'])
+        cents, means, stds = ComputeBinnedStats(Final_Orbits, sign * Torque / Mdot, args.Number_of_Averages)
         fig, ax = plt.subplots(figsize=[text_width, 0.5*text_width])
-        #plt.plot(Final_Orbits, l, c = 'tab:orange', label = r'$l$'     , linewidth = 0.8)
-        plt.plot(*ComputeBinnedMeans(Final_Orbits, l, args.Number_of_Averages), c = 'purple', label = 'Mean Stream Efficiency', linewidth = 0.5)
-        plt.axhline(y=0, c = 'black', linestyle='dashed')
-        plt.xlabel('Time [P]')
-        plt.ylabel(r'$l$')
-        plt.legend(loc = 'best')
+        ax.plot(cents, means, c='tab:orange', label='Mean Stream Efficiency')
+        ax.fill_between(cents, means - stds, means + stds, color='tab:orange', alpha=0.4)
+        ax.axhline(y=0, c='black', linestyle='dashed')
+        ax.set_yscale('symlog', linthresh=0.1)
+        ax.set_xlabel('Time [P]')
+        ax.set_ylabel(r'$l$')
+        ax.legend(loc='best')
         savename = "StreamEfficiency"
 
         if args.Outputs is None:
@@ -490,10 +492,10 @@ if __name__ == '__main__':
         fig.tight_layout()
 
         ax.scatter(0.0, -10.14, color=_blue, marker='x', s=50, zorder=4)
-        ax.scatter(0.3, -14.22, color=_blue, marker='x', s=50, zorder=4)
-        ax.scatter(0.3,  -3.58, color=_red , marker='x', s=50, zorder=4)
-        ax.scatter(0.6, -21.88, color=_blue, marker='x', s=50, zorder=4)
-        ax.scatter(0.6,  -2.35, color=_red , marker='x', s=50, zorder=4)
+        ax.scatter(0.3, -13.16, color=_blue, marker='x', s=50, zorder=4)
+        ax.scatter(0.3,  -2.59, color=_red , marker='x', s=50, zorder=4)
+        ax.scatter(0.6, -17.81, color=_blue, marker='x', s=50, zorder=4)
+        ax.scatter(0.6,  -0.84, color=_red , marker='x', s=50, zorder=4)
 
         if args.Outputs is None:
             plt.show()
