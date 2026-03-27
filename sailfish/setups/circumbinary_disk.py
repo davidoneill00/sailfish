@@ -717,9 +717,10 @@ class CoolBinary(SetupBase):
         phi_hat_x  = -y / max(r, 1e-12)
         phi_hat_y  = +x / max(r, 1e-12)
 
-        sign = 1.0
         if self.retrograde == True:
-                sign = -1.
+            sign = -1.0
+        else:
+            sign = 1.0
 
         f        = 1 - sign * self.ell0 / (r_softened)**0.5 
         sigma    = self.SS73.surface_density_profile(r_softened)  * f ** 0.6
