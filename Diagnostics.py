@@ -319,9 +319,7 @@ if __name__ == '__main__':
             ax0.plot(Final_Orbits, AccretionRate, label='$\dot{M}_\mathrm{t}$'      , linewidth = 1.0, c = cmap(0/n_lines)  )
             ax0.plot(Final_Orbits, Accretion_2  , label=r'$\dot{M}_2$'              , linewidth = 1.0, c = cmap(1.9/n_lines))
             ax0.plot(Final_Orbits, Accretion_1  , label=r'$\dot{M}_1$'              , linewidth = 1.0, c = cmap(0.7/n_lines), alpha = 0.7)
-            #Inflow        = ts.buffer_inflow[-len(Final_Orbits):] / M_dot_0
-            #ax0.plot(Final_Orbits,  Inflow_buff  , label=r'$\dot{M}_\mathrm{buffer}$', linewidth = 1.2, c = cmap(2.4/n_lines), linestyle='dashed')
-        
+                 
 
         signal        = AccretionRate - np.mean(AccretionRate)
         freq          = np.logspace(-2, 1, 1000)      # cycles / orbit
@@ -387,11 +385,15 @@ if __name__ == '__main__':
         ax.plot(cents, means, c='tab:orange', label='Mean Stream Efficiency')
         ax.fill_between(cents, means - stds, means + stds, color='tab:orange', alpha=0.4)
         ax.axhline(y=0, c='black', linestyle='dashed')
-        ax.set_yscale('symlog', linthresh=0.1)
+        #ax.set_yscale('symlog', linthresh=0.1)
         ax.set_xlabel('Time [P]')
         ax.set_ylabel(r'$l$')
+        ax.axhline(y=1.12, label='Ram Shock Efficiency', linestyle='dashed')
         ax.legend(loc='best')
         savename = "StreamEfficiency"
+
+        
+        ax.set_ylim([0.8 * np.min(means), 1.2 * np.max(means)])
 
         if args.Outputs is None:
             plt.show()
