@@ -806,7 +806,7 @@ def main_cbdgam_2d():
     parser.add_argument(
         "--log",
         "-l",
-        default=False,
+        default=True,
         action="store_true",
         help="use log scaling",
     )
@@ -845,19 +845,19 @@ def main_cbdgam_2d():
     )
     parser.add_argument(
         "--vmin",
-        default=None,
+        default=-7,
         type=float,
         help="minimum value for colormap",
     )
     parser.add_argument(
         "--vmax",
-        default=None,
+        default=-4,
         type=float,
         help="maximum value for colormap",
     )
     parser.add_argument(
         "--radius",
-        default=None,
+        default=2.4,
         type=float,
         help="plot the domain out to this radius",
     )
@@ -881,10 +881,11 @@ def main_cbdgam_2d():
     )
     parser.add_argument(
         "--remap",
-        type=bool,
-        default=False,
+        type=lambda x: x.lower() == 'true',
+        default=True,
         help="Whether or not to rescale disk properties to target accretion rate",
     )
+
 
 
     args = parser.parse_args()
@@ -1187,8 +1188,8 @@ def main_cbdgam_2d():
             semimaj      = chkpt['timeseries'][-1][ 1] 
             mass_ratio   = chkpt["point_masses"][0].mass / chkpt["point_masses"][1].mass
             Orbital_Path = np.array([Position(t, semimaj, eccentr, mass_ratio) for t in np.linspace(0,2*np.pi,1000)])
-            plt.plot( Orbital_Path[:,0,0], Orbital_Path[:,0,1], linestyle = 'dotted', c = 'black', linewidth = 1.0)
-            plt.plot(-Orbital_Path[:,1,0], Orbital_Path[:,1,1], linestyle = 'dotted', c = 'black', linewidth = 1.0)
+            plt.plot( Orbital_Path[:,0,0], Orbital_Path[:,0,1], linestyle = 'dotted', c = 'grey', linewidth = 1.0)
+            plt.plot(-Orbital_Path[:,1,0], Orbital_Path[:,1,1], linestyle = 'dotted', c = 'grey', linewidth = 1.0)
 
 
         if args.Outputs is None:
