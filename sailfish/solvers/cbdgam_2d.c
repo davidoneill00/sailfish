@@ -151,7 +151,7 @@ PRIVATE void point_mass_source_term(
     // }
 
     //double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
-    double sink_rate = (dr < 1.5 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 8.0)) : 0.0;
+    double sink_rate = (dr < 2.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 8.0)) : 0.0;
     sink_rate = min2(sink_rate, 0.9 / dt); // prevent removing more mass than is present in the cell during this step
     double fgrav_numerator = sigma * mass->mass * pow(r2 + r_soft * r_soft, -1.5);
     double fx = -fgrav_numerator * dx;
@@ -821,11 +821,17 @@ PUBLIC void cbdgam_2d_advance_rk(
             double hlj = disk_height(&mass_list, xc, yl, plj, gamma_law_index);
             double hrj = disk_height(&mass_list, xc, yr, prj, gamma_law_index);
 
-            double nucc = alpha * hcc * sqrt(cs2cc);
-            double nuli = alpha * hli * sqrt(cs2li);
-            double nuri = alpha * hri * sqrt(cs2ri);
-            double nulj = alpha * hlj * sqrt(cs2lj);
-            double nurj = alpha * hrj * sqrt(cs2rj);
+            double rcc = sqrt(xc * xc + yc * yc + 1e-12);
+            double rli = sqrt(xl * xl + yc * yc + 1e-12);
+            double rri = sqrt(xr * xr + yc * yc + 1e-12);
+            double rlj = sqrt(xc * xc + yl * yl + 1e-12);
+            double rrj = sqrt(xc * xc + yr * yr + 1e-12);
+
+            double nucc = alpha * min2(hcc, HRMAX * rcc) * sqrt(cs2cc);
+            double nuli = alpha * min2(hli, HRMAX * rli) * sqrt(cs2li);
+            double nuri = alpha * min2(hri, HRMAX * rri) * sqrt(cs2ri);
+            double nulj = alpha * min2(hlj, HRMAX * rlj) * sqrt(cs2lj);
+            double nurj = alpha * min2(hrj, HRMAX * rrj) * sqrt(cs2rj);
 
             fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
             fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
