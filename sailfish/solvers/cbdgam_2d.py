@@ -103,6 +103,7 @@ class Patch:
         self.surface_density_powerlaw      = surface_density_powerlaw
         self.pressure_powerlaw             = pressure_powerlaw
         self.Mdot_inf                      = Mdot_inf
+        self._iteration                    = 0
         #self.FJ0                           = FJ0
 
         # option to vary the cooling coefficient dynamically
@@ -239,33 +240,17 @@ class Patch:
 
     def maximum_wavespeed(self):
         with self.execution_context:
-            # import numpy as np
-            # # 1. Check primitive BEFORE calling the kernel
-            prim = self.primitive1
-            # if not np.isfinite(prim).all():
-            xp = self.xp
-            if not bool(xp.all(xp.isfinite(self.primitive1))):
-                raise RuntimeError(
-                    f"[Patch.maximum_wavespeed PRE] Non-finite values in primitive1 "
-                    f"on device {self.execution_context.id}.\n"
-                    f"  Sigma range: {prim[..., 0].min()} – {prim[..., 0].max()}\n"
-                    f"  Pressure range: {prim[..., 3].min()} – {prim[..., 3].max()}"
-                )
-
-            # 2. Call the wavespeed kernel
             self.lib.cbdgam_2d_wavespeed[self.shape](
                 self.primitive1,
                 self.wavespeeds,
                 self.physics.gamma_law_index,
             )
-
-            # 3. Check the wavespeeds themselves
-            if not xp.isfinite(self.wavespeeds).all():
-                raise RuntimeError(
-                    f"[Patch.maximum_wavespeed POST] Non-finite values in wavespeeds "
-                    f"on device {self.execution_context.id}."
-                )
-
+            if self._iteration % 1000 == 0:
+                if not self.xp.isfinite(self.wavespeeds).all():
+                    raise RuntimeError(
+                        f"[Patch.maximum_wavespeed] Non-finite values in wavespeeds "
+                        f"on device {self.execution_context.id}."
+                    )
             return self.wavespeeds.max()
 
     def recompute_conserved(self):
@@ -331,22 +316,23 @@ class Patch:
                 int(self.physics.constant_softening)
             )
 
-            import numpy as np
-            rho = self.primitive2[..., 0]
-            pre = self.primitive2[..., 3]
-            if not np.isfinite(rho).all() or not np.isfinite(pre).all():
-                raise RuntimeError(
-                    f"[Patch.advance_rk] Non-finite values in primitive2 after advance_rk "
-                    f"on device {self.execution_context.id}, time={self.time}, rk_param={rk_param}, dt={dt}.\n"
-                    f"  Sigma range: {rho.min()} – {rho.max()}\n"
-                    f"  Pressure range: {pre.min()} – {pre.max()}"
-                )
+            if self._iteration % 1000 == 0:
+                rho = self.primitive2[..., 0]
+                pre = self.primitive2[..., 3]
+                if not self.xp.isfinite(rho).all() or not self.xp.isfinite(pre).all():
+                    raise RuntimeError(
+                        f"[Patch.advance_rk] Non-finite values in primitive2 after advance_rk "
+                        f"on device {self.execution_context.id}, time={self.time}, rk_param={rk_param}, dt={dt}.\n"
+                        f"  Sigma range: {float(rho.min())} – {float(rho.max())}\n"
+                        f"  Pressure range: {float(pre.min())} – {float(pre.max())}"
+                    )
 
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
     def new_iteration(self):
         self.time0 = self.time
+        self._iteration += 1
         self.recompute_conserved()
 
     @property
