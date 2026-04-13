@@ -579,7 +579,7 @@ PRIVATE double primitive_max_wavespeed(const double *prim, double cs2)
     return max2(ax, ay);
 }
 
-PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, double cs2, int direction, double gamma_law_index)
+PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, int direction, double gamma_law_index)
 {
     double ul[NCONS];
     double ur[NCONS];
@@ -588,12 +588,15 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, doub
     double al[2];
     double ar[2];
 
+    double cs2l = pl[3] / pl[0] * gamma_law_index;
+    double cs2r = pr[3] / pr[0] * gamma_law_index;
+
     primitive_to_conserved(pl, ul, gamma_law_index);
     primitive_to_conserved(pr, ur, gamma_law_index);
     primitive_to_flux(pl, ul, fl, direction);
     primitive_to_flux(pr, ur, fr, direction);
-    primitive_to_outer_wavespeeds(pl, al, cs2, direction);
-    primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
+    primitive_to_outer_wavespeeds(pl, al, cs2l, direction);
+    primitive_to_outer_wavespeeds(pr, ar, cs2r, direction);
 
     const double am = min3(0.0, al[0], ar[0]);
     const double ap = max3(0.0, al[1], ar[1]);
@@ -796,10 +799,10 @@ PUBLIC void cbdgam_2d_advance_rk(
         double cs2rj = sound_speed_squared(gamma_law_index, prj);
         double hcc = disk_height(&mass_list, xc, yc, pcc, gamma_law_index);
 
-        riemann_hlle(plim, plip, fli, cs2li, 0, gamma_law_index);
-        riemann_hlle(prim, prip, fri, cs2ri, 0, gamma_law_index);
-        riemann_hlle(pljm, pljp, flj, cs2lj, 1, gamma_law_index);
-        riemann_hlle(prjm, prjp, frj, cs2rj, 1, gamma_law_index);
+        riemann_hlle(plim, plip, fli, 0, gamma_law_index);
+        riemann_hlle(prim, prip, fri, 0, gamma_law_index);
+        riemann_hlle(pljm, pljp, flj, 1, gamma_law_index);
+        riemann_hlle(prjm, prjp, frj, 1, gamma_law_index);
 
         if (alpha > 0.0)
         {
