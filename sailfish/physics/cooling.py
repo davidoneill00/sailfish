@@ -111,7 +111,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		"""
 		Disk surface density from Shakura Sunyaev in cgs
 
-		   Sigma = (32 * 3^6 / pi^3)^(1/5) * (mp^4 / kb^4 * sigmab / kappa)^(1/5) 
+		   Sigma = (32 / 3^6 pi^3)^(1/5) * (mp^4 / kb^4 * sigmab / kappa)^(1/5) 
 		   			* alpha^(-4/5) * (GM)^(1/5) * Mdot^(3/5) * r^(-3/5)
 		"""
 		s0 = 0.269274 * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.) * self.gamma**(-4./5.)
@@ -206,10 +206,7 @@ class ShakuraSunyaevDisk(NamedTuple):
 		coeff = 2**(4./5.) / 3. / pi**(3./5.)
 		s0 = coeff * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.)
 		return s0 * self.alpha**(-4./5.) * self._GM**(1./5.) * self._accretion_rate**(3./5.) * self._length**(-3./5.)
-		coeff = 2**(4./5.) / 3. / pi**(3./5.)
-		s0 = coeff * (cgs['mp']**4 / cgs['kb']**4 * cgs['sigmab'] / cgs['kappa'])**(1./5.)
-		return s0 * self.alpha**(-4./5.) * self._GM**(1./5.) * self._accretion_rate**(3./5.) * self._length**(-3./5.)
-
+		
 	def midplane_temperature_goodman(self):
 		coeff = (1. / 16. / pi**2)**(1./5.)
 		t0 = coeff * (cgs['mp'] * cgs['kappa'] / cgs['kb'] / cgs['sigmab'])**(1./5.)
@@ -376,12 +373,14 @@ if __name__ == '__main__':
 	ss = ShakuraSunyaevDisk(
         	central_mass_msun = 8e6, 
         	length_scale_pc   = 9.7e-4,
-        	mach_number_a     = 10,
+        	mach_number_a     = 7,
         	alpha             = 0.1,
 			gamma             = 5./3.,
-			target_accretion_rate=0.1,
+			target_accretion_rate=10.0,
         )
-	print("fedd : ", ss._eddington_fraction)
+	print("fedd     : ", ss._eddington_fraction)
+	print("Sigma    : ", ss.surface_density_profile(1.0))
+	print("Pressure : ", ss.surface_pressure_profile(1.0))
 	mp_code = cgs['mp'] /  ss._mass
 	kb_code = cgs['kb'] / (ss._mass * ss._length**2 / ss._time**2)
 
