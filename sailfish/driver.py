@@ -153,8 +153,8 @@ def DetermineBufferSolution(solver, timeseries):
         # Update buffer targets with the running average
         TargetPressure, TargetDensity           = TorquedProfile(r=solver.buffer_onset_radius, FJ0=MeanTorque, Mdot=solver.Mdot_inf, setup=solver.setup)
         for patch in solver.patches:
-            patch.buffer_surface_density_onset  = TargetDensity
-            patch.buffer_surface_pressure_onset = TargetPressure
+            patch.buffer_surface_density_onset = TargetDensity
+            patch.buffer_pressure_onset        = TargetPressure
 
     return MeanTorque
 
