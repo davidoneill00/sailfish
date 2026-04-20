@@ -805,7 +805,7 @@ class CoolBinary(SetupBase):
                 dict(quantity="buffer_torque", which_mass=0, buffer=True),
                 dict(quantity="buffer_torque_dynamical", which_mass=0, buffer=True),
                 dict(quantity="buffer_mass_rate", which_mass=0, buffer=True),
-                
+                dict(quantity="radial_mass_flux", radial_cut=(self.domain_radius - self.buffer_onset_width - 1.0, self.domain_radius - self.buffer_onset_width)),
             ]
         else:
             return [

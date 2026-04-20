@@ -127,8 +127,6 @@ class DavidTimeseries:
                 self.torque_b_dyn    = np.array([s[23] for s in ts])
                 self.inflow_b        = np.array([s[24] for s in ts])
                 self.mdot_flux_outer = np.array([s[25] for s in ts])
-                self.mdot_flux_mid   = np.array([s[26] for s in ts])
-                self.mdot_flux_inner = np.array([s[27] for s in ts])
             except IndexError:
                 pass
             
@@ -322,11 +320,7 @@ if __name__ == '__main__':
             ax0.plot(Final_Orbits, Accretion_1  , label=r'$\dot{M}_1$'              , linewidth = 1.0, c = cmap(0.7/n_lines), alpha = 0.7)
             try:
                 FluxOuter = -ts.mdot_flux_outer[-len(Final_Orbits):] / M_dot_0
-                #FluxMid   = -ts.mdot_flux_mid  [-len(Final_Orbits):] / M_dot_0
-                #FluxInner = -ts.mdot_flux_inner [-len(Final_Orbits):] / M_dot_0
                 ax0.plot(Final_Orbits, FluxOuter, label=r'$\dot{M}(r_\mathrm{buf})$', linewidth=0.8, c='royalblue' , linestyle='dashed')
-                #ax0.plot(Final_Orbits, FluxMid  , label=r'$\dot{M}(r{=}5)$'         , linewidth=0.8, c='mediumblue', linestyle='dashed')
-                #ax0.plot(Final_Orbits, FluxInner , label=r'$\dot{M}(r{=}3)$'         , linewidth=0.8, c='navy'      , linestyle='dashed')
             except AttributeError:
                 pass
 
@@ -491,7 +485,6 @@ if __name__ == '__main__':
         ax.set_ylim(_ylo, _yhi)   
         ax.axhline(y=0, color='0.5', linewidth=0.8, linestyle='--', zorder=2)
 
-        #ax.set_xlim(0.0, 0.1)
         ax.set_xlabel('Orbital Eccentricity $e$')
         ax.set_ylabel(r'$\dot{a}/a,\ \dot{e}\ [\Omega_0]$')
         ax.set_title(r'Mach 10, $n = 2500$', fontsize=8)
