@@ -150,6 +150,10 @@ def DetermineBufferSolution(solver, timeseries):
             patch.buffer_surface_density_onset = TargetDensity
             patch.buffer_pressure_onset        = TargetPressure
 
+        ell0_eff = MeanTorque / solver.Mdot_inf
+        logger.info(f"live_buffer update: ell0_eff={ell0_eff:.4f} Sigma_onset={TargetDensity:.4e} P_onset={TargetPressure:.4e} (t={t:.1f})")
+
+
     return MeanTorque
 
 
