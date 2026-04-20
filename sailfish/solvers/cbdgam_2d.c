@@ -280,6 +280,7 @@ PRIVATE void buffer_source_term(
 
     double lambda = pow(x*x*(3.0 - 2.0*x), 2.0);
     double frac   = buffer->driving_rate * lambda * dt;
+    if (frac > 1.0) frac = 1.0;
 
     if (frac <= 0.0) return;
 
@@ -327,19 +328,7 @@ PRIVATE void buffer_source_term(
     // keep internal energy unchanged during momentum damping
     E         += (ke1 - ke0);
 
-    // ==== relax entropy ====
-    double P   = (E - ke1) * (gamma_law_index - 1.0);
-    P          = max2(P, eps);
-
-    double K   = P   / pow(Sigma,   gamma_law_index);
-    double K_t = P_t / pow(Sigma_t, gamma_law_index);
-
-    double frac_K = 0.1 * frac;      // weaker dampinf for entropy
-    K            += (K_t - K) * frac_K;
-
-    P             = K * pow(Sigma, gamma_law_index);
-    double eint   = P / (gamma_law_index - 1.0);
-    E             = eint + ke1;
+    // entropy is not damped: pressure = K_actual * Sigma^gamma, already encoded in E
 
     // ==== back to Cartesian ====
     cons[0] = Sigma;
