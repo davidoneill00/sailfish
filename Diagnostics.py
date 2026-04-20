@@ -92,10 +92,9 @@ class DavidTimeseries:
         self.currenttime = Checkpoint["time"] / 2 / np.pi 
         self.modelparams = Checkpoint['model_parameters'] 
         self.SS73        = Checkpoint['SS73']
-        #self.dt_cadence  = Checkpoint['driver'].events['timeseries'].interval
 
         max_length       = max(len(arr) for arr in timeseries_data)
-        ts               = np.array([np.pad(arr, (0, max_length - len(arr)), 'constant') for arr in timeseries_data])
+        ts               = np.array([np.pad(arr, (0, max_length - len(arr)), 'constant', constant_values=np.nan) for arr in timeseries_data])
 
         if Checkpoint['driver'].model_parameters['which_diagnostics'] == 'david':
             self.time            = np.array([s[ 0] for s in ts])
@@ -127,8 +126,8 @@ class DavidTimeseries:
                 self.torque_b        = np.array([s[22] for s in ts])
                 self.torque_b_dyn    = np.array([s[23] for s in ts])
                 self.inflow_b        = np.array([s[24] for s in ts])
+                self.mdot_flux_outer = np.array([s[25] for s in ts])
             except IndexError:
-                #self.inflow_b        = np.array([s[23] for s in ts])
                 pass
             
     @property
@@ -319,7 +318,11 @@ if __name__ == '__main__':
             ax0.plot(Final_Orbits, AccretionRate, label='$\dot{M}_\mathrm{t}$'      , linewidth = 1.0, c = cmap(0/n_lines)  )
             ax0.plot(Final_Orbits, Accretion_2  , label=r'$\dot{M}_2$'              , linewidth = 1.0, c = cmap(1.9/n_lines))
             ax0.plot(Final_Orbits, Accretion_1  , label=r'$\dot{M}_1$'              , linewidth = 1.0, c = cmap(0.7/n_lines), alpha = 0.7)
-                 
+            try:
+                FluxOuter = -ts.mdot_flux_outer[-len(Final_Orbits):] / M_dot_0
+                ax0.plot(Final_Orbits, FluxOuter, label=r'$\dot{M}(r_\mathrm{buf})$', linewidth=0.8, c='royalblue' , linestyle='dashed')
+            except AttributeError:
+                pass
 
         signal        = AccretionRate - np.mean(AccretionRate)
         freq          = np.logspace(-2, 1, 1000)      # cycles / orbit
@@ -334,7 +337,7 @@ if __name__ == '__main__':
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         ax0.set_title(r'Accretion Timeseries')
-        ax0.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.0))
+        ax0.legend(ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.0), fontsize='x-small')
 
         ax1.yaxis.tick_right()
         ax1.yaxis.set_label_position("right")
@@ -394,7 +397,6 @@ if __name__ == '__main__':
         ax.axhline(y=1.12, label='Ram Shock Efficiency', linestyle='dashed')
         ax.legend(loc='best')
         savename = "StreamEfficiency"
-
         
         ax.set_ylim([0.8 * np.min(means), 1.2 * np.max(means)])
 
@@ -472,19 +474,20 @@ if __name__ == '__main__':
         _blue    = '#2166AC'   # ColorBrewer RdBu deep blue
         _red     = '#B2182B'   # ColorBrewer RdBu deep crimson
 
-        ea, ma, _ = ComputeBinnedStats(e, adot, 0.01)
-        ee, me, _ = ComputeBinnedStats(e, edot, 0.01)
+        ea, ma, _ = ComputeBinnedStats(e, adot, 0.05)
+        ee, me, _ = ComputeBinnedStats(e, edot, 0.05)
 
         fig, ax = plt.subplots(figsize=[text_width, column_width])
         ax.plot(ea, ma, linewidth=1.8, linestyle='solid', color=_blue, label=r'$\dot{a}/a$', zorder=3)
         ax.plot(ee, me, linewidth=1.8, linestyle='solid', color=_red,  label=r'$\dot{e}$',   zorder=3)
+        ax.scatter(ea, ma, color=_blue, label=r'$\dot{a}/a$')
+        ax.scatter(ee, me, color=_red,  label=r'$\dot{e}$'  )
         ax.autoscale()
         _ylo, _yhi = ax.get_ylim()
 
         ax.set_ylim(_ylo, _yhi)   
         ax.axhline(y=0, color='0.5', linewidth=0.8, linestyle='--', zorder=2)
 
-        ax.set_xlim(0.0, 1.0)
         ax.set_xlabel('Orbital Eccentricity $e$')
         ax.set_ylabel(r'$\dot{a}/a,\ \dot{e}\ [\Omega_0]$')
         ax.set_title(r'Mach 10, $n = 2500$', fontsize=8)
@@ -496,11 +499,11 @@ if __name__ == '__main__':
         ax.tick_params(which='minor', length=2.5, direction='in')
         fig.tight_layout()
 
-        ax.scatter(0.0, -10.14, color=_blue, marker='x', s=50, zorder=4)
-        ax.scatter(0.3, -13.16, color=_blue, marker='x', s=50, zorder=4)
-        ax.scatter(0.3,  -2.59, color=_red , marker='x', s=50, zorder=4)
-        ax.scatter(0.6, -17.81, color=_blue, marker='x', s=50, zorder=4)
-        ax.scatter(0.6,  -0.84, color=_red , marker='x', s=50, zorder=4)
+        # ax.scatter(0.0, -10.14, color=_blue, marker='x', s=50, zorder=4)
+        # ax.scatter(0.3, -13.16, color=_blue, marker='x', s=50, zorder=4)
+        # ax.scatter(0.3,  -2.59, color=_red , marker='x', s=50, zorder=4)
+        # ax.scatter(0.6, -17.81, color=_blue, marker='x', s=50, zorder=4)
+        # ax.scatter(0.6,  -0.84, color=_red , marker='x', s=50, zorder=4)
 
         if args.Outputs is None:
             plt.show()
@@ -524,9 +527,9 @@ if __name__ == '__main__':
         _n_e      = 100
         _e_edges  = np.linspace(0.0, 1.0, _n_e + 1)
         _e_ctrs   = 0.5 * (_e_edges[:-1] + _e_edges[1:])
-        _freq_2d  = np.logspace(-1, 1, 100)           # cycles / orbit, 0.1 – 10
+        _freq_2d  = np.logspace(-1.5, 1, 500)           # cycles / orbit, 0.1 – 10
         _omega_2d = 2.0 * np.pi * _freq_2d
-        _min_samp = 5                                 # min points per bin for reliable LS
+        _min_samp = 25                                # min points per bin for reliable LS
 
         # pre-compute L(e) stats and per-bin periodograms for each band
         _band_stats = []
@@ -543,8 +546,10 @@ if __name__ == '__main__':
                     var_bin = np.var(sig_bin)
                     if var_bin > 0:
                         p          = lombscargle(t_bin, sig_bin, _omega_2d)
-                        p         /= var_bin          # normalised LS
-                        p         /= np.nanmax(p)     # row-normalise → [0, 1]
+                        p         /= var_bin          # Scargle-normalised LS power
+                        med        = np.median(p)
+                        if med > 0:
+                            p /= med                  # excess above noise floor; stable w.r.t. freq resolution
                         power_2d[j] = p
 
             _band_stats.append((ec, lm, ls, power_2d, band_label, ylabel, color, cmap))
@@ -586,10 +591,10 @@ if __name__ == '__main__':
                 ax_lum.tick_params(labelbottom=False)
 
             # right: 2D LS spectrogram — P(e, f) as pcolormesh
-            from matplotlib.colors import PowerNorm
+            from matplotlib.colors import LogNorm
             im = ax_per.pcolormesh(_e_ctrs, _freq_2d, power_2d.T,
                                    cmap=cmap, shading='auto', rasterized=True,
-                                   norm=PowerNorm(gamma=0.4, vmin=0.0, vmax=1.0))
+                                   norm=LogNorm(vmin=1.0, vmax=10.0))
             last_im = im
             ax_per.set_yscale('log')
             ax_per.set_ylim(_freq_2d[0], _freq_2d[-1])
@@ -717,6 +722,8 @@ if __name__ == '__main__':
         plt.xlabel('Time [P]')
         plt.title('Orbital Elements')
         plt.legend(loc='lower left')
+
+        print('Current orbital eccentricity is', Eccentricity[-1])
         
         if args.Outputs is None:
             plt.show()

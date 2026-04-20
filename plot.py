@@ -1256,7 +1256,7 @@ def main_cbdgam_2d():
         plt.savefig(Savename, dpi=400, bbox_inches='tight')
 
     if args.MinidiskProfile:
-        RMinidisk          = 0.3
+        RMinidisk          = 0.5
         primary, secondary = chkpt['point_masses']
         SinkRadius         = (primary.sink_radius     , secondary.sink_radius)
         SoftRadius         = (primary.softening_length, secondary.softening_length)
@@ -1571,11 +1571,16 @@ def main_cbdgam_2d():
 
 
     if args.mdot:        
+        Sigma_0         = Sigma /  Mdrop**(3./5.)
+        #Pressure_0      = fields["pre"](prim).T   * Mdrop
+
+        #Normal = (SS73.Mdrop/SS73.Mdot_inf) if args.remap else (SS73.Mdot_inf)
+        #print(SS73.Mdot_inf*SS73.Mdrop, SS73.Mdot_inf)
         R      = np.sqrt(X**2 + Y**2)
         Vr     = (Vx * X + Vy * Y) / (R + 1e-12)
-        f      = 2*np.pi*R * Sigma * Vr / SS73.Mdot_inf
-       
-        G      = Sigma * Vr   # mass flux density through circles (per area)
+        f      = 2*np.pi*R * Sigma_0 * Vr / SS73.Mdot_inf
+        
+        G      = Sigma_0 * Vr   # mass flux density through circles (per area)
         dx, dy = mesh.dx, mesh.dy
         dA     = dx * dy
         r_flat = R.ravel()

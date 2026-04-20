@@ -373,7 +373,7 @@ if __name__ == '__main__':
 	ss = ShakuraSunyaevDisk(
         	central_mass_msun = 8e6, 
         	length_scale_pc   = 9.7e-4,
-        	mach_number_a     = 7,
+        	mach_number_a     = 20,
         	alpha             = 0.1,
 			gamma             = 5./3.,
 			target_accretion_rate=10.0,
@@ -395,8 +395,8 @@ if __name__ == '__main__':
 	ax2.plot(r, ss.surface_pressure_goodman() / (ss._mass / ss._time**2) * r**(-3./2.) * fcavity, c='C1', ls='--')
 	ax2.plot(r, pi * 6.7e-5 * r**(-3./2.) * fcavity, c='C3')
 
-	ax3.plot(r, ss.surface_pressure_profile(r) / ss.surface_density_profile(r), c='C0')
-	ax3.plot(r, 6.7e-5 * r**(-3./2.) / (0.057 * r**(-3./5.)), c='C3')
+	ax3.plot(r, 1 / np.sqrt(r) / np.sqrt((5./3.)*ss.surface_pressure_profile(r) / ss.surface_density_profile(r)), c='C0')
+	#ax3.plot(r, 6.7e-5 * r**(-3./2.) / (0.057 * r**(-3./5.)), c='C3')
 
 	ax4.plot(r, ss.mach_profile(r), c='silver')
 	ax4.set_ylim([0, ss.mach_profile(0.1)])
@@ -410,7 +410,7 @@ if __name__ == '__main__':
 
 	plt.tight_layout()
 	plt.subplots_adjust(hspace=0.1)
-	plt.show()
+	plt.savefig('Hmmmm.png')
 
 	plt.figure()
 	plt.plot(r, 2 * np.pi * ss.Mdot(r), c='C0')
