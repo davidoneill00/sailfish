@@ -380,7 +380,10 @@ if __name__ == '__main__':
     
     if args.StreamEfficiency:
         sign = 2 * (0.5 - chkpt['model_parameters']['retrograde'])
-        cents, means, stds = ComputeBinnedStats(Final_Orbits, sign * Torque / Mdot, args.Number_of_Averages)
+        Mcents, Mmeans, Mstds = ComputeBinnedStats(Final_Orbits, Mdot         , args.Number_of_Averages)
+        Tcents, Tmeans, Tstds = ComputeBinnedStats(Final_Orbits, sign * Torque, args.Number_of_Averages)
+
+        cents, means, stds = Mcents, Tmeans/Mmeans, (Tmeans/Mmeans) * np.sqrt((Tstds/Tmeans)**2 + (Mstds/Mmeans)**2)
         fig, ax = plt.subplots(figsize=[text_width, 0.5*text_width])
         ax.plot(cents, means, c='tab:orange', label='Mean Stream Efficiency')
         ax.fill_between(cents, means - stds, means + stds, color='tab:orange', alpha=0.4)
