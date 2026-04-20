@@ -681,6 +681,14 @@ class Solver(SolverBase):
             if quantity == "buffer_mass_rate":
                 return get_field(patch, 0, cut=(self.buffer_onset_radius, self.domain_radius), mass=0, gravity=False,  accretion=False, buffer=True)
 
+            if quantity == "radial_mass_flux":
+                r0, r1 = cut if cut is not None else (0.0, 1e10)
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx    = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy    = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                vr    = (vx * x + vy * y) / (r + 1e-12)
+                return sigma * vr / (r1 - r0)
+
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
                 fy = get_field(patch, 2, cut, mass, gravity, accretion, buffer)
