@@ -1571,20 +1571,16 @@ def main_cbdgam_2d():
 
 
     if args.mdot:        
-        Sigma_0         = Sigma /  Mdrop**(3./5.)
-        #Pressure_0      = fields["pre"](prim).T   * Mdrop
-
-        #Normal = (SS73.Mdrop/SS73.Mdot_inf) if args.remap else (SS73.Mdot_inf)
-        #print(SS73.Mdot_inf*SS73.Mdrop, SS73.Mdot_inf)
-        R      = np.sqrt(X**2 + Y**2)
-        Vr     = (Vx * X + Vy * Y) / (R + 1e-12)
-        f      = 2*np.pi*R * Sigma_0 * Vr / SS73.Mdot_inf
+        Sigma_0 = Sigma /  Mdrop**(3./5.)
+        R       = np.sqrt(X**2 + Y**2)
+        Vr      = (Vx * X + Vy * Y) / (R + 1e-12)
+        f       = 2*np.pi*R * Sigma_0 * Vr / SS73.Mdot_inf
         
-        G      = Sigma_0 * Vr   # mass flux density through circles (per area)
-        dx, dy = mesh.dx, mesh.dy
-        dA     = dx * dy
-        r_flat = R.ravel()
-        G_flat = G.ravel()
+        G       = Sigma_0 * Vr   # mass flux density through circles (per area)
+        dx, dy  = mesh.dx, mesh.dy
+        dA      = dx * dy
+        r_flat  = R.ravel()
+        G_flat  = G.ravel()
 
         r_min, r_max = 1.0, np.max(r_flat)/np.sqrt(2)
         n_bins  = min(100, mesh.shape[0] // 4)
@@ -1604,11 +1600,29 @@ def main_cbdgam_2d():
         title          = 'Mass Inflow Rate'
         savename       = 'MdotMap'
 
+        # --- Compute F_{J,0}(r) = F_J_visc - Mdot * sqrt(r) ---
+        # ν Σ = α γ P₀ r^{3/2}  →  F_J_visc = 3π ν Σ √r = (3/2) α γ r_k * sum(P₀ dA) / dr
+        alpha_visc  = chkpt['model_parameters']['alpha']
+        P0_flat     = fields["pre"](prim).T.ravel()  # unscaled (code-unit) pressure
+        FJ0_ring    = np.full(n_bins - 1, np.nan)
+
+        for k in range(n_bins - 1):
+            r0, r1 = r_bins[k], r_bins[k + 1]
+            mask   = (r_flat >= r0) & (r_flat < r1)
+            if mask.any():
+                dr              = r1 - r0
+                r_k             = r_centers[k]
+                FJ_visc         = (3. / 2.) * alpha_visc * gamma * r_k * (P0_flat[mask].sum() * dA) / dr
+                FJ0_ring[k]     = FJ_visc - mdot_ring[k] * np.sqrt(r_k)
+
+        FJ0_ring_norm = FJ0_ring / SS73.Mdot_inf  # in steady state ≈ ell0 (const)
+
         # ======== Plotting ========
-        fig = plt.figure(figsize=(1.0 * text_width, 1.0 * text_width))
-        gs  = fig.add_gridspec(2, 1, height_ratios=[0.75, 0.25,], hspace=0.0, wspace=0.1)
+        fig = plt.figure(figsize=(1.0 * text_width, 1.3 * text_width))
+        gs  = fig.add_gridspec(3, 1, height_ratios=[0.72, 0.14, 0.14], hspace=0.0, wspace=0.1)
         ax0 = fig.add_subplot(gs[0])
         ax1 = fig.add_subplot(gs[1])
+        ax2 = fig.add_subplot(gs[2])
 
         extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
         cm     = ax0.imshow(
@@ -1632,21 +1646,28 @@ def main_cbdgam_2d():
         ax0.set_title(title + r' at time $t = $ %g $\mathrm{[2\pi\Omega_0^{-1}]}$'%(np.round(chkpt["time"]/2/np.pi,3)))
 
 
-        if args.radius is not None:
-            ax0.set_xlim(-args.radius, args.radius)
-            ax0.set_ylim(-args.radius, args.radius)
+        # if args.radius is not None:
+        #     ax0.set_xlim(-args.radius, args.radius)
+        #     ax0.set_ylim(-args.radius, args.radius)
         
-        # Bottom panel: radial profile
+        # Middle panel: Mdot radial profile
         ax1.plot(r_centers, mdot_ring_norm, 'o-', color='tab:blue', markersize=3, linewidth=1.5, label=r'$\dot{M}(r)$')
-        #ax1.plot(r_bin_centers, mdot_radial_mean, 'o-', color='tab:blue', markersize=3, linewidth=1.5, label=r'$\langle\dot{M}\rangle$')
         ax1.axhline(y=0, color='k', linestyle='--', linewidth=1, alpha=0.5)
-        ax1.set_xlabel(r'Radius $r/a$')
-        ax1.set_ylabel(r'$\dot{M}$')
+        ax1.axhline(y=1, color='k', linestyle=':', linewidth=1, alpha=0.3)
+        ax1.set_ylabel(r'$\dot{M}/\dot{M}_0$')
         ax1.legend(loc='best', fontsize=7)
-        ax1.set_yticks([-2, -1, 0, 1, 2])
+        ax1.set_yticks([-1, 0, 1, 2])
         ax1.grid(True, alpha=0.3)
-        ax1.set_position([0.1975, 0.0505, 0.578, 0.25])  # [left, bottom, width, height]
-        ax1.set_ylim([-3,3])
+        ax1.set_ylim([-2, 2])
+        ax1.tick_params(labelbottom=False)
+
+        # Bottom panel: F_{J,0} radial profile
+        ax2.plot(r_centers, FJ0_ring_norm, 'o-', color='tab:orange', markersize=3, linewidth=1.5, label=r'$F_{J,0}(r)$')
+        ax2.axhline(y=0, color='k', linestyle='--', linewidth=1, alpha=0.5)
+        ax2.set_xlabel(r'Radius $r/a$')
+        ax2.set_ylabel(r'$F_{J,0}/\dot{M}_0$')
+        ax2.legend(loc='best', fontsize=7)
+        ax2.grid(True, alpha=0.3)
         
         # Save combined figure
         if args.Outputs is None:
