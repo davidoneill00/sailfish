@@ -93,7 +93,7 @@ def update_where_none(new, old, frozen=[]):
     return type(new)(**new_dict)
 
 
-def TorquedProfile(r, MeanTorque, setup):
+def TorquedProfile(r, Torque, setup):
     """
     Target densities and pressures given a constant angular momentum flux FJ0.
     We assume steady state with Mdot constant accretion (see Rafikov 2013)
@@ -104,7 +104,7 @@ def TorquedProfile(r, MeanTorque, setup):
     else:
         sign = 1.0
 
-    f          = max(1e-10, 1 - sign * MeanTorque / (r**0.5))
+    f          = max(1e-10, 1 - sign * Torque / (r**0.5))
     sigma      = setup.SS73.surface_density_profile(r)  * f ** 0.6
     pressure   = setup.SS73.surface_pressure_profile(r) * f       
 
@@ -144,14 +144,13 @@ def DetermineBufferSolution(solver, timeseries):
         #MeanMdot   = np.trapezoid(np.array(ReversedMdot)   , np.array(ReversedTimes), axis=0) / solver.live_buffer_cadence
         
         # Update buffer targets with the running average
-        # ell0 = MeanTorque / MeanMdot
-        TargetDensity, TargetPressure          = TorquedProfile(r=solver.buffer_onset_radius, MeanTorque=MeanTorque, setup=solver.setup)
+        Torque = MeanTorque / solver.setup.SS73.Mdot_inf
+        TargetDensity, TargetPressure          = TorquedProfile(r=solver.buffer_onset_radius, Torque=Torque, setup=solver.setup)
         for patch in solver.patches:
             patch.buffer_surface_density_onset = TargetDensity
             patch.buffer_pressure_onset        = TargetPressure
 
-
-    return MeanTorque
+    return Torque
 
 
 
