@@ -722,7 +722,7 @@ class CoolBinary(SetupBase):
         else:
             sign = 1.0
 
-        f          = max(0.001, 1 - self.ell0 / (r_softened)**0.5)
+        f          = max(0.0001, 1 - self.ell0 / (r_softened)**0.5)
         sigma      = self.SS73.surface_density_profile(r_softened)  * f ** 0.6
         pressure   = self.SS73.surface_pressure_profile(r_softened) * f       
         v_phi      = sqrt(self.GM / r_softened)  #* sqrt(1.0 - (3.0 * self.softening_length * self.softening_length) / (r_softened * r_softened))
