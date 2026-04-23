@@ -283,7 +283,7 @@ def append_timeseries(state):
         if BufferSolution is None:
             logger.info(f"record timeseries event {len(state.timeseries)}")
         else:
-            logger.info(f"record timeseries event {len(state.timeseries)} with F_{J0}={BufferSolution[0]:.2f}, f={BufferSolution[1]:.2f}")
+            logger.info(f"record timeseries event {len(state.timeseries)} with F_J0={BufferSolution[0]:.2f}, f={BufferSolution[1]:.2f}")
     else:
         logger.warning(
             "timeseries event ignored because solver does not provide reductions"
