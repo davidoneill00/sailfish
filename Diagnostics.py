@@ -320,7 +320,7 @@ if __name__ == '__main__':
             ax0.plot(Final_Orbits, Accretion_1  , label=r'$\dot{M}_1$'              , linewidth = 1.0, c = cmap(0.7/n_lines), alpha = 0.7)
             try:
                 FluxOuter = -ts.mdot_flux_outer[-len(Final_Orbits):] / M_dot_0
-                ax0.plot(Final_Orbits, FluxOuter, label=r'$\dot{M}(r_\mathrm{buf})$', linewidth=0.8, c='royalblue' , linestyle='dashed')
+                #ax0.plot(Final_Orbits, FluxOuter, label=r'$\dot{M}(r_\mathrm{buf})$', linewidth=0.8, c='royalblue' , linestyle='dashed')
             except AttributeError:
                 pass
 
@@ -394,7 +394,7 @@ if __name__ == '__main__':
         #ax.set_yscale('symlog', linthresh=0.1)
         ax.set_xlabel('Time [P]')
         ax.set_ylabel(r'$l$')
-        ax.axhline(y=1.12, label='Ram Shock Efficiency', linestyle='dashed')
+        ax.axhline(y=1.77, label='Shock Impulse Approximation', linestyle='dashed')
         ax.legend(loc='best')
         savename = "StreamEfficiency"
         
@@ -813,9 +813,9 @@ if __name__ == '__main__':
         ax0 = fig.add_subplot(gs[0])
         ax1 = fig.add_subplot(gs[1])
 
-        ax0.plot(Final_Orbits, -Torque  , label='$\mathcal{T}$'   , linewidth = 0.4, c = 'royalblue')
-        ax0.plot(Final_Orbits, -Torque_g, label=r'Grav', linewidth = 0.2, c = 'blue')
-        ax0.plot(Final_Orbits, -Torque_a, label=r'Acc' , linewidth = 0.2, c = 'silver')
+        #ax0.plot(Final_Orbits, -Torque  , label='$\mathcal{T}$'   , linewidth = 0.4, c = 'royalblue')
+        #ax0.plot(Final_Orbits, -Torque_g, label=r'Grav', linewidth = 0.2, c = 'blue')
+        #ax0.plot(Final_Orbits, -Torque_a, label=r'Acc' , linewidth = 0.2, c = 'silver')
         ax0.plot(*ComputeBinnedMeans(Final_Orbits, Torque, args.Number_of_Averages), c = 'royalblue', label = 'Mean Torque', linewidth = 0.5, linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\mathcal{T}$')
