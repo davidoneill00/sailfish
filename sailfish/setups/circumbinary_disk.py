@@ -629,7 +629,7 @@ class CoolBinary(SetupBase):
     which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
 
     # buffer 
-    live_buffer           = param(False, "whether to set the buffer targets by the binary torque", mutable=True)
+    live_buffer           = param(False, "whether to update buffer targets from measured F_J and Mdot", mutable=True)
     live_buffer_cadence   = param(50.0 , "binned intervals of binary torque for computing target values", mutable=True)
     buffer_driving_rate   = param(100.0, "rate at which the buffer drives the solution towards target values", mutable=True)
     buffer_onset_width    = param(0.2  , "buffer ramp distance", mutable=True)
@@ -806,6 +806,8 @@ class CoolBinary(SetupBase):
                 dict(quantity="buffer_torque_dynamical", which_mass=0, buffer=True),
                 dict(quantity="buffer_mass_rate", which_mass=0, buffer=True),
                 dict(quantity="radial_mass_flux", radial_cut=(self.domain_radius - self.buffer_onset_width - 1.0, self.domain_radius - self.buffer_onset_width)),
+                dict(quantity="angular_momentum_flux", radial_cut=(self.domain_radius - self.buffer_onset_width - 0.5, self.domain_radius - self.buffer_onset_width)),
+                dict(quantity="radial_mass_flux",      radial_cut=(self.domain_radius - self.buffer_onset_width - 0.5, self.domain_radius - self.buffer_onset_width)),
             ]
         else:
             return [

@@ -93,59 +93,75 @@ def update_where_none(new, old, frozen=[]):
     return type(new)(**new_dict)
 
 
-def TorquedProfile(r, Torque, setup):
+def DetermineBufferSolution(solver, timeseries):
     """
-    Target densities and pressures given a constant angular momentum flux FJ0.
-    We assume steady state with Mdot constant accretion (see Rafikov 2013)
+    Measure F_J and Mdot from the disk interior just inside the buffer, then
+    set buffer targets using the full Rafikov (2013) steady-state profile.
+
+    Reads the last two diagnostics in each timeseries entry:
+      entry[-2] = angular_momentum_flux at r_m  (≈ F_J_visc)
+      entry[-1] = radial_mass_flux at r_m        (≈ -Mdot; negative for inflow)
     """
-
-    if setup.physics['retrograde']:
-        sign = -1.0
-    else:
-        sign = 1.0
-
-    f          = max(0.0001, 1 - sign * Torque / (r**0.5))
-    sigma      = setup.SS73.surface_density_profile(r)  * f ** 0.6
-    pressure   = setup.SS73.surface_pressure_profile(r) * f       
-
-    return sigma, pressure, 1 - sign * Torque / (setup.buffer_onset_width**0.5)
-
-
-def DetermineBufferSolution(solver, timeseries):    
     t = solver.time / solver.setup.reference_time_scale
-    
-    if (not solver.live_buffer) or (t < solver.t_viscous_a):
-        # solver.FJ0 = 0.0
-        return 
 
-    
-    # Continue updating buffer throughout simulation using running average
-    # Compute running average over the last live_buffer_cadence orbits
-    # Optimization: only process recent data instead of entire timeseries
-    cutoff_time     = t - solver.live_buffer_cadence
-    ReversedTimes   = []
-    ReversedTorques = []
+    if not solver.live_buffer:
+        return
 
-    # Walk backward from most recent data
+    if t < solver.live_buffer_cadence:
+        return
+
+    cutoff_time = t - solver.live_buffer_cadence
+    times_list  = []
+    FJ_list     = []
+    Mdot_list   = []
+
     for entry in reversed(timeseries):
         entry_time = entry[0]
         if entry_time < cutoff_time:
-            break                            # Stop when we're outside the averaging window
-        torque_sum  = entry[14] + entry[15]  # Sum binary torques
-        ReversedTimes.append(entry_time)
-        ReversedTorques.append(torque_sum)
-    
-    if len(ReversedTimes) > 0:  # Ensure we have data points in the window
-        MeanTorque = np.trapezoid(np.array(ReversedTorques), np.array(ReversedTimes), axis=0) / solver.live_buffer_cadence
-        
-        # Update buffer targets with the running average
-        Torque = MeanTorque / solver.setup.SS73.Mdot_inf
-        TargetDensity, TargetPressure, f_buffer = TorquedProfile(r=solver.buffer_onset_radius, Torque=Torque, setup=solver.setup)
-        for patch in solver.patches:
-            patch.buffer_surface_density_onset = TargetDensity
-            patch.buffer_pressure_onset        = TargetPressure
+            break
+        FJ_list.append(entry[-2])
+        Mdot_list.append(-entry[-1])  # radial_mass_flux ≈ -Mdot; negate for positive inflow
+        times_list.append(entry_time)
 
-    return [Torque, f_buffer]
+    if len(times_list) < 2:
+        return
+
+    # Reverse to ascending time order for trapezoid integration
+    times     = np.array(times_list[::-1])
+    FJ_arr    = np.array(FJ_list[::-1])
+    Mdot_arr  = np.array(Mdot_list[::-1])
+    duration  = times[-1] - times[0]
+
+    if duration <= 0.0 or np.isnan(FJ_arr).any() or np.isnan(Mdot_arr).any():
+        return
+
+    FJ_mean   = np.trapezoid(FJ_arr,   times) / duration
+    Mdot_mean = np.trapezoid(Mdot_arr, times) / duration
+
+    if Mdot_mean <= 0.0:
+        return
+
+    sign    = -1.0 if solver.setup.physics['retrograde'] else 1.0
+    r_onset = solver.buffer_onset_radius
+    r_m     = r_onset - 0.25   # centre of the measurement annulus (r_onset - 0.5, r_onset)
+
+    # Effective ell0: ell0 = sign*sqrt(r_m) - F_J(r_m)/Mdot
+    ell0_eff = sign * np.sqrt(r_m) - FJ_mean / Mdot_mean
+
+    # Rafikov f at onset radius, clamped for numerical safety
+    f_onset = max(1e-4, 1.0 - sign * ell0_eff / np.sqrt(r_onset))
+
+    Sigma_onset = solver.setup.SS73.surface_density_profile(r_onset) * f_onset**0.6
+    P_onset     = solver.setup.SS73.surface_pressure_profile(r_onset) * f_onset
+
+    for patch in solver.patches:
+        patch.buffer_surface_density_onset = Sigma_onset
+        patch.buffer_pressure_onset        = P_onset
+        patch.buffer_ell0_eff              = ell0_eff
+
+    M_dot_0 = solver.setup.SS73.Mdot_inf
+
+    return [FJ_mean/M_dot_0 , Mdot_mean/M_dot_0 , ell0_eff, f_onset]
 
 
 
@@ -279,11 +295,16 @@ def append_timeseries(state):
 
     if reductions:
         state.timeseries.append(reductions)
-        BufferSolution = DetermineBufferSolution(state.solver, state.timeseries)
-        if BufferSolution is None:
+        result = DetermineBufferSolution(state.solver, state.timeseries)
+        if result is None:
             logger.info(f"record timeseries event {len(state.timeseries)}")
         else:
-            logger.info(f"record timeseries event {len(state.timeseries)} with F_J0={BufferSolution[0]:.2f}, f={BufferSolution[1]:.2f}")
+            FJ_mean, Mdot_mean, ell0_eff, f_onset = result
+            logger.info(
+                f"record timeseries event {len(state.timeseries)} "
+                f"FJ={FJ_mean:.4f} Mdot={Mdot_mean:.4f} "
+                f"ell0_eff={ell0_eff:.4f} f={f_onset:.4f}"
+            )
     else:
         logger.warning(
             "timeseries event ignored because solver does not provide reductions"
@@ -517,8 +538,8 @@ def simulate(driver):
     )
 
     if driver.chkpt_file:
-        BufferSolution = DetermineBufferSolution(solver, chkpt['timeseries'])
-        logger.info("Reattributed constant angular momentum flux to the solver. Buffer target values will be updated accordingly")
+        DetermineBufferSolution(solver, chkpt['timeseries'])
+        logger.info("Restored buffer targets from checkpoint timeseries")
 
     if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
         raise ConfigurationError(
