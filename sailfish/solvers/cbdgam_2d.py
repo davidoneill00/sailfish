@@ -56,9 +56,6 @@ def initial_condition(setup, mesh, time):
 
     return primitive
 
-def ViscousTime(r, Mach_a, alpha):
-    t_nu = (5/12) * (Mach_a**2 / alpha) * r**1.6 # here r is in units of a
-    return t_nu
 
 class Patch:
     """
@@ -80,6 +77,7 @@ class Patch:
         buffer_pressure_onset,
         surface_density_powerlaw,
         pressure_powerlaw,
+        buffer_ell0_eff,
         lib,
         xp,
         execution_context,
@@ -103,8 +101,8 @@ class Patch:
         self.surface_density_powerlaw      = surface_density_powerlaw
         self.pressure_powerlaw             = pressure_powerlaw
         self.Mdot_inf                      = Mdot_inf
+        self.buffer_ell0_eff               = buffer_ell0_eff
         self._iteration                    = 0
-        #self.FJ0                           = FJ0
 
         # option to vary the cooling coefficient dynamically
         def dynamic_cooling(_self):
@@ -225,7 +223,7 @@ class Patch:
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 self.Mdot_inf,
-                #self.FJ0,
+                self.buffer_ell0_eff,
                 float(int(self.physics.buffer_is_enabled)),
                 float(int(self.retrograde)),
             ], dtype=self.xp.float64))
@@ -284,7 +282,7 @@ class Patch:
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 self.Mdot_inf,
-                #self.FJ0,
+                self.buffer_ell0_eff,
                 int(self.physics.buffer_is_enabled),
                 int(self.retrograde),
                 m1.position_x,
@@ -404,16 +402,9 @@ class Solver(SolverBase):
         self.buffer_onset_radius   = self.domain_radius - physics.buffer_onset_width
         self.live_buffer           = self.setup.live_buffer
         self.live_buffer_cadence   = self.setup.live_buffer_cadence
-        self.t_viscous_a           = 0.5 * ViscousTime(r=1, Mach_a=self.physics['mach_number'], alpha=self.physics['alpha'])  # viscous time near cavity
-        
         x                          = self.xp.array([self.mesh.cell_coordinates(i, 0)[0] for i in range(ni)])
         y                          = self.xp.array([self.mesh.cell_coordinates(0, j)[1] for j in range(nj)])
         self.X, self.Y             = self.xp.meshgrid(x, y, indexing="xy")
-
-        # self.buffer_surface_density_onset  = None
-        # self.buffer_pressure_onset         = None
-
-        logger.info(f"Begin computing the binary torques at {self.t_viscous_a:.2f} orbital periods")
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
         else:
@@ -429,12 +420,14 @@ class Solver(SolverBase):
             # These values are only at initialization and can be overwritten in driver.append_timeseries
             buffer_surface_density_onset       = buffer_prim[0]
             buffer_pressure_onset              = buffer_prim[3]
+            buffer_ell0_eff                    = getattr(setup, 'ell0', 0.0)
         else:
             buffer_outer_radius                = 0.0
             buffer_surface_density_onset       = 0.0
             buffer_pressure_onset              = 0.0
             surface_density_powerlaw           = 0.0
             pressure_powerlaw                  = 0.0
+            buffer_ell0_eff                    = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
             prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
@@ -452,6 +445,7 @@ class Solver(SolverBase):
                 buffer_pressure_onset,
                 surface_density_powerlaw,
                 pressure_powerlaw,
+                buffer_ell0_eff,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
@@ -688,6 +682,14 @@ class Solver(SolverBase):
                 vy    = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
                 vr    = (vx * x + vy * y) / (r + 1e-12)
                 return sigma * vr / (r1 - r0)
+
+            if quantity == "angular_momentum_flux":
+                r0, r1 = cut if cut is not None else (0.0, 1e10)
+                pres = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 3])
+                vx   = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy   = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                vphi = (-y * vx + x * vy) / (r + 1e-12)
+                return (1.5 * self._physics.alpha * self._physics.gamma_law_index) * pres * r**1.5 * vphi / (r1 - r0)
 
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion, buffer)
