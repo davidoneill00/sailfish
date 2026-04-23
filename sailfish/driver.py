@@ -104,11 +104,11 @@ def TorquedProfile(r, Torque, setup):
     else:
         sign = 1.0
 
-    f          = max(1e-10, 1 - sign * Torque / (r**0.5))
+    f          = max(0.0001, 1 - sign * Torque / (r**0.5))
     sigma      = setup.SS73.surface_density_profile(r)  * f ** 0.6
     pressure   = setup.SS73.surface_pressure_profile(r) * f       
 
-    return sigma, pressure
+    return sigma, pressure, 1 - sign * Torque / (setup.buffer_onset_width**0.5)
 
 
 def DetermineBufferSolution(solver, timeseries):    
@@ -125,32 +125,27 @@ def DetermineBufferSolution(solver, timeseries):
     cutoff_time     = t - solver.live_buffer_cadence
     ReversedTimes   = []
     ReversedTorques = []
-    ReversedMdot    = []
 
     # Walk backward from most recent data
     for entry in reversed(timeseries):
         entry_time = entry[0]
         if entry_time < cutoff_time:
-            break  # Stop when we're outside the averaging window
+            break                            # Stop when we're outside the averaging window
         torque_sum  = entry[14] + entry[15]  # Sum binary torques
-        mdot_sum    = entry[12] + entry[13]
         ReversedTimes.append(entry_time)
         ReversedTorques.append(torque_sum)
-        #ReversedMdot.append(mdot_sum)
-        #count += 1
     
     if len(ReversedTimes) > 0:  # Ensure we have data points in the window
         MeanTorque = np.trapezoid(np.array(ReversedTorques), np.array(ReversedTimes), axis=0) / solver.live_buffer_cadence
-        #MeanMdot   = np.trapezoid(np.array(ReversedMdot)   , np.array(ReversedTimes), axis=0) / solver.live_buffer_cadence
         
         # Update buffer targets with the running average
         Torque = MeanTorque / solver.setup.SS73.Mdot_inf
-        TargetDensity, TargetPressure          = TorquedProfile(r=solver.buffer_onset_radius, Torque=Torque, setup=solver.setup)
+        TargetDensity, TargetPressure, f_buffer = TorquedProfile(r=solver.buffer_onset_radius, Torque=Torque, setup=solver.setup)
         for patch in solver.patches:
             patch.buffer_surface_density_onset = TargetDensity
             patch.buffer_pressure_onset        = TargetPressure
 
-    return Torque
+    return [Torque, f_buffer]
 
 
 
@@ -284,11 +279,11 @@ def append_timeseries(state):
 
     if reductions:
         state.timeseries.append(reductions)
-        MeanTorque = DetermineBufferSolution(state.solver, state.timeseries)
-        if MeanTorque is None:
+        BufferSolution = DetermineBufferSolution(state.solver, state.timeseries)
+        if BufferSolution is None:
             logger.info(f"record timeseries event {len(state.timeseries)}")
         else:
-            logger.info(f"record timeseries event {len(state.timeseries)} with FJ0={MeanTorque:.2f}")
+            logger.info(f"record timeseries event {len(state.timeseries)} with F_{J0}={BufferSolution[0]:.2f}, f={BufferSolution[1]:.2f}")
     else:
         logger.warning(
             "timeseries event ignored because solver does not provide reductions"
@@ -522,7 +517,7 @@ def simulate(driver):
     )
 
     if driver.chkpt_file:
-        MeanTorque = DetermineBufferSolution(solver, chkpt['timeseries'])
+        BufferSolution = DetermineBufferSolution(solver, chkpt['timeseries'])
         logger.info("Reattributed constant angular momentum flux to the solver. Buffer target values will be updated accordingly")
 
     if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
