@@ -63,12 +63,13 @@ struct KeplerianBuffer {
     double surface_density_onset;
     double surface_density_powerlaw;
     double pressure_onset;
-    double pressure_powerlaw; 
+    double pressure_powerlaw;
     double central_mass;
     double driving_rate;
     double outer_radius;
     double onset_width;
     double Mdot_inf;      // >0 means inward accretion (v_r < 0)
+    double ell0_eff;      // effective angular momentum parameter: ell0 = sign*sqrt(r_m) - F_J(r_m)/Mdot
     int is_enabled;
     int is_retrograde;
 };
@@ -305,8 +306,16 @@ PRIVATE void buffer_source_term(
     double vphi   = pphi / (Sigma + eps);
 
     // ==== relax (Sigma, vr, vphi) ====
-    double Sigma_t = buffer->surface_density_onset * pow(rc/onset_radius, buffer->surface_density_powerlaw);
-    double P_t     = buffer->pressure_onset        * pow(rc/onset_radius, buffer->pressure_powerlaw);
+    // Full Rafikov profile: f(r) = 1 - sign*ell0_eff/sqrt(r), normalised by f at onset so
+    // the onset values encode the correct absolute normalisation and the ratio f/f_onset
+    // propagates the correct steady-state shape throughout the buffer zone.
+    double f_onset = 1.0 - sign * buffer->ell0_eff / (sqrt(onset_radius) + eps);
+    double f_rc    = 1.0 - sign * buffer->ell0_eff / (sqrt(rc)           + eps);
+    if (f_onset < 1e-4) f_onset = 1e-4;
+    if (f_rc    < 1e-4) f_rc    = 1e-4;
+    double f_ratio = f_rc / f_onset;
+    double Sigma_t = buffer->surface_density_onset * pow(rc/onset_radius, buffer->surface_density_powerlaw) * pow(f_ratio, 0.6);
+    double P_t     = buffer->pressure_onset        * pow(rc/onset_radius, buffer->pressure_powerlaw)        * f_ratio;
 
     Sigma         += (Sigma_t - Sigma) * frac;
 
@@ -619,6 +628,7 @@ PUBLIC void cbdgam_2d_advance_rk(
     double buffer_outer_radius,
     double buffer_onset_width,
     double buffer_Mdot_inf,
+    double buffer_ell0_eff,
     int buffer_is_enabled,
     int retrograde,
     double x1, // point mass 1
@@ -660,6 +670,7 @@ PUBLIC void cbdgam_2d_advance_rk(
         buffer_outer_radius,
         buffer_onset_width,
         buffer_Mdot_inf,
+        buffer_ell0_eff,
         buffer_is_enabled,
         retrograde
     };
@@ -882,8 +893,9 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     double buffer_outer_radius           = p[11];
     double buffer_onset_width            = p[12];
     double buffer_Mdot_inf               = p[13];
-    int buffer_is_enabled                = (int)p[14];
-    int retro                            = (int)p[15];
+    double buffer_ell0_eff               = p[14];
+    int buffer_is_enabled                = (int)p[15];
+    int retro                            = (int)p[16];
 
 
     struct KeplerianBuffer buffer = {
@@ -896,6 +908,7 @@ PUBLIC void cbdgam_2d_buffer_source_term(
         buffer_outer_radius,
         buffer_onset_width,
         buffer_Mdot_inf,
+        buffer_ell0_eff,
         buffer_is_enabled,
         retro
     };
