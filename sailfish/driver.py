@@ -138,15 +138,16 @@ def DetermineBufferSolution(solver, timeseries):
     FJ_mean   = np.trapezoid(FJ_arr,   times) / duration
     Mdot_mean = np.trapezoid(Mdot_arr, times) / duration
 
-    if Mdot_mean <= 0.0:
-        return
-
     sign    = -1.0 if solver.setup.physics['retrograde'] else 1.0
     r_onset = solver.buffer_onset_radius
     r_m     = r_onset - 0.25   # centre of the measurement annulus (r_onset - 0.5, r_onset)
+    Mdot_0  = solver.setup.SS73.Mdot_inf
 
-    # Effective ell0: ell0 = sign*sqrt(r_m) - F_J(r_m)/Mdot
-    ell0_eff = sign * np.sqrt(r_m) - FJ_mean / Mdot_mean
+    # Normalise by the target accretion rate Mdot_0, not the measured Mdot.
+    # Using Mdot_measured here amplifies early-time transients where Mdot << Mdot_0
+    # by up to a factor of 2, causing ell0_eff to swing wildly and the buffer to
+    # overshoot in density.
+    ell0_eff = sign * np.sqrt(r_m) - FJ_mean / Mdot_0
 
     # Rafikov f at onset radius, clamped for numerical safety
     f_onset = max(1e-4, 1.0 - sign * ell0_eff / np.sqrt(r_onset))
@@ -159,9 +160,7 @@ def DetermineBufferSolution(solver, timeseries):
         patch.buffer_pressure_onset        = P_onset
         patch.buffer_ell0_eff              = ell0_eff
 
-    M_dot_0 = solver.setup.SS73.Mdot_inf
-
-    return [FJ_mean/M_dot_0 , Mdot_mean/M_dot_0 , ell0_eff, f_onset]
+    return [FJ_mean / Mdot_0, Mdot_mean / Mdot_0, ell0_eff, f_onset]
 
 
 
