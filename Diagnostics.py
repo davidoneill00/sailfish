@@ -275,8 +275,8 @@ if __name__ == '__main__':
         M, G                = m1 + m2, 1.0
         q                   = m2 / m1                                            # mass ratio
         mu                  = m1 * m2 / M                                        # reduced mass
-        sign                = -1 if ts.modelparams['retrograde'] else 1
-        Torque              = -sign * (np.array(ts.torque_g[-len(n_final):]) + np.array(ts.torque_a[-len(n_final):])) / M_dot_0
+
+        Torque              = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
         Power               = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
         Accretion_1         = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
         Accretion_2         = -(np.array(ts.mdot2[-len(Final_Orbits):])) / M_dot_0
@@ -438,7 +438,7 @@ if __name__ == '__main__':
 
     if args.Buffer_Torque:
         Buffer_Torque        = ts.torque_b[-len(Final_Orbits):] / M_dot_0
-        Binary_Torque        = ts.torque_a[-len(Final_Orbits):] / M_dot_0 + ts.torque_g[-len(Final_Orbits):] / M_dot_0
+        Binary_Torque        = Torque
         savename             = "BufferTorque"
         DynamicalTorque      = ts.torque_b_dyn[-len(Final_Orbits):] / M_dot_0
 
@@ -447,7 +447,7 @@ if __name__ == '__main__':
         plt.plot(Final_Orbits, DynamicalTorque, c = 'red' , label = 'Dynamical Torque'  , linewidth = 0.8)
         plt.plot(*ComputeBinnedMeans(Final_Orbits, Buffer_Torque, args.Number_of_Averages), c = 'blue', label = 'Mean Buffer Torque', linewidth = 0.5)
         plt.axhline(y=0, c = 'black', linestyle='dashed')
-        plt.axhline(y=np.mean(Binary_Torque), c = 'black', linewidth = 1.0, label = 'Mean Binary Torque', linestyle='dashdot')
+        plt.axhline(y=np.mean(Binary_Torque), c = 'black', linewidth = 2.5, label = 'Mean Binary Torque', linestyle='dashdot')
         plt.xlabel('Time [P]')
         #plt.ylim([-4.0, 4.0])
         plt.ylabel(r'$\tau_\mathrm{b}/\dot{M}_0$')
@@ -813,9 +813,9 @@ if __name__ == '__main__':
         ax0 = fig.add_subplot(gs[0])
         ax1 = fig.add_subplot(gs[1])
 
-        #ax0.plot(Final_Orbits, -Torque  , label='$\mathcal{T}$'   , linewidth = 0.4, c = 'royalblue')
-        #ax0.plot(Final_Orbits, -Torque_g, label=r'Grav', linewidth = 0.2, c = 'blue')
-        #ax0.plot(Final_Orbits, -Torque_a, label=r'Acc' , linewidth = 0.2, c = 'silver')
+        ax0.plot(Final_Orbits, Torque  , label='$\mathcal{T}$'   , linewidth = 0.4, c = 'royalblue')
+        #ax0.plot(Final_Orbits, Torque_g, label=r'Grav', linewidth = 0.2, c = 'blue')
+        #ax0.plot(Final_Orbits, Torque_a, label=r'Acc' , linewidth = 0.2, c = 'silver')
         ax0.plot(*ComputeBinnedMeans(Final_Orbits, Torque, args.Number_of_Averages), c = 'royalblue', label = 'Mean Torque', linewidth = 0.5, linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\mathcal{T}$')
