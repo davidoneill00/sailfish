@@ -77,7 +77,7 @@ class Patch:
         buffer_pressure_onset,
         surface_density_powerlaw,
         pressure_powerlaw,
-        buffer_ell0_eff,
+        #buffer_ell0_eff,
         lib,
         xp,
         execution_context,
@@ -101,7 +101,7 @@ class Patch:
         self.surface_density_powerlaw      = surface_density_powerlaw
         self.pressure_powerlaw             = pressure_powerlaw
         self.Mdot_inf                      = Mdot_inf
-        self.buffer_ell0_eff               = buffer_ell0_eff
+        #self.buffer_ell0_eff               = buffer_ell0_eff
         self._iteration                    = 0
 
         # option to vary the cooling coefficient dynamically
@@ -223,7 +223,7 @@ class Patch:
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 self.Mdot_inf,
-                self.buffer_ell0_eff,
+                #self.buffer_ell0_eff,
                 float(int(self.physics.buffer_is_enabled)),
                 float(int(self.retrograde)),
             ], dtype=self.xp.float64))
@@ -282,7 +282,7 @@ class Patch:
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 self.Mdot_inf,
-                self.buffer_ell0_eff,
+                #self.buffer_ell0_eff,
                 int(self.physics.buffer_is_enabled),
                 int(self.retrograde),
                 m1.position_x,
@@ -420,14 +420,14 @@ class Solver(SolverBase):
             # These values are only at initialization and can be overwritten in driver.append_timeseries
             buffer_surface_density_onset       = buffer_prim[0]
             buffer_pressure_onset              = buffer_prim[3]
-            buffer_ell0_eff                    = getattr(setup, 'ell0', 0.0)
+            #buffer_ell0_eff                    = getattr(setup, 'ell0', 0.0)
         else:
             buffer_outer_radius                = 0.0
             buffer_surface_density_onset       = 0.0
             buffer_pressure_onset              = 0.0
             surface_density_powerlaw           = 0.0
             pressure_powerlaw                  = 0.0
-            buffer_ell0_eff                    = 0.0
+            #buffer_ell0_eff                    = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
             prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
@@ -445,7 +445,7 @@ class Solver(SolverBase):
                 buffer_pressure_onset,
                 surface_density_powerlaw,
                 pressure_powerlaw,
-                buffer_ell0_eff,
+                #buffer_ell0_eff,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),

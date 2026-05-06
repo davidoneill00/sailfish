@@ -628,7 +628,7 @@ PUBLIC void cbdgam_2d_advance_rk(
     double buffer_outer_radius,
     double buffer_onset_width,
     double buffer_Mdot_inf,
-    double buffer_ell0_eff,
+    //double buffer_ell0_eff,
     int buffer_is_enabled,
     int retrograde,
     double x1, // point mass 1
@@ -670,7 +670,7 @@ PUBLIC void cbdgam_2d_advance_rk(
         buffer_outer_radius,
         buffer_onset_width,
         buffer_Mdot_inf,
-        buffer_ell0_eff,
+        //buffer_ell0_eff,
         buffer_is_enabled,
         retrograde
     };
@@ -893,7 +893,7 @@ PUBLIC void cbdgam_2d_buffer_source_term(
     double buffer_outer_radius           = p[11];
     double buffer_onset_width            = p[12];
     double buffer_Mdot_inf               = p[13];
-    double buffer_ell0_eff               = p[14];
+    //double buffer_ell0_eff               = p[14];
     int buffer_is_enabled                = (int)p[15];
     int retro                            = (int)p[16];
 
@@ -908,7 +908,7 @@ PUBLIC void cbdgam_2d_buffer_source_term(
         buffer_outer_radius,
         buffer_onset_width,
         buffer_Mdot_inf,
-        buffer_ell0_eff,
+        //buffer_ell0_eff,
         buffer_is_enabled,
         retro
     };

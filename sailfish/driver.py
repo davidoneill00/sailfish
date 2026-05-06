@@ -99,7 +99,7 @@ def DetermineBufferSolution(solver, timeseries):
     set buffer targets using the full Rafikov (2013) steady-state profile.
 
     Reads the last two diagnostics in each timeseries entry:
-      entry[-2] = angular_momentum_flux at r_m  (≈ F_J_visc)
+      entry[-2] = angular_momentum_flux at r_m   (≈ F_J_visc)
       entry[-1] = radial_mass_flux at r_m        (≈ -Mdot; negative for inflow)
     """
     t = solver.time / solver.setup.reference_time_scale
@@ -138,29 +138,29 @@ def DetermineBufferSolution(solver, timeseries):
     FJ_mean   = np.trapezoid(FJ_arr,   times) / duration
     Mdot_mean = np.trapezoid(Mdot_arr, times) / duration
 
-    sign    = -1.0 if solver.setup.physics['retrograde'] else 1.0
     r_onset = solver.buffer_onset_radius
     r_m     = r_onset - 0.25   # centre of the measurement annulus (r_onset - 0.5, r_onset)
     Mdot_0  = solver.setup.SS73.Mdot_inf
 
-    # Normalise by the target accretion rate Mdot_0, not the measured Mdot.
-    # Using Mdot_measured here amplifies early-time transients where Mdot << Mdot_0
-    # by up to a factor of 2, causing ell0_eff to swing wildly and the buffer to
-    # overshoot in density.
-    ell0_eff = sign * np.sqrt(r_m) - FJ_mean / Mdot_0
+    # We infer the constant current sourced by the binary FJ0_eff.
+    # This is in contrast to directly measuring FJ0 from the timeseries
+    # which is unreliable for evolving binaries, requires long averaging windows
+    # and requires a viscous timescale to be communitcated to the boundary. 
+    sign    = -1.0 if solver.setup.physics['retrograde'] else 1.0
+    FJ0_eff = FJ_mean - sign * Mdot_0 * np.sqrt(r_m)
 
     # Rafikov f at onset radius, clamped for numerical safety
-    f_onset = max(1e-4, 1.0 - sign * ell0_eff / np.sqrt(r_onset))
+    f_onset = max(1e-4, 1.0 + FJ0_eff / (Mdot_0 * np.sqrt(r_onset))) # GM=1 here!
 
-    Sigma_onset = solver.setup.SS73.surface_density_profile(r_onset) * f_onset**0.6
+    Sigma_onset = solver.setup.SS73.surface_density_profile(r_onset)  * f_onset**0.6
     P_onset     = solver.setup.SS73.surface_pressure_profile(r_onset) * f_onset
 
     for patch in solver.patches:
         patch.buffer_surface_density_onset = Sigma_onset
         patch.buffer_pressure_onset        = P_onset
-        patch.buffer_ell0_eff              = ell0_eff
+        #patch.buffer_ell0_eff              = ell0_eff
 
-    return [FJ_mean / Mdot_0, Mdot_mean / Mdot_0, ell0_eff, f_onset]
+    return [FJ_mean / Mdot_0, Mdot_mean / Mdot_0, f_onset]
 
 
 
@@ -298,11 +298,10 @@ def append_timeseries(state):
         if result is None:
             logger.info(f"record timeseries event {len(state.timeseries)}")
         else:
-            FJ_mean, Mdot_mean, ell0_eff, f_onset = result
+            FJ_mean, Mdot_mean, f_onset = result
             logger.info(
                 f"record timeseries event {len(state.timeseries)} "
                 f"FJ={FJ_mean:.4f} Mdot={Mdot_mean:.4f} "
-                f"ell0_eff={ell0_eff:.4f} f={f_onset:.4f}"
             )
     else:
         logger.warning(
