@@ -275,25 +275,24 @@ if __name__ == '__main__':
         M, G                = m1 + m2, 1.0
         q                   = m2 / m1                                            # mass ratio
         mu                  = m1 * m2 / M                                        # reduced mass
-        Torque              = -(np.array(ts.torque_g[-len(Final_Orbits):]) + np.array(ts.torque_a[-len(Final_Orbits):])) / M_dot_0
+        sign                = -1 if ts.modelparams['retrograde'] else 1
+        Torque              = -sign * (np.array(ts.torque_g[-len(n_final):]) + np.array(ts.torque_a[-len(n_final):])) / M_dot_0
         Power               = -(np.array(ts.power_g[-len(Final_Orbits):] ) + np.array(ts.power_a[-len(Final_Orbits):] )) / M_dot_0
         Accretion_1         = -(np.array(ts.mdot1[-len(Final_Orbits):])) / M_dot_0
         Accretion_2         = -(np.array(ts.mdot2[-len(Final_Orbits):])) / M_dot_0
         Mdot                = Accretion_1 + Accretion_2                          # total mass accretion rate
+        
         a                   = np.array(ts.semimajor_axis[-len(Final_Orbits):])   # = a_rel (relative orbit semi-major axis)
         e                   = np.array(ts.eccentricity[-len(Final_Orbits):])
-        E_Anomaly           = np.array([eccentric_anomaly(2*np.pi*Final_Orbits[ind], e[ind], a[ind], M) for ind in range(len(Final_Orbits))])
+        E_Anomaly           = np.array([eccentric_anomaly(2*np.pi * Final_Orbits[ind], e[ind], a[ind], M) for ind in range(len(Final_Orbits))])
         cosE                = np.cos(E_Anomaly)
         ecosE               = e * cosE
         r_binary            = a * (1 - ecosE)                                    # binary separation
         E                   = - G * M * mu / (2*a)
-        L                   = mu * np.sqrt(G * M * a * (1 - e**2))
-        mudot               = Mdot * mu / M + (1 - q) * (Accretion_2 - q * Accretion_1) * mu / q / M
-        v2                  = G * M * (2 / r_binary - 1 / a)
-        Edot                = -0.5*mudot*v2 - G*M*mudot/r_binary - G*Mdot*mu / r_binary + Power
-        Ldot                = Torque 
-        adot                = Mdot / M + mudot / mu - Edot / E
-        edot                = ((1-e**2) / (2*e+1e-5)) * (2*Mdot/M + 3*mudot/mu - 2*Ldot/L - Edot/E)
+        L                   = mu * np.sqrt(G * M * a * (1 - e**2))        
+        adot_a              = (Mdot/M) * (1-2*a/r_binary) - Power/E
+        edot                = ((1-e**2)/(e+1e-2)) * ((Mdot/M)*(1-a/r_binary) - Power/(2*E) - Torque/L)
+
 
     # ======= Plotting Blocks ========
     if args.Accretion:
@@ -333,7 +332,8 @@ if __name__ == '__main__':
 
         print('Mean accretion rate over window:', np.mean(AccretionRate))
         
-        ax0.plot(*ComputeBinnedMeans(Final_Orbits, AccretionRate, args.Number_of_Averages), label='Binned Means', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
+        ax0.plot(*ComputeBinnedMeans(Final_Orbits, AccretionRate, args.Number_of_Averages), label='Mean Binary', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
+        ax0.plot(*ComputeBinnedMeans(Final_Orbits, FluxOuter    , args.Number_of_Averages), label='Mean Buffer', linewidth = 1.2, c = 'royalblue', linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\dot{M}/\langle\dot{M}_0\rangle$')
         ax0.set_title(r'Accretion Timeseries')
@@ -415,15 +415,15 @@ if __name__ == '__main__':
     if args.OrbitalEvolution:
         savename = 'OrbitalEvolution'
         fig, ax  = plt.subplots(figsize=[text_width, column_width])
-        plt.plot(Final_Orbits, adot, c = 'darkblue'    , label = r'$\dot{a}/a$', linewidth = 0.1)
-        plt.plot(Final_Orbits, edot, c = 'darkred'     , label = r'$\dot{e}$', linewidth = 0.1)
-        plt.plot(*ComputeBinnedMeans(Final_Orbits, adot, args.Number_of_Averages), linewidth = 1, label = 'Mean ', c = 'black')
-        plt.plot(*ComputeBinnedMeans(Final_Orbits, edot, args.Number_of_Averages), linewidth = 1,                  c = 'black')
+        plt.plot(Final_Orbits, adot_a, c = 'darkblue'    , label = r'$\dot{a}/a$', linewidth = 0.1)
+        plt.plot(Final_Orbits, edot  , c = 'darkred'     , label = r'$\dot{e}$', linewidth = 0.1)
+        plt.plot(*ComputeBinnedMeans(Final_Orbits, adot_a, args.Number_of_Averages), linewidth = 1, label = 'Mean ', c = 'black')
+        plt.plot(*ComputeBinnedMeans(Final_Orbits, edot  , args.Number_of_Averages), linewidth = 1,                  c = 'black')
         plt.xlabel('Time [P]')
         plt.ylim([-100,100])
         plt.ylabel(r'$\dot{a}/a, \dot{e} \left[\Omega\right]$')
         plt.legend(loc = 'upper right')
-        ax.text(0.5, 0.75, r'$~\frac{1}{a}\frac{da}{d(\Omega t)} = %g,~~\frac{de}{d(\Omega t)} = %g~$'% (np.round(np.mean(ComputeBinnedMeans(Final_Orbits, adot, args.Number_of_Averages)[1]), 2), np.round(np.mean(ComputeBinnedMeans(Final_Orbits, edot, args.Number_of_Averages)[1]), 2)), transform=ax.transAxes, ha='center', va='center', bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
+        ax.text(0.5, 0.75, r'$~\frac{1}{a}\frac{da}{d(\Omega t)} = %g,~~\frac{de}{d(\Omega t)} = %g~$'% (np.round(np.mean(ComputeBinnedMeans(Final_Orbits, adot_a, args.Number_of_Averages)[1]), 2), np.round(np.mean(ComputeBinnedMeans(Final_Orbits, edot, args.Number_of_Averages)[1]), 2)), transform=ax.transAxes, ha='center', va='center', bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
         
         if args.Outputs is None:
             plt.show()
