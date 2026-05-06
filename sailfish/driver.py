@@ -147,7 +147,7 @@ def DetermineBufferSolution(solver, timeseries):
     # which is unreliable for evolving binaries, requires long averaging windows
     # and requires a viscous timescale to be communitcated to the boundary. 
     sign    = -1.0 if solver.setup.physics['retrograde'] else 1.0
-    FJ0_eff = FJ_mean - sign * Mdot_0 * np.sqrt(r_m)
+    FJ0_eff = FJ_mean - sign * Mdot_mean * np.sqrt(r_m)
 
     # Rafikov f at onset radius, clamped for numerical safety
     f_onset = max(1e-4, 1.0 + FJ0_eff / (Mdot_0 * np.sqrt(r_onset))) # GM=1 here!
@@ -301,7 +301,7 @@ def append_timeseries(state):
             FJ_mean, Mdot_mean, f_onset = result
             logger.info(
                 f"record timeseries event {len(state.timeseries)} "
-                f"FJ={FJ_mean:.4f} Mdot={Mdot_mean:.4f} "
+                f"FJ={FJ_mean:.4f} f={f_onset:.4f} "
             )
     else:
         logger.warning(

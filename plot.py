@@ -885,6 +885,13 @@ def main_cbdgam_2d():
         default=True,
         help="Whether or not to rescale disk properties to target accretion rate",
     )
+    parser.add_argument(
+        "--streamlines",
+        type=lambda x: x.lower() == 'true',
+        default=False,
+        help="Whether or not to include streamline plots",
+    )
+    
 
 
 
@@ -1101,6 +1108,19 @@ def main_cbdgam_2d():
             else:
                 ColourbarLabel = r'$e$'
             
+        elif args.field == 'Schlieren':
+            dS_dx = np.gradient(Sigma, x, axis=1)
+            dS_dy = np.gradient(Sigma, y, axis=0)
+            f     = np.sqrt(dS_dx**2 + dS_dy**2) / Sigma
+            title    = r'Schlieren'
+            savename = 'Schlieren'
+            cmap     = 'hot'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}|\nabla\Sigma|/\Sigma$'
+            else:
+                ColourbarLabel = r'$|\nabla\Sigma|/Sigma$'            
+
+
         elif args.field == 'Sigma':
             f        = Sigma
             title    = 'Surface Density, e = %g'%(np.round(chkpt['timeseries'][-1][2], 2))
@@ -1159,6 +1179,10 @@ def main_cbdgam_2d():
                 color='darkgrey', headwidth=4
             )
 
+        if args.streamlines:
+            ax.streamplot(x, y, Sigma * Vx, Sigma * Vy,
+              density=2.5, color='dimgray', linewidth=0.5,
+              arrowsize=0.8)
 
         if args.plot_sink:
             primary, secondary = chkpt['point_masses']
@@ -1602,8 +1626,7 @@ def main_cbdgam_2d():
         title          = 'Mass Inflow Rate'
         savename       = 'MdotMap'
 
-        # --- Compute F_{J,0}(r) = F_J_visc - Mdot * sqrt(r) ---
-        # ν Σ = α γ P₀ r^{3/2}  →  F_J_visc = 3π ν Σ √r = (3/2) α γ r_k * sum(P₀ dA) / dr
+        
         alpha_visc    = chkpt['model_parameters']['alpha']
         P0_flat       = fields["pre"](prim).T.ravel()  # unscaled (code-unit) pressure
         FJ0_ring      = np.full(n_bins - 1, np.nan)
