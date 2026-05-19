@@ -54,7 +54,12 @@ class SetupBase(ABC):
 
         for key, val in kwargs.items():
             if not hasattr(self, key):
-                if (key != "init_mach_number") and (key != "final_mach_number") and (key != "mass_ratio"): # I know this is lazy 
+                if  (  # I know this is lazy 
+                    (key != "init_mach_number") and
+                    (key != "final_mach_number") and
+                    (key != "mass_ratio") and
+                    (key != "live_buffer_adaptability")
+                    ): 
                     raise SetupError(
                         f"'{self.dash_case_class_name()}' has no parameter '{key}'"
                     )
