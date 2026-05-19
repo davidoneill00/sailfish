@@ -803,12 +803,19 @@ def main_cbdgam_2d():
         help="which field to plot",
     )
     parser.add_argument("--poly", type=int, nargs=2, default=None)
+    # parser.add_argument(
+    #     "--log",
+    #     "-l",
+    #     default=True,
+    #     action="store_true",
+    #     help="use log scaling",
+    # )
     parser.add_argument(
         "--log",
         "-l",
+        type=lambda x: x.lower() == 'true',
         default=True,
-        action="store_true",
-        help="use log scaling",
+        help="Whether or not to use log scaling",
     )
     parser.add_argument(
         "--SED",
@@ -836,6 +843,13 @@ def main_cbdgam_2d():
         default=False,
         action="store_true",
         help="plot accretion rate onto the binary",
+    )
+    parser.add_argument(
+        "--torque_map",
+        "-tmap",
+        default=False,
+        action="store_true",
+        help="plot gravitational torque density map with radial dT/dlnr profile",
     )
     parser.add_argument(
         "--vmap",
@@ -1120,6 +1134,19 @@ def main_cbdgam_2d():
             else:
                 ColourbarLabel = r'$|\nabla\Sigma|/Sigma$'            
 
+        elif args.field == 'Torque':
+            F1 = - 0.5 * Sigma / R_1**2
+            F2 = - 0.5 * Sigma / R_2**2
+
+
+            f        = X * fy - Y * fx
+            title    = 'Surface Density, e = %g'%(np.round(chkpt['timeseries'][-1][2], 2))
+            savename = 'DensityMap'
+            cmap     = 'magma'
+            if args.log:
+                ColourbarLabel = r'$\log_{10}\Sigma$'
+            else:
+                ColourbarLabel = r'$\Sigma$'
 
         elif args.field == 'Sigma':
             f        = Sigma
@@ -1717,6 +1744,100 @@ def main_cbdgam_2d():
             pngname = args.Outputs + savename + f"-{int(CurrentTime * 100):05d}.png"
             fig.savefig(pngname, dpi=400, bbox_inches='tight')
 
+
+
+    if args.torque_map:
+        rs1  = primary.softening_length
+        rs2  = secondary.softening_length
+        dx, dy = mesh.dx, mesh.dy
+        dA     = dx * dy
+        R      = np.sqrt(X**2 + Y**2)
+
+        fx1  = -Sigma * primary.mass   * (X - xprim) / (R_1**2 + rs1**2)**1.5
+        fy1  = -Sigma * primary.mass   * (Y - yprim) / (R_1**2 + rs1**2)**1.5
+        fx2  = -Sigma * secondary.mass * (X - xsec)  / (R_2**2 + rs2**2)**1.5
+        fy2  = -Sigma * secondary.mass * (Y - ysec)  / (R_2**2 + rs2**2)**1.5
+        t    = X * (fy1 + fy2) - Y * (fx1 + fx2)
+
+        # 2D map: symlog compression so both signs are visible across decades
+        linthresh = max(np.abs(t).max() * 1e-2, 1e-12)
+        t_display = np.sign(t) * np.log10(1.0 + np.abs(t) / linthresh)
+
+        # Radial profile: dT/d ln r binned by radius
+        r_min, r_max = 0.3, args.radius if args.radius is not None else np.sqrt(X**2 + Y**2).max() / np.sqrt(2)
+        n_bins   = min(120, mesh.shape[0] // 4)
+        r_bins   = np.linspace(r_min, r_max, n_bins)
+        r_centers = 0.5 * (r_bins[:-1] + r_bins[1:])
+        r_flat   = R.ravel()
+        t_flat   = (t * dA).ravel()
+
+        dT_dlnr = np.full(n_bins - 1, np.nan)
+        for k in range(n_bins - 1):
+            mask = (r_flat >= r_bins[k]) & (r_flat < r_bins[k + 1])
+            if mask.any():
+                dT_dlnr[k] = t_flat[mask].sum() * r_centers[k]
+
+        # Normalise to total gravitational torque in the domain
+        T_total = np.nansum(t_flat)
+
+        title    = 'Gravitational Torque Density'
+        savename = 'TorqueMap'
+
+        T_cumulative = np.nancumsum(dT_dlnr) / abs(T_total)
+
+        fig2 = plt.figure(figsize=(text_width, 1.5 * text_width))
+        gs   = fig2.add_gridspec(3, 1, height_ratios=[2.5, 0.6, 0.6], hspace=0.05)
+        ax0  = fig2.add_subplot(gs[0])
+        ax1  = fig2.add_subplot(gs[1])
+        ax2  = fig2.add_subplot(gs[2])
+
+        extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
+        peak   = np.abs(t_display).max()
+        cm = ax0.imshow(
+            t_display,
+            origin="lower",
+            vmin=-peak,
+            vmax=peak,
+            cmap='RdBu_r',
+            extent=extent,
+        )
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        divider = make_axes_locatable(ax0)
+        cax = divider.append_axes("right", size="5%", pad=0.12)
+        cbar = fig2.colorbar(cm, cax=cax)
+        cax.set_position([cax.get_position().x0, ax0.get_position().y0,
+                          cax.get_position().width, ax0.get_position().height])
+        cbar.ax.set_title(r'$\mathrm{sgn}(\mathcal{T})\log_{10}(1+|\mathcal{T}|/\mathcal{T}_0)$', pad=6)
+        ax0.set_aspect("equal")
+        ax0.set_ylabel(r'$y/a$')
+        ax0.tick_params(labelbottom=False)
+        ax0.set_title(title + r' at $t = $ %g $[2\pi\Omega_0^{-1}]$' % np.round(chkpt["time"] / 2 / np.pi, 3))
+        if args.radius is not None:
+            ax0.set_xlim(-args.radius, args.radius)
+            ax0.set_ylim(-args.radius, args.radius)
+
+        ax1.plot(r_centers, dT_dlnr / abs(T_total), color='tab:purple', lw=1.5)
+        ax1.axhline(0, color='k', lw=0.8, ls='--', alpha=0.5)
+        ax1.set_ylabel(r'$(dT/d\ln r)\,/\,|T_\mathrm{tot}|$')
+        ax1.tick_params(labelbottom=False)
+        ax1.axvline(x=0.7, linestyle='dotted', c = 'grey')
+        ax1.grid(True, alpha=0.3)
+
+        ax2.plot(r_centers, T_cumulative, color='tab:red', lw=1.5)
+        ax2.axhline(0, color='k', lw=0.8, ls='--', alpha=0.5)
+        ax2.set_xlabel(r'$r/a$')
+        ax2.set_ylabel(r'$T(<r)\,/\,|T_\mathrm{tot}|$')
+        ax2.axvline(x=0.7, linestyle='dotted', c = 'grey')
+        ax2.grid(True, alpha=0.3)
+
+        if args.Outputs is None:
+            pass
+        elif args.Outputs == ".":
+            pngname = os.path.join(args.Outputs, f"{savename}-{int(CurrentTime * 100):05d}.png")
+            fig2.savefig(pngname, dpi=400, bbox_inches='tight')
+        else:
+            pngname = args.Outputs + savename + f"-{int(CurrentTime * 100):05d}.png"
+            fig2.savefig(pngname, dpi=400, bbox_inches='tight')
 
 
     if args.print_model_parameters:

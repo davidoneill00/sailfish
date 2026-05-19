@@ -331,6 +331,8 @@ if __name__ == '__main__':
         savename      = "Accretion"
 
         print('Mean accretion rate over window:', np.mean(AccretionRate))
+
+        ax0.axhline(y=1, linestyle='dotted', c = 'black', linewidth=1.2)
         
         ax0.plot(*ComputeBinnedMeans(Final_Orbits, AccretionRate, args.Number_of_Averages), label='Mean Binary', linewidth = 1.2, c = cmap(0/n_lines), linestyle='dashed')
         ax0.plot(*ComputeBinnedMeans(Final_Orbits, FluxOuter    , args.Number_of_Averages), label='Mean Buffer', linewidth = 1.2, c = 'royalblue', linestyle='dashed')
@@ -382,9 +384,11 @@ if __name__ == '__main__':
 
     
     if args.StreamEfficiency:
-        sign = 2 * (0.5 - chkpt['model_parameters']['retrograde'])
-        Mcents, Mmeans, Mstds = ComputeBinnedStats(Final_Orbits, Mdot         , args.Number_of_Averages)
-        Tcents, Tmeans, Tstds = ComputeBinnedStats(Final_Orbits, sign * Torque, args.Number_of_Averages)
+        sign = 1.0
+        if chkpt['model_parameters']['retrograde']:
+            sign = -1.0
+        Mcents, Mmeans, Mstds = ComputeBinnedStats(Final_Orbits, Mdot  , args.Number_of_Averages)
+        Tcents, Tmeans, Tstds = ComputeBinnedStats(Final_Orbits, Torque, args.Number_of_Averages)
 
         cents, means, stds = Mcents, Tmeans/Mmeans, (Tmeans/Mmeans) * np.sqrt((Tstds/Tmeans)**2 + (Mstds/Mmeans)**2)
         fig, ax = plt.subplots(figsize=[text_width, 0.5*text_width])
@@ -394,11 +398,11 @@ if __name__ == '__main__':
         #ax.set_yscale('symlog', linthresh=0.1)
         ax.set_xlabel('Time [P]')
         ax.set_ylabel(r'$l$')
-        ax.axhline(y=1.77, label='Shock Impulse Approximation', linestyle='dashed')
+        #ax.axhline(y=1.77, label='Shock Impulse Approximation', linestyle='dashed')
         ax.legend(loc='best')
         savename = "StreamEfficiency"
         
-        ax.set_ylim([0.8 * np.min(means), 1.2 * np.max(means)])
+        ax.set_ylim([np.min(means), np.max(means)])
 
         if args.Outputs is None:
             plt.show()
@@ -807,18 +811,21 @@ if __name__ == '__main__':
         power         = lombscargle(Final_Orbits, signal, omega)
         power        /= np.var(signal)
         savename      = "Torque"
+
+        Tcents, Tmeans, Tstds = ComputeBinnedStats(Final_Orbits, Torque, args.Number_of_Averages)
         
         fig = plt.figure(figsize=(1.2 * text_width, 1.2 * 0.25*text_width))
         gs  = fig.add_gridspec(1, 2, width_ratios=[1, 0.33], hspace=0., wspace=0.)
         ax0 = fig.add_subplot(gs[0])
         ax1 = fig.add_subplot(gs[1])
 
-        ax0.plot(Final_Orbits, Torque  , label='$\mathcal{T}$'   , linewidth = 0.4, c = 'royalblue')
+        ax0.plot(Final_Orbits, Torque  , label='$\mathcal{T}$'   , linewidth = 1.0, c = 'royalblue', alpha=0.3)
         #ax0.plot(Final_Orbits, Torque_g, label=r'Grav', linewidth = 0.2, c = 'blue')
         #ax0.plot(Final_Orbits, Torque_a, label=r'Acc' , linewidth = 0.2, c = 'silver')
-        ax0.plot(*ComputeBinnedMeans(Final_Orbits, Torque, args.Number_of_Averages), c = 'royalblue', label = 'Mean Torque', linewidth = 0.5, linestyle='dashed')
+        ax0.plot(Tcents, Tmeans, c = 'royalblue', label = 'Mean Torque', linewidth = 0.8, linestyle='dashed')
         ax0.set_xlabel('Time [P]')
         ax0.set_ylabel(r'$\mathcal{T}$')
+        ax0.set_ylim([np.min(Tmeans), np.max(Tmeans)])
         ax0.set_title(r'Torque Timeseries')
         ax0.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.0))
 
