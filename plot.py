@@ -1086,19 +1086,27 @@ def main_cbdgam_2d():
             ni, nj = mesh.shape
             cmap   = 'magma'
             
+
+            cs              = cs / Mdrop**(1./5.)
             # ===== Calculate orbital velocity ========
             speed              = np.sqrt(Vx**2 + Vy**2)
             f                  = (speed / cs)
             title              = 'Mach Number'
             savename           = 'MachMap'
-            MachNumber_a       = chkpt["model_parameters"]["mach_number_a"] * Mdrop**(-1./5.)
+            MachNumber_a       = chkpt["model_parameters"]["mach_number_a"]# * Mdrop**(-1./5.)
+            args.vmin = 0.10 * chkpt["model_parameters"]["mach_number_a"]
+            args.vmax = 10.0 * chkpt["model_parameters"]["mach_number_a"]
+            if args.log:
+                args.vmin          = np.log10(args.vmin)
+                args.vmax          = np.log10(args.vmax)
+
             if args.log:
                 ColourbarLabel = r'$\log_{10}\mathcal{M}$'
             else:
                 ColourbarLabel = r'$\mathcal{M}$'
 
             # ===== Plot midplane cuts ========
-            plt.figure(figsize = (column_width,3*column_width/4))
+            plt.figure(figsize = (text_width, text_width))
             plt.title('Mach Number Profile')
             plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), f[mesh.shape[1]//2,:], label = 'horizontal cut', c = 'tab:red', linewidth = 2)
             plt.plot(np.linspace(mesh.x0, mesh.x1, mesh.shape[0]), f[:,mesh.shape[0]//2], label = 'vertical cut'  , c = 'tab:blue', linewidth = 2)
