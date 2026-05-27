@@ -865,10 +865,8 @@ class CoolBinary(SetupBase):
             logq = np.log10(q0) + self.sweep_rate_q * delta
             e = 10**loge
             q = 10**logq
-        if q > self.final_mass_ratio:
-            q = self.final_mass_ratio
-        if e > self.final_eccentricity:
-            e = self.final_eccentricity
+        q = np.clip(q, min(q0, self.final_mass_ratio), max(q0, self.final_mass_ratio))
+        e = np.clip(e, min(e0, self.final_eccentricity), max(e0, self.final_eccentricity))
         return OrbitalElements(
             semimajor_axis=1.0,
             total_mass=1.0,
