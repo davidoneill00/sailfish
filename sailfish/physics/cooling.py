@@ -319,7 +319,9 @@ def XrayEmission(temperature):
 	return BandEmission(temperature, nu_Xray_low, nu_Xray_high)
 
 def PlanckSpectrum(nu, T):
-    B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2) / np.expm1(cgs['h'] * nu / (cgs['kb'] * T))
+    x = np.clip(cgs['h'] * nu / (cgs['kb'] * T), None, 700.0)
+    with np.errstate(over='ignore', invalid='ignore'):
+        B_nu = (2 * cgs['h'] * nu**3 / cgs['c']**2) / np.expm1(x)
     return np.pi * B_nu
 
 def TransitionRadii(m, alpha, mdot, a): # m in units of Msun, mdot in units of mdot_Edd and a in units of Rgrav
@@ -343,6 +345,7 @@ def TransitionRadii(m, alpha, mdot, a): # m in units of Msun, mdot in units of m
     print('Transition in Rgrav.........',x * 3)
     print('Ratio to semimajor axis.....', x * 3 / a)
     print('Approximate Error...........', f_x)
+    tr_radiation = x * 3
 
     # (2) Electron scattering -> Free free absorption transition
     C           = 6.3e3 * mdot**(2/3)
@@ -363,6 +366,22 @@ def TransitionRadii(m, alpha, mdot, a): # m in units of Msun, mdot in units of m
     print('Transition in Rgrav.........',x * 3)
     print('Ratio to semimajor axis.....', x * 3 / a)
     print('Approximate Error...........', f_x)
+    
+    tr_freefree = x * 3
+    return (tr_radiation, tr_freefree)
+
+
+def r_self_gravity(M, mdot, alpha=0.1):
+    """
+    Toomre Q=1 radius in SS73 zone-c (gas pressure, free-free opacity).
+
+    M     : BH mass in solar masses
+    mdot  : Eddington fraction Mdot/Mdot_Edd
+    alpha : viscosity parameter
+
+    Returns radius in cm.
+    """
+    return 3.76e17 * alpha**(28/45) * mdot**(-22/45) * M**(-7/45)
 
 
 if __name__ == '__main__':
