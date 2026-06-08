@@ -639,9 +639,10 @@ class CoolBinary(SetupBase):
     central_mass_msun     = param(8e6 , "Mass of the central object in solar masses")
     mach_number_a         = param(10  , "Disk Mach number") 
     target_accretion_rate = param(0.1 , "Fraction of Eddington the disk we remap to in post-processing", mutable=True) 
-    OpticalDepthFloor     = param(1.0 , "Minimum optical depth to measure lightcurves", mutable=True) 
-    Cooling_N             = param(1e7 , "N samples of temperatures in tabulated emission", mutable=True) 
-    Cooling_logspace      = param(True, "Whether to space the temperature samples logarithmically", mutable=True)
+    OpticalDepthFloor     = param(1.0  , "Minimum optical depth to measure lightcurves", mutable=True)
+    Cooling_N             = param(1e7  , "N samples of temperatures in tabulated emission", mutable=True)
+    Cooling_logspace      = param(True , "Whether to space the temperature samples logarithmically", mutable=True)
+    record_sed_timeseries = param(False, "Record full SED at each timeseries cadence for observability analysis", mutable=True)
     cavity_radius         = param(1.5 , "Initialised radius in units of the binary separation; only affects q>0", mutable=True)
 
     # binary parameters

@@ -10,6 +10,7 @@ from logging import getLogger
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup_base import SetupBase, SetupError
 from sailfish.solver_base import SolverBase
+from sailfish.physics.cooling import cgs
 from sailfish.solvers import (
     SolverInitializationError,
     register_solver_extension,
@@ -928,14 +929,28 @@ def main():
             else:
                 events_dict = dict()
 
+            E_array    = np.logspace(np.log10(1e-1 / 1e3), np.log10(5e6 / 1e3), 100)
+            freq_space = E_array * 1e3 * cgs['ev'] / cgs['h']
+            sed_series = []
+
             for name, number, state in simulate(driver):
                 if name == "timeseries":
                     append_timeseries(state)
+                    if (getattr(state.solver.setup, 'record_sed_timeseries', False)
+                            and hasattr(state.solver, 'timeseries_sed')):
+                        sed_series.append((state.solver.time,
+                                           state.solver.timeseries_sed(freq_space)))
                 elif name == "checkpoint":
                     write_checkpoint(number, outdir, state)
                 elif name == "end":
                     if args.final_chkpt:
                         write_checkpoint("final", outdir, state)
+                    if sed_series:
+                        sed_path = os.path.join(outdir, "sed_series.pkl")
+                        with open(sed_path, "wb") as f:
+                            pickle.dump({"E_array": E_array, "freq_space": freq_space,
+                                         "sed_series": sed_series}, f)
+                        logger.info(f"saved SED timeseries ({len(sed_series)} entries) to {sed_path}")
                 elif name in events_dict:
                     events_dict[name](number, outdir, state, logger)
                 else:

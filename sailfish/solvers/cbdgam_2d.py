@@ -482,7 +482,7 @@ class Solver(SolverBase):
             return float(s.get() if hasattr(s, "get") else s)
 
 
-    def Band_Luminosity(self, patch):
+    def Band_Luminosity(self, patch, return_teff=False):
         with patch.execution_context:
             ng     = self.ng
             dev_id = int(getattr(patch.execution_context, "id", 0))
@@ -559,8 +559,24 @@ class Solver(SolverBase):
             Interpolated_Xray    *= (mask * self.setup.SS73.Length_Scale_CGS**2)
             BolometricLuminosity *= (mask * self.setup.SS73.Length_Scale_CGS**2)
 
+            if return_teff:
+                Teff_cpu = Teff.get() if hasattr(Teff, "get") else np.array(Teff)
+                mask_cpu = mask.get() if hasattr(mask, "get") else np.array(mask)
+                return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~mask), self.xp.max(Teff*mask), Teff_cpu, mask_cpu
+
             return 2*Interpolated_Infared, 2*Interpolated_Optical, 2*Interpolated_UV, 2*Interpolated_Xray, 2*BolometricLuminosity, self.xp.sum(~mask), self.xp.max(Teff*mask)
 
+    def timeseries_sed(self, freq_space):
+        from sailfish.physics.cooling import PlanckSpectrum
+        spectrum = np.zeros(len(freq_space))
+        area     = (self.mesh.dx * self.setup.SS73.Length_Scale_CGS) ** 2
+        for patch in self.patches:
+            *_, Teff_cpu, mask_cpu = self.Band_Luminosity(patch, return_teff=True)
+            Teff_masked = np.where(mask_cpu, Teff_cpu, 1.0)
+            T_flat  = Teff_masked.ravel()[np.newaxis, :]
+            f_col   = freq_space[:, np.newaxis]
+            spectrum += PlanckSpectrum(f_col, T_flat).sum(axis=1) * area * 2
+        return spectrum
 
     def reductions(self):
         """
