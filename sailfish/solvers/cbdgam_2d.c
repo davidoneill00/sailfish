@@ -561,7 +561,9 @@ PUBLIC void cbdgam_2d_advance_rk(
     double sink_rate2,
     double sink_radius2,
     int sink_model2,
-    double alpha, // other
+    double alpha, // alpha viscosity parameter, if viscosity_model is constant-alpha
+    double nu, // kinematic viscosity coefficient, if viscosity_model is constant-nu
+    int viscosity_model, // 0: none, 1: constant-nu, 2: constant-alpha
     double a,
     double dt,
     double velocity_ceiling,
@@ -716,7 +718,7 @@ PUBLIC void cbdgam_2d_advance_rk(
         riemann_hlle(pljm, pljp, flj, 1, gamma_law_index);
         riemann_hlle(prjm, prjp, frj, 1, gamma_law_index);
 
-        if (alpha > 0.0)
+        if (viscosity_model != 0)
         {
             double sli[4];
             double sri[4];
@@ -730,23 +732,32 @@ PUBLIC void cbdgam_2d_advance_rk(
             shear_strain(gxrj, gyrj, dx, dy, srj);
             shear_strain(gxcc, gycc, dx, dy, scc);
 
-            double cs2cc = sound_speed_squared(gamma_law_index, pcc);
-            double hli = disk_height(&mass_list, xl, yc, pli, gamma_law_index);
-            double hri = disk_height(&mass_list, xr, yc, pri, gamma_law_index);
-            double hlj = disk_height(&mass_list, xc, yl, plj, gamma_law_index);
-            double hrj = disk_height(&mass_list, xc, yr, prj, gamma_law_index);
+            double nucc, nuli, nuri, nulj, nurj;
 
-            double rcc = sqrt(xc * xc + yc * yc + 1e-12);
-            double rli = sqrt(xl * xl + yc * yc + 1e-12);
-            double rri = sqrt(xr * xr + yc * yc + 1e-12);
-            double rlj = sqrt(xc * xc + yl * yl + 1e-12);
-            double rrj = sqrt(xc * xc + yr * yr + 1e-12);
+            if (viscosity_model == 1) // constant-nu
+            {
+                nucc = nuli = nuri = nulj = nurj = nu;
+            }
+            else // constant-alpha
+            {
+                double cs2cc = sound_speed_squared(gamma_law_index, pcc);
+                double hli = disk_height(&mass_list, xl, yc, pli, gamma_law_index);
+                double hri = disk_height(&mass_list, xr, yc, pri, gamma_law_index);
+                double hlj = disk_height(&mass_list, xc, yl, plj, gamma_law_index);
+                double hrj = disk_height(&mass_list, xc, yr, prj, gamma_law_index);
 
-            double nucc = alpha * min2(hcc, HRMAX * rcc) * sqrt(cs2cc);
-            double nuli = alpha * min2(hli, HRMAX * rli) * sqrt(cs2li);
-            double nuri = alpha * min2(hri, HRMAX * rri) * sqrt(cs2ri);
-            double nulj = alpha * min2(hlj, HRMAX * rlj) * sqrt(cs2lj);
-            double nurj = alpha * min2(hrj, HRMAX * rrj) * sqrt(cs2rj);
+                double rcc = sqrt(xc * xc + yc * yc + 1e-12);
+                double rli = sqrt(xl * xl + yc * yc + 1e-12);
+                double rri = sqrt(xr * xr + yc * yc + 1e-12);
+                double rlj = sqrt(xc * xc + yl * yl + 1e-12);
+                double rrj = sqrt(xc * xc + yr * yr + 1e-12);
+
+                nucc = alpha * min2(hcc, HRMAX * rcc) * sqrt(cs2cc);
+                nuli = alpha * min2(hli, HRMAX * rli) * sqrt(cs2li);
+                nuri = alpha * min2(hri, HRMAX * rri) * sqrt(cs2ri);
+                nulj = alpha * min2(hlj, HRMAX * rlj) * sqrt(cs2lj);
+                nurj = alpha * min2(hrj, HRMAX * rrj) * sqrt(cs2rj);
+            }
 
             fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
             fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y

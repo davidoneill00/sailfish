@@ -64,6 +64,7 @@ class CircumbinaryDisk(SetupBase):
     constant_softening = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
     which_diagnostics = param("none", "diagnostics set to get from solver [none|mdots]")
+    retrograde            = param(False , "is disk retrograde?")
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
@@ -89,10 +90,16 @@ class CircumbinaryDisk(SetupBase):
         phi_hat_x = -y / max(r, 1e-12)
         phi_hat_y = +x / max(r, 1e-12)
 
+        if self.retrograde == True:
+            sign = -1.0
+        else:
+            sign = 1.0
+
+
         if self.is_isothermal:
             primitive[0] = self.initial_sigma
-            primitive[1] = sqrt(GM / r_softened) * phi_hat_x
-            primitive[2] = sqrt(GM / r_softened) * phi_hat_y
+            primitive[1] = sign * sqrt(GM / r_softened) * phi_hat_x
+            primitive[2] = sign * sqrt(GM / r_softened) * phi_hat_y
 
         elif self.is_gamma_law:
             # See eq. (A2) from Goodman (2003)
@@ -101,8 +108,8 @@ class CircumbinaryDisk(SetupBase):
                 * r_softened ** (-3.0 / 5.0)
                 * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
             )
-            primitive[1] = sqrt(GM / r_softened) * phi_hat_x
-            primitive[2] = sqrt(GM / r_softened) * phi_hat_y
+            primitive[1] = sign * sqrt(GM / r_softened) * phi_hat_x
+            primitive[2] = sign * sqrt(GM / r_softened) * phi_hat_y
             primitive[3] = (
                 self.initial_pressure
                 * r_softened ** (-3.0 / 2.0)
@@ -621,9 +628,11 @@ class CoolBinary(SetupBase):
     sink_radius           = param(0.03, "component sink radius", mutable=True)
     softening_length      = param(0.03, "gravitational softening length", mutable=True)
     sink_model            = param("acceleration_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
-    alpha                 = param(0.1   , "alpha-viscosity parameter (gamma-law)")
-    nu                    = param(0.001 , "kinematic viscosity parameter (isothermal)")
-    gamma_law_index       = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    alpha                 = param(0.1   , "alpha-viscosity parameter, used if viscosity_mode is alpha")
+    nu                    = param(0.001 , "kinematic viscosity parameter, used if viscosity_mode is nu")
+    viscosity_mode        = param("alpha", "viscosity model to use, for either eos [alpha|nu]", mutable=True)
+    initial_sigma         = param(1.0  , "initial disk surface density at r=1 (isothermal EOS only; overall scale is not physically meaningful since the isothermal equations are invariant under uniform density rescaling)", mutable=True)
+    gamma_law_index       = param(5.0 / 3.0, "adiabatic index (gamma-law)", mutable=True)
     constant_softening    = param(True  , "whether to use constant softening (gamma-law)")
     retrograde            = param(False , "is disk retrograde?")
     which_diagnostics     = param("none", "diagnostics set to get from solver [none|mdots]")
@@ -659,6 +668,14 @@ class CoolBinary(SetupBase):
     
     a0 = 1.0
     GM = 1.0
+
+    def validate(self):
+        if self.eos not in ("isothermal", "gamma-law"):
+            raise SetupError(f"eos must be isothermal or gamma-law, got {self.eos}")
+        if self.viscosity_mode not in ("alpha", "nu"):
+            raise SetupError(
+                f"viscosity_mode must be alpha or nu, got {self.viscosity_mode}"
+            )
 
     @property
     def single_point_mass(self):
@@ -723,31 +740,53 @@ class CoolBinary(SetupBase):
         else:
             sign = 1.0
 
-        f          = max(0.0001, 1 + self.ell0 / (r_softened)**0.5)
-        sigma      = self.SS73.surface_density_profile(r_softened)  * f ** 0.6
-        pressure   = self.SS73.surface_pressure_profile(r_softened) * f       
-        v_phi      = sqrt(self.GM / r_softened)  #* sqrt(1.0 - (3.0 * self.softening_length * self.softening_length) / (r_softened * r_softened))
-        
-        
         if not self.single_point_mass:
             cavity_radius = self.cavity_radius
         else:
             cavity_radius = 0.2
-        
-        primitive[0] = sigma    * (0.0001 + 0.9999 * exp(-((cavity_radius / r_softened) ** 30)))
-        primitive[1] = sign     * v_phi * phi_hat_x
-        primitive[2] = sign     * v_phi * phi_hat_y
-        primitive[3] = pressure * (0.0001 + 0.9999 * exp(-((cavity_radius / r_softened) ** 30))) # cavity at r=1
+
+        v_phi         = sqrt(self.GM / r_softened)
+        Vx            = sign * v_phi * phi_hat_x
+        Vy            = sign * v_phi * phi_hat_y
+        cavity_factor = 0.001 + 0.9999 * exp(-((cavity_radius / r_softened) ** 30))
+
+
+        if self.viscosity_mode == 'alpha':
+            f        = max(0.001, 1 + self.ell0 / (r_softened)**0.5)
+            sigma    = self.SS73.surface_density_profile(r_softened)  * f ** 0.6
+            pressure = self.SS73.surface_pressure_profile(r_softened) * f
+            Sigma    = sigma    * cavity_factor
+            P        = pressure * cavity_factor
+
+        elif self.viscosity_mode == 'nu':
+            # Constant-nu steady profile: Mdot = 3 pi nu Sigma = const, so
+            Sigma = self.initial_sigma * cavity_factor
+            cs    = 1 / np.sqrt(r_softened) / self.mach_number_a # assuming v_a = 1
+            P     = Sigma * cs**2
+
+        primitive[0] = Sigma
+        primitive[1] = Vx
+        primitive[2] = Vy
+
+        if self.eos == 'gamma-law':
+            primitive[3] = P
 
         return primitive
 
     @property
     def surface_density_powerlaw(self):
-        return -0.6  # SS73 value
+        if self.viscosity_mode == 'alpha':
+            return -0.6  # SS73 value
+        elif self.viscosity_mode == 'nu':
+            return 0
     
     @property
     def pressure_powerlaw(self):
-        return -1.5  # SS73 value
+        if self.viscosity_mode == 'alpha':
+            return -1.5  # SS73 value
+        elif self.viscosity_mode == 'nu':
+            return -1.0
+
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -757,9 +796,30 @@ class CoolBinary(SetupBase):
         return 3000
 
     @property
+    def solver(self):
+        if self.eos == 'isothermal':
+            return "cbdiso_2d"
+        elif self.eos == 'gamma-law':
+            return "cbdgam_2d"
+
+    @property
+    def Equation_of_State(self):
+        if self.eos == 'isothermal':
+            return EquationOfState.LOCALLY_ISOTHERMAL
+        elif self.eos == 'gamma-law':
+            return EquationOfState.GAMMA_LAW
+
+    @property
+    def viscosity_model(self):
+        if self.viscosity_mode == 'alpha':
+            return ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE
+        elif self.viscosity_mode == 'nu':
+            return ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE
+
+    @property
     def physics(self):
         return dict(
-            eos_type               = EquationOfState.GAMMA_LAW,
+            eos_type               = self.Equation_of_State,
             gamma_law_index        = self.gamma_law_index,
             point_mass_function    = self.point_masses,
             buffer_is_enabled      = self.buffer_is_enabled,
@@ -767,8 +827,8 @@ class CoolBinary(SetupBase):
             buffer_onset_width     = self.buffer_onset_width,    # default value in circumbinary.py
             dynamic_cooling_base   = self.dynamic_cooling_base,
             constant_softening     = self.constant_softening,
-            viscosity_model        = ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
-            viscosity_coefficient  = 0.0,
+            viscosity_model        = self.viscosity_model,
+            viscosity_coefficient  = self.nu if self.viscosity_model == ViscosityModel.CONSTANT_NU else 0.0,
             alpha                  = self.alpha,
             diagnostics            = self.diagnostics,
             retrograde             = self.retrograde,
@@ -776,10 +836,9 @@ class CoolBinary(SetupBase):
             optical_depth_floor    = self.OpticalDepthFloor,
         )
 
-
     @property
     def diagnostics(self):
-        if self.which_diagnostics == "david":
+        if self.which_diagnostics == "david" and self.eos == "gamma-law":
             return [
                 dict(quantity="time"),
                 dict(quantity="semimajor-axis"),
@@ -810,16 +869,29 @@ class CoolBinary(SetupBase):
                 dict(quantity="angular_momentum_flux", radial_cut=(self.domain_radius - self.buffer_onset_width - 0.5, self.domain_radius - self.buffer_onset_width)),
                 dict(quantity="radial_mass_flux",      radial_cut=(self.domain_radius - self.buffer_onset_width - 0.5, self.domain_radius - self.buffer_onset_width)),
             ]
+        elif self.which_diagnostics == "david" and self.eos == "isothermal":
+            # Same as the gamma-law "david" set, but restricted to quantities
+            # cbdiso_2d actually implements (no energy equation, no orbital
+            # element tracking, no floor/buffer/flux diagnostics). Unsupported
+            # entries are dropped rather than substituted.
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot"  , which_mass=1, accretion=True),
+                dict(quantity="mdot"  , which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass='both', gravity=True),
+                dict(quantity="torque", which_mass='both', accretion=True),
+                dict(quantity="power" , which_mass=1, gravity=True),
+                dict(quantity="power" , which_mass=2, gravity=True),
+                dict(quantity="power" , which_mass=1, accretion=True),
+                dict(quantity="power" , which_mass=2, accretion=True),
+                dict(quantity="angular_momentum"),  # cbdiso_2d's name for total_angular_momentum
+            ]
         else:
             return [
                 dict(quantity="time"),
                 dict(quantity="mdot", which_mass=1, accretion=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
             ]
-        
-    @property
-    def solver(self):
-        return "cbdgam_2d"
 
     @property
     def boundary_condition(self):

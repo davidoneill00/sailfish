@@ -25,9 +25,11 @@ class Options(NamedTuple):
     Contains parameters which are solver specific options.
     """
 
-    velocity_ceiling: float = 1e12
-    density_floor: float = 1e-12
-    rk_order: int = 2
+    velocity_ceiling : float = 1e12
+    pressure_floor   : float = 1e-12
+    density_floor    : float = 1e-12
+    rk_order         : int = 2
+    sink_emission    : bool  = False
 
 
 def initial_condition(setup, mesh, time):
@@ -209,6 +211,7 @@ class Patch:
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
                 int(self.physics.buffer_is_enabled),
+                int(self.physics.retrograde),
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
@@ -231,6 +234,8 @@ class Patch:
                 self.physics.mach_number**2,
                 self.physics.eos_type.value,
                 self.physics.viscosity_coefficient,
+                self.physics.alpha,
+                self.physics.viscosity_model.value,
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
@@ -282,8 +287,11 @@ class Solver(SolverBase):
         if physics.viscosity_model not in (
             ViscosityModel.NONE,
             ViscosityModel.CONSTANT_NU,
+            ViscosityModel.CONSTANT_ALPHA,
         ):
-            raise ValueError("solver only supports constant-nu viscosity")
+            raise ValueError(
+                "solver only supports constant-nu or constant-alpha viscosity"
+            )
 
         if physics.eos_type not in (
             EquationOfState.GLOBALLY_ISOTHERMAL,
@@ -467,6 +475,11 @@ class Solver(SolverBase):
                 f = udots1[i][..., q]
             elif mass == 2:
                 f = udots2[i][..., q]
+            else:
+                raise ValueError(
+                    f"cbdiso_2d does not support diagnostic quantity={quantity!r} "
+                    f"which_mass={mass!r} (gravity={gravity}, accretion={accretion})"
+                )
 
             return apply_radial_cut(f)
 

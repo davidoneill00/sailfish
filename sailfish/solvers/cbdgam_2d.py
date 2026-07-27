@@ -304,6 +304,8 @@ class Patch:
                 m2.sink_radius,
                 m2.sink_model.value,
                 self.physics.alpha,
+                self.physics.viscosity_coefficient,
+                self.physics.viscosity_model.value,
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
@@ -372,8 +374,11 @@ class Solver(SolverBase):
         if physics.viscosity_model not in (
             ViscosityModel.NONE,
             ViscosityModel.CONSTANT_ALPHA,
+            ViscosityModel.CONSTANT_NU,
         ):
-            raise ValueError("solver only supports constant-alpha viscosity")
+            raise ValueError(
+                "solver only supports constant-alpha or constant-nu viscosity"
+            )
 
         if physics.eos_type != EquationOfState.GAMMA_LAW:
             raise ValueError("solver only supports isothermal equation of states")
@@ -570,11 +575,11 @@ class Solver(SolverBase):
         from sailfish.physics.cooling import PlanckSpectrum
         spectrum = np.zeros(len(freq_space))
         area     = (self.mesh.dx * self.setup.SS73.Length_Scale_CGS) ** 2
+        f_col    = freq_space[:, np.newaxis]
         for patch in self.patches:
-            *_, Teff_cpu, mask_cpu = self.Band_Luminosity(patch, return_teff=True)
+            Teff_cpu, mask_cpu = self._teff_cache[patch]
             Teff_masked = np.where(mask_cpu, Teff_cpu, 1.0)
             T_flat  = Teff_masked.ravel()[np.newaxis, :]
-            f_col   = freq_space[:, np.newaxis]
             spectrum += PlanckSpectrum(f_col, T_flat).sum(axis=1) * area * 2
         return spectrum
 
@@ -613,8 +618,14 @@ class Solver(SolverBase):
                     raise ValueError("Invalid source term")
             return udots_cache[key]
 
-        # Precompute emission results once per patch
-        band_cache = {p: self.Band_Luminosity(p) for p in self.patches}
+        # Precompute emission results once per patch, caching Teff if SED recording is on
+        if getattr(self.setup, 'record_sed_timeseries', False):
+            _full        = {p: self.Band_Luminosity(p, return_teff=True) for p in self.patches}
+            band_cache   = {p: v[:-2] for p, v in _full.items()}
+            self._teff_cache = {p: v[-2:] for p, v in _full.items()}
+        else:
+            band_cache       = {p: self.Band_Luminosity(p) for p in self.patches}
+            self._teff_cache = {}
 
         import sailfish.physics.kepler as kepler
         m1, m2 = self._physics.point_masses(self.time)

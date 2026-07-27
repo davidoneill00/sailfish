@@ -105,7 +105,7 @@ def DetermineBufferSolution(solver, timeseries):
     """
     t = solver.time / solver.setup.reference_time_scale
 
-    if not solver.live_buffer:
+    if not getattr(solver, "live_buffer", False):
         return
 
     if t < solver.live_buffer_cadence:
@@ -524,6 +524,8 @@ def simulate(driver):
     ):
         logger.info(f"options struct (cmdline -> solver) {driver.solver_options}")
 
+
+    print('Making solver with', setup.solver)
     solver = make_solver(
         setup.solver,
         setup.physics,

@@ -9,6 +9,7 @@ DESCRIPTION: Isothermal solver for a binary accretion problem in 2D planar
 // ============================================================================
 #define NCONS 3
 #define PLM_THETA 1.8
+#define HRMAX 0.8
 
 
 // ============================ MATH ==========================================
@@ -62,6 +63,7 @@ struct KeplerianBuffer {
     double outer_radius;
     double onset_width;
     int is_enabled;
+    int is_retrograde;
 };
 
 
@@ -92,6 +94,31 @@ PRIVATE double gravitational_potential(
         }
     }
     return phi;
+}
+
+PRIVATE double keplerian_omega_squared(
+    struct PointMassList *mass_list,
+    double x1,
+    double y1)
+{
+    double omega2 = 0.0;
+
+    for (int p = 0; p < 2; ++p)
+    {
+        if (mass_list->masses[p].mass > 0.0)
+        {
+            double x0 = mass_list->masses[p].x;
+            double y0 = mass_list->masses[p].y;
+            double mp = mass_list->masses[p].mass;
+
+            double dx = x1 - x0;
+            double dy = y1 - y0;
+            double r2 = dx * dx + dy * dy + 1e-12;
+            double r  = sqrt(r2);
+            omega2 += mp * pow(r, -3.0);
+        }
+    }
+    return omega2;
 }
 
 PRIVATE void point_mass_source_term(
@@ -210,6 +237,21 @@ PRIVATE double sound_speed_squared(
     }
 }
 
+PRIVATE double disk_height(
+    struct PointMassList *mass_list,
+    double x1,
+    double y1,
+    double cs2)
+{
+    double omega2 = keplerian_omega_squared(mass_list, x1, y1);
+
+    if (omega2 == 0.0)
+    {
+        return 1.0;
+    }
+    return sqrt(cs2 / omega2);
+}
+
 PRIVATE void buffer_source_term(
     struct KeplerianBuffer *buffer,
     double xc,
@@ -230,7 +272,8 @@ PRIVATE void buffer_source_term(
 
         if (rc > onset_radius)
         {
-            double v_kep = sqrt(central_mass / rc);
+            double sign = buffer->is_retrograde ? -1.0 : 1.0;
+            double v_kep = sign * sqrt(central_mass / rc);
             double px = surface_density * (-yc / rc) * v_kep;
             double py = surface_density * (+xc / rc) * v_kep;
             double u0[NCONS] = {surface_density, px, py};
@@ -398,6 +441,7 @@ PUBLIC void cbdiso_2d_advance_rk(
     double buffer_outer_radius,
     double buffer_onset_width,
     int buffer_is_enabled,
+    int buffer_is_retrograde,
     double x1, // point mass 1
     double y1,
     double vx1,
@@ -419,7 +463,9 @@ PUBLIC void cbdiso_2d_advance_rk(
     double cs2, // equation of state
     double mach_squared,
     int eos_type,
-    double nu, // kinematic viscosity coefficient
+    double nu, // kinematic viscosity coefficient, if viscosity_model is constant-nu
+    double alpha, // alpha viscosity parameter, if viscosity_model is constant-alpha
+    int viscosity_model, // 0: none, 1: constant-nu, 2: constant-alpha
     double a, // RK parameter
     double dt, // timestep
     double velocity_ceiling,
@@ -431,7 +477,8 @@ PUBLIC void cbdiso_2d_advance_rk(
         buffer_driving_rate,
         buffer_outer_radius,
         buffer_onset_width,
-        buffer_is_enabled
+        buffer_is_enabled,
+        buffer_is_retrograde
     };
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
@@ -562,7 +609,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         riemann_hlle(pljm, pljp, flj, cs2lj, 1);
         riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-        if (nu > 0.0)
+        if (viscosity_model != 0)
         {
             double sli[4];
             double sri[4];
@@ -576,14 +623,43 @@ PUBLIC void cbdiso_2d_advance_rk(
             shear_strain(gxrj, gyrj, dx, dy, srj);
             shear_strain(gxcc, gycc, dx, dy, scc);
 
-            fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-            fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-            fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-            fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-            flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-            flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-            frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-            frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+            double nucc, nuli, nuri, nulj, nurj;
+
+            if (viscosity_model == 1) // constant-nu
+            {
+                nucc = nuli = nuri = nulj = nurj = nu;
+            }
+            else // constant-alpha
+            {
+                double cs2cc = sound_speed_squared(cs2, mach_squared, eos_type, xc, yc, &mass_list);
+
+                double rcc = sqrt(xc * xc + yc * yc + 1e-12);
+                double rli = sqrt(xl * xl + yc * yc + 1e-12);
+                double rri = sqrt(xr * xr + yc * yc + 1e-12);
+                double rlj = sqrt(xc * xc + yl * yl + 1e-12);
+                double rrj = sqrt(xc * xc + yr * yr + 1e-12);
+
+                double hcc = disk_height(&mass_list, xc, yc, cs2cc);
+                double hli = disk_height(&mass_list, xl, yc, cs2li);
+                double hri = disk_height(&mass_list, xr, yc, cs2ri);
+                double hlj = disk_height(&mass_list, xc, yl, cs2lj);
+                double hrj = disk_height(&mass_list, xc, yr, cs2rj);
+
+                nucc = alpha * min2(hcc, HRMAX * rcc) * sqrt(cs2cc);
+                nuli = alpha * min2(hli, HRMAX * rli) * sqrt(cs2li);
+                nuri = alpha * min2(hri, HRMAX * rri) * sqrt(cs2ri);
+                nulj = alpha * min2(hlj, HRMAX * rlj) * sqrt(cs2lj);
+                nurj = alpha * min2(hrj, HRMAX * rrj) * sqrt(cs2rj);
+            }
+
+            fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
+            fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
+            fri[1] -= 0.5 * (nucc * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
+            fri[2] -= 0.5 * (nucc * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
+            flj[1] -= 0.5 * (nulj * plj[0] * slj[2] + nucc * pcc[0] * scc[2]); // y-x
+            flj[2] -= 0.5 * (nulj * plj[0] * slj[3] + nucc * pcc[0] * scc[3]); // y-y
+            frj[1] -= 0.5 * (nucc * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
+            frj[2] -= 0.5 * (nucc * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
         }
         double delta_cons[3] = {0.0, 0.0, 0.0};
         primitive_to_conserved(pcc, ucc);
